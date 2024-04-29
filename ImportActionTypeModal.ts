@@ -1,9 +1,15 @@
 // ImportActionTypeModal.ts
 import { Modal, App, Notice, Setting } from 'obsidian';
+import {
+		ImportActionType,
+	} from './types'; // Adjust the path as necessary
 import type ImportAttachments from './main'; // Import the type of your plugin class if needed for type hinting
 
 export default class ImportActionTypeModal extends Modal {
+    private rememberChoice: boolean = false;  // Private variable to store the checkbox state
+
     constructor(app: App, private plugin: ImportAttachments) {
+    	// use TypeScript `parameter properties` to initialize `plugin`.
         super(app);
     }
 
@@ -16,33 +22,35 @@ export default class ImportActionTypeModal extends Modal {
             .setDesc('Move files into the vault')
             .addButton(button => button
                 .setButtonText('Move')
-                .onClick(() => this.handleChoice('move')));
+                .onClick(() => this.handleChoice(ImportActionType.MOVE)));
 
         new Setting(contentEl)
             .setName('Copy files')
             .setDesc('Copy files into the vault')
             .addButton(button => button
                 .setButtonText('Copy')
-                .onClick(() => this.handleChoice('copy')));
+                .onClick(() => this.handleChoice(ImportActionType.COPY)));
 
         new Setting(contentEl)
             .setName('Remember this choice')
             .addToggle(toggle => toggle
                 .setValue(false)
-                .onChange(value => {
-                	console.log(value);
-                    // this.plugin.settings.rememberChoice = value;
+                .onChange(async value => {
+	                this.rememberChoice = value;  // Update the private variable when the toggle changes
                 }));
     }
 
-    async handleChoice(choice: 'move' | 'copy') {
-    	console.log(choice);
-        // if (this.plugin.settings.rememberChoice) {
-        //     this.plugin.settings.actionDroppedFilesOnImport = choice;
-        //     await this.plugin.saveSettings();
-        // }
-        this.close();
-        new Notice(`Files will be ${choice === 'move' ? 'moved' : 'copied'}`);
+    async handleChoice(choice: ImportActionType) {
+    	this.close();
+
+        this.plugin.settings.actionPastedFilesOnImport = choice;
+        await this.plugin.saveSettings();
+
+        
+
+        new Notice(`Files will be ${choice === 'MOVE' ? 'MOVE' : 'COPIED'}`);
+
+
     }
 
     onClose() {

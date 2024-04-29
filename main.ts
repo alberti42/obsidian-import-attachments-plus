@@ -11,25 +11,14 @@ import {
 	TFile,
 } from "obsidian";
 
+import ImportActionTypeModal from './ImportActionTypeModal';
+import {
+		ImportActionType,
+		MultipleFilesImportTypes,
+	} from './types'; // Adjust the path as necessary
+
 const fs = require("fs").promises; // Ensure you're using the promise-based version of fs
 const path = require("path"); // Node.js path module to handle path operations
-
-enum ImportOperationType {
-    PASTE,
-    DRAG_AND_DROP
-}
-
-enum ImportActionType {
-	MOVE='MOVE',
-	COPY='COPY',
-	ASK_USER='ASK_USER'
-}
-
-enum MultipleFilesImportTypes {
-	BULLETED='BULLETED',
-	NUMBERED='NUMBERED',
-	INLINE='INLINE'
-}
 
 interface ImportAttachmentsSettings {
     actionDroppedFilesOnImport: ImportActionType;
@@ -211,6 +200,21 @@ export default class ImportAttachments extends Plugin {
         switch(importType)
         {
         case ImportOperationType.DRAG_AND_DROP:
+        	switch(this.settings.actionPastedFilesOnImport)
+    		{
+    		case ImportActionType.MOVE:
+    			doMove=true;
+    			break;
+    		case ImportActionType.COPY:
+    			doMove=false;
+    			break;
+    		case ImportActionType.ASK_USER:
+			default:
+				let modal = new ImportActionTypeModal(this.app, this);
+        		modal.open();
+        		doMove=false;
+    			break;
+    		}
         	break;
         case ImportOperationType.PASTE:
     	default:
@@ -224,6 +228,10 @@ export default class ImportAttachments extends Plugin {
     			break;
     		case ImportActionType.ASK_USER:
 			default:
+				console.log("Hey");
+				let modal = new ImportActionTypeModal(this.app, this);
+        		modal.open();
+        		console.log("Hey");
     			doMove=false;
     			break;
     		}
@@ -329,10 +337,10 @@ export default class ImportAttachments extends Plugin {
 
         Array.from(filesToImport).forEach(async (fileToImport,index) => {
         	const destFilePath = path.join(attachmentsFolderPath, fileToImport.name);
-			const originalFilePath = fileToImport.path;
-
+        	const originalFilePath = fileToImport.path;
+        	
 	        // Check for existing file in the vault
-	        const existingFile = this.app.vault.getAbstractFileByPath(fileToImport.path);
+	        const existingFile = this.app.vault.getAbstractFileByPath(originalFilePath);
 	        if (existingFile) {
 	            let msg = "A file with the same name already exists. No file was imported.";
 	            console.error(msg);
