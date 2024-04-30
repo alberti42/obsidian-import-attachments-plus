@@ -51,6 +51,12 @@ If your plugin does not need CSS, delete this file.
     margin: 15px 0 0 15px;         /* Optional: Adds margin on the right for spacing from container edge */
 }
 
+/* Focus styles for accessibility */
+.import-buttons button:focus {
+    outline: 3px solid var(--interactive-accent-hover);
+    outline-offset: 2px;
+}
+
 .switch {
 	position: relative;
 	display: inline-block;

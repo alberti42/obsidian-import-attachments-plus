@@ -107,6 +107,17 @@ export class ImportActionTypeModal extends Modal {
 
 	     // Create the 'Move' button inside the container
 	    const importButtonContainer = container.createDiv({cls:'import-buttons'});
+
+	    /*
+		const cancelButton = importButtonContainer.createEl('button', {
+	        text: 'Cancel',
+	        cls: 'mod-cta'
+	    });
+	    cancelButton.addEventListener('click', () => {
+	        this.close();
+	    });
+	    */
+
 	    const importButton = importButtonContainer.createEl('button', {
 	        text: 'Import',
 	        cls: 'mod-cta'
@@ -115,11 +126,20 @@ export class ImportActionTypeModal extends Modal {
 	        this.import();
 	    });
 
+	    setTimeout(() => {
+			// Set focus with a slight delay:
+			// this method leverages JavaScript's event loop, ensuring that focusing the button
+	    	// is enqueued after all the elements are properly rendered and the DOM is fully updated.
+			importButton.focus();
+		}, 0); // A timeout of 0 ms is often enough
+
+	    /*
 	    contentEl.addEventListener('keyup', (event) => {
 	        if (event.key === 'Enter') {
 	            importButton.click();
 	        }
     	});
+    	*/
     }
 
     async import() {

@@ -483,8 +483,6 @@ export default class ImportAttachments extends Plugin {
 		const filename=Utils.getFilename(importedFilePath);
 		const relativePath=path.relative(referencePath, importedFilePath);
 
-		console.log(relativePath);
-
 		let prefix = '';
 		let postfix = '';
 		let customDisplay = '';
