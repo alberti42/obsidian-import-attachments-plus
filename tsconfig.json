@@ -17,7 +17,7 @@
       "ES2020"
     ]
   },
-  "typeRoots": ["./src/types"],
+  "typeRoots": ["./src/global"],
   "include": [
     "**/*.ts"
   ]

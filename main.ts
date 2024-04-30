@@ -15,30 +15,14 @@ import ImportActionTypeModal from './ImportActionTypeModal';
 import {
 		ImportActionType,
 		MultipleFilesImportTypes,
-	} from './types'; // Adjust the path as necessary
+		ImportOperationType,
+		ImportAttachmentsSettings,
+		AttachmentFolderPath,
+		ImportSettingsInterface,
+	} from './types';
 
 const fs = require("fs").promises; // Ensure you're using the promise-based version of fs
 const path = require("path"); // Node.js path module to handle path operations
-
-interface ImportAttachmentsSettings {
-    actionDroppedFilesOnImport: ImportActionType;
-    actionPastedFilesOnImport: ImportActionType;
-    embedFilesOnImport: boolean;
-    multipleFilesImportType: MultipleFilesImportTypes;
-    customDisplayText: boolean;
-}
-
-// Define an interface for the return type
-interface AttachmentFolderPath {
-    attachmentsFolderPath: string;
-    vaultPath: string;
-    activeFile: TFile;
-}
-
-interface ImportSettingsInterface {
-    embed: boolean;
-    move: boolean;
-}
 
 const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 	actionDroppedFilesOnImport: ImportActionType.MOVE,  // Default to moving files
@@ -64,7 +48,7 @@ export default class ImportAttachments extends Plugin {
 			name: "Move File to Vault as Link",
 			callback: () => this.chooseFileToImport({
 				embed: false,
-				move: true,
+				action: ImportActionType.COPY,
 			}),
 		});
 
@@ -74,7 +58,7 @@ export default class ImportAttachments extends Plugin {
 			name: "Move File to Vault as Embedded",
 			callback: () => this.chooseFileToImport({
 				embed: true,
-				move: true,
+				action: ImportActionType.MOVE,
 			}),
 		});
 		// Register the command to open the attachments folder
@@ -197,52 +181,30 @@ export default class ImportAttachments extends Plugin {
         const { attachmentsFolderPath, vaultPath, activeFile } = attachmentsFolder;
 
         let doMove=false;  // default value, if something goes wrong with parsing the configuration
+        let actionPastedFilesOnImport=ImportActionType.COPY; // for safety, the defualt is COPY
         switch(importType)
         {
         case ImportOperationType.DRAG_AND_DROP:
-        	switch(this.settings.actionPastedFilesOnImport)
-    		{
-    		case ImportActionType.MOVE:
-    			doMove=true;
-    			break;
-    		case ImportActionType.COPY:
-    			doMove=false;
-    			break;
-    		case ImportActionType.ASK_USER:
-			default:
-				let modal = new ImportActionTypeModal(this.app, this);
-        		modal.open();
-        		doMove=false;
-    			break;
-    		}
+        	actionPastedFilesOnImport=this.settings.actionPastedFilesOnImport;
         	break;
         case ImportOperationType.PASTE:
-    	default:
-    		switch(this.settings.actionPastedFilesOnImport)
-    		{
-    		case ImportActionType.MOVE:
-    			doMove=true;
-    			break;
-    		case ImportActionType.COPY:
-    			doMove=false;
-    			break;
-    		case ImportActionType.ASK_USER:
-			default:
-				console.log("Hey");
-				let modal = new ImportActionTypeModal(this.app, this);
-        		modal.open();
-        		console.log("Hey");
-    			doMove=false;
-    			break;
-    		}
+        	actionPastedFilesOnImport=this.settings.actionDroppedFilesOnImport;
     		break;
         }
-		// const multiFiles = files.length>1;
+        if(actionPastedFilesOnImport==ImportActionType.ASK_USER)
+        {
+        	let modal = new ImportActionTypeModal(this.app, this);
+    		modal.open();
+		    const choice = await modal.promise;
+		    if(choice==null) return; // return if the user closes the modal without preferences        		
+    		actionPastedFilesOnImport=choice;
+        }
+
 		const doEmbed = this.settings.embedFilesOnImport;
 
         const importSettings = {
         	embed: doToggleEmbedPreference ? !doEmbed : doEmbed,
-        	move: doMove,
+        	action: actionPastedFilesOnImport,
         };
 
         this.moveFileToAttachmentsFolder(files, attachmentsFolderPath, vaultPath, activeFile, editor, view, importSettings);
@@ -337,6 +299,7 @@ export default class ImportAttachments extends Plugin {
 
         Array.from(filesToImport).forEach(async (fileToImport,index) => {
         	const destFilePath = path.join(attachmentsFolderPath, fileToImport.name);
+
         	const originalFilePath = fileToImport.path;
         	
 	        // Check for existing file in the vault
@@ -349,12 +312,16 @@ export default class ImportAttachments extends Plugin {
 	        }
 
 	        try {
-	        	if(importSettings.move) {
+	        	switch(importSettings.action)
+	        	{
+	        	case ImportActionType.MOVE:
 	        		await fs.rename(originalFilePath, path.join(vaultPath, destFilePath)); // Move the file directly	
 	        		new Notice("File moved successfully to the attachments folder.");
-	        	} else {
+	        		break;
+        		case ImportActionType.COPY:
 	    		    await fs.copyFile(originalFilePath, path.join(vaultPath, destFilePath)); // Copy the file
 	    			new Notice("File copied successfully to the attachments folder.");
+	    			break;
 	        	}
 
 	        	let counter;

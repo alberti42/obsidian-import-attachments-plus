@@ -2,15 +2,20 @@
 import { Modal, App, Notice, Setting } from 'obsidian';
 import {
 		ImportActionType,
-	} from './types'; // Adjust the path as necessary
+	} from './types';
 import type ImportAttachments from './main'; // Import the type of your plugin class if needed for type hinting
 
 export default class ImportActionTypeModal extends Modal {
-    private rememberChoice: boolean = false;  // Private variable to store the checkbox state
-
+    promise: Promise<ImportActionType | null>;
+    private resolveChoice: (choice: ImportActionType | null) => void = () => {};  // To resolve the promise. Initialize with a no-op function
+	private rememberChoice: boolean = false;  // Private variable to store the checkbox state
+    
     constructor(app: App, private plugin: ImportAttachments) {
     	// use TypeScript `parameter properties` to initialize `plugin`.
         super(app);
+        this.promise = new Promise<ImportActionType | null>((resolve) => {
+            this.resolveChoice = resolve;
+        });
     }
 
     onOpen() {
@@ -41,19 +46,12 @@ export default class ImportActionTypeModal extends Modal {
     }
 
     async handleChoice(choice: ImportActionType) {
-    	this.close();
-
-        this.plugin.settings.actionPastedFilesOnImport = choice;
-        await this.plugin.saveSettings();
-
-        
-
-        new Notice(`Files will be ${choice === 'MOVE' ? 'MOVE' : 'COPIED'}`);
-
-
+    	this.resolveChoice(choice);  // Resolve the promise with the selected choice        
+    	this.close(); 
     }
 
     onClose() {
         this.contentEl.empty();
+        this.resolveChoice(null);  // Resolve with null if the modal is closed without a choice
     }
 }
