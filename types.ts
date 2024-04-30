@@ -40,3 +40,9 @@ export interface ImportSettingsInterface {
     embed: boolean;
     action: ImportActionType;
 }
+
+// Define a type for what resolveChoice will accept
+export type ImportActionChoiceResult = {
+    action: ImportActionType;
+    rememberChoice: boolean;
+} | null;

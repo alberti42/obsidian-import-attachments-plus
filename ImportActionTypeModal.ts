@@ -2,51 +2,72 @@
 import { Modal, App, Notice, Setting } from 'obsidian';
 import {
 		ImportActionType,
+		ImportActionChoiceResult,
 	} from './types';
 import type ImportAttachments from './main'; // Import the type of your plugin class if needed for type hinting
 
 export default class ImportActionTypeModal extends Modal {
-    promise: Promise<ImportActionType | null>;
-    private resolveChoice: (choice: ImportActionType | null) => void = () => {};  // To resolve the promise. Initialize with a no-op function
+    promise: Promise<ImportActionChoiceResult | null>;
+    private resolveChoice: (result: ImportActionChoiceResult) => void = () => {};  // To resolve the promise. Initialize with a no-op function
 	private rememberChoice: boolean = false;  // Private variable to store the checkbox state
     
     constructor(app: App, private plugin: ImportAttachments) {
     	// use TypeScript `parameter properties` to initialize `plugin`.
         super(app);
-        this.promise = new Promise<ImportActionType | null>((resolve) => {
+        this.promise = new Promise<ImportActionChoiceResult>((resolve) => {
             this.resolveChoice = resolve;
         });
     }
 
     onOpen() {
-        const { contentEl } = this;
-        contentEl.createEl('h2', { text: 'Import Files' });
+		 let { contentEl } = this;
 
-        new Setting(contentEl)
-            .setName('Move files')
-            .setDesc('Move files into the vault')
-            .addButton(button => button
-                .setButtonText('Move')
-                .onClick(() => this.handleChoice(ImportActionType.MOVE)));
+	    contentEl.createEl('h2', { text: 'Import Files' });
+	    contentEl.createEl('p', { text: 'Do you want to move or copy the files into the vault?' });
 
-        new Setting(contentEl)
-            .setName('Copy files')
-            .setDesc('Copy files into the vault')
-            .addButton(button => button
-                .setButtonText('Copy')
-                .onClick(() => this.handleChoice(ImportActionType.COPY)));
+	    // Create a container for buttons to control layout
+	    const buttonContainer = contentEl.createEl('div', { cls: 'button-container' });
 
-        new Setting(contentEl)
-            .setName('Remember this choice')
-            .addToggle(toggle => toggle
-                .setValue(false)
-                .onChange(async value => {
-	                this.rememberChoice = value;  // Update the private variable when the toggle changes
-                }));
+	    // Create the 'Move' button inside the container
+	    const moveButton = buttonContainer.createEl('button', {
+	        text: 'Move',
+	        cls: 'mod-cta'
+	    });
+	    moveButton.addEventListener('click', () => {
+	        this.handleChoice(ImportActionType.MOVE);
+	    });
+
+	    // Create the 'Copy' button inside the container
+	    const copyButton = buttonContainer.createEl('button', {
+	        text: 'Copy',
+	        cls: 'mod-cta'
+	    });
+	    copyButton.addEventListener('click', () => {
+	    	this.handleChoice(ImportActionType.COPY);
+	    });
+
+		setTimeout(() => {
+			// Set focus with a slight delay:
+			// this method leverages JavaScript's event loop, ensuring that focusing the button
+	    	// is enqueued after all the elements are properly rendered and the DOM is fully updated.
+    		copyButton.focus();
+		}, 0); // A timeout of 0 ms is often enough
+
+	    new Setting(contentEl)
+        .setName('Remember this choice')
+        .addToggle(toggle => toggle
+            .setValue(false)
+            .onChange(async value => {
+                this.rememberChoice = value;  // Update the private variable when the toggle changes
+            }));
     }
 
     async handleChoice(choice: ImportActionType) {
-    	this.resolveChoice(choice);  // Resolve the promise with the selected choice        
+    	// When a choice is made, resolve the promise with both the choice and remember status
+        this.resolveChoice({
+            action: choice,
+            rememberChoice: this.rememberChoice
+        });
     	this.close(); 
     }
 

@@ -6,3 +6,27 @@ available in the app when your plugin is enabled.
 If your plugin does not need CSS, delete this file.
 
 */
+
+/* Style for the container that holds the buttons */
+.button-container {
+    display: flex;
+    justify-content: flex-end;  /* Align buttons to the right */
+    padding: 0 0 20px 0;  /* Padding above and below the buttons */
+}
+
+/* Style for individual buttons */
+.mod-cta {
+    margin-left: 15px;  /* Spacing between buttons */
+    padding: 10px 20px;  /* Padding inside each button for better touch */
+    background-color: var(--interactive-accent);
+}
+
+.mod-cta:hover {
+    background-color: var(--interactive-accent-hover);
+}
+
+.mod-cta:focus {
+    outline: 3px solid var(--interactive-accent); /* Example: blue outline */
+    outline-offset: 3px;
+}
+

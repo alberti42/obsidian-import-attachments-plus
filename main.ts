@@ -36,8 +36,6 @@ export default class ImportAttachments extends Plugin {
 	settings: ImportAttachmentsSettings = DEFAULT_SETTINGS;
 
 	async onload() {
-		console.log('Loaded')
-
 		await this.loadSettings();
         // Add settings tab
         this.addSettingTab(new ImportAttachmentsSettingTab(this.app, this));
@@ -88,7 +86,6 @@ export default class ImportAttachments extends Plugin {
         // Ensure the event listener is removed when the plugin is unloaded
         this.register(() => document.body.removeEventListener('drop', dropHandler));
         */
-
 
 		this.registerEvent(
 			// check obsidian.d.ts for other types of events
@@ -152,6 +149,8 @@ export default class ImportAttachments extends Plugin {
 		        }
 			})
 		);
+
+		console.log('Loaded plugin Import Attachments+');
 	}
 
     async loadSettings() {
@@ -197,7 +196,19 @@ export default class ImportAttachments extends Plugin {
     		modal.open();
 		    const choice = await modal.promise;
 		    if(choice==null) return; // return if the user closes the modal without preferences        		
-    		actionPastedFilesOnImport=choice;
+    		actionPastedFilesOnImport=choice.action;
+    		if(choice.rememberChoice){
+    			switch(importType)
+        		{
+        		case ImportOperationType.DRAG_AND_DROP:
+        			this.settings.actionPastedFilesOnImport=actionPastedFilesOnImport;
+        			break;
+        		case ImportOperationType.PASTE:
+        			this.settings.actionDroppedFilesOnImport=actionPastedFilesOnImport;
+    				break;
+        		}
+    			await this.saveSettings();
+    		}
         }
 
 		const doEmbed = this.settings.embedFilesOnImport;
@@ -277,7 +288,6 @@ export default class ImportAttachments extends Plugin {
 		};
 		input.click(); // Trigger the file input dialog
     }
-
     async moveFileToAttachmentsFolder(filesToImport: FileList, attachmentsFolderPath: string, vaultPath: string, activeFile: TFile, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface) {
         // Ensure the directory exists before moving the file
         await this.ensureDirectoryExists(attachmentsFolderPath);
@@ -297,47 +307,56 @@ export default class ImportAttachments extends Plugin {
 
         const multipleFiles = filesToImport.length>1;
 
-        Array.from(filesToImport).forEach(async (fileToImport,index) => {
-        	const destFilePath = path.join(attachmentsFolderPath, fileToImport.name);
+		const tasks = Array.from(filesToImport).map(async (fileToImport) => {
+			const destFilePath = path.join(attachmentsFolderPath, fileToImport.name);
+			const originalFilePath = fileToImport.path;
 
-        	const originalFilePath = fileToImport.path;
-        	
-	        // Check for existing file in the vault
-	        const existingFile = this.app.vault.getAbstractFileByPath(originalFilePath);
-	        if (existingFile) {
-	            let msg = "A file with the same name already exists. No file was imported.";
-	            console.error(msg);
-	            new Notice(msg);
-	            return;
-	        }
+			// Check if file already exists in the vault
+			const existingFile = this.app.vault.getAbstractFileByPath(originalFilePath);
+			if (existingFile) {
+				console.error("A file with the same name already exists. No file was imported.");
+				return null; // Skip this file
+			}
 
-	        try {
-	        	switch(importSettings.action)
-	        	{
-	        	case ImportActionType.MOVE:
-	        		await fs.rename(originalFilePath, path.join(vaultPath, destFilePath)); // Move the file directly	
-	        		new Notice("File moved successfully to the attachments folder.");
-	        		break;
-        		case ImportActionType.COPY:
-	    		    await fs.copyFile(originalFilePath, path.join(vaultPath, destFilePath)); // Copy the file
-	    			new Notice("File copied successfully to the attachments folder.");
-	    			break;
-	        	}
+			try {
+				switch (importSettings.action) {
+					case ImportActionType.MOVE:
+						await fs.rename(originalFilePath, path.join(vaultPath, destFilePath));
+						break;
+					case ImportActionType.COPY:
+						await fs.copyFile(originalFilePath, path.join(vaultPath, destFilePath));
+						break;
+				}
+				return fileToImport.name;
+			} catch (error) {
+				let msg = "Failed to process the file";
+				new Notice(msg + ".");
+				console.error( msg + ":", fileToImport.name, error);
+				return null; // Indicate failure in processing this file
+			}
+		});
 
-	        	let counter;
-	        	if(multipleFiles){
-	        		counter = index+1;	
-	        	} else {
-	        		counter = 0;
-	        	}
-	        	
-	            this.insertLinkToEditor(activeFile, attachmentsFolderPath, fileToImport.name, editor, view, importSettings, counter);
-	        } catch (error) {
-	            let msg = "Failed to move the file";
-	            console.error(msg + ":", error);
-	            new Notice(msg + ".");
-	        }
+		// this.insertLinkToEditor(attachmentsFolderPath, fileToImport.name, editor, view, importSettings, multipleFiles?counter:0);
+
+		// Wait for all tasks to complete
+		const results = await Promise.all(tasks);
+
+		// Now process the results
+		results.forEach((importedFilename, index) => {
+	    	if (importedFilename) { // Ensure the filename was processed successfully
+	        	this.insertLinkToEditor(attachmentsFolderPath, importedFilename, editor, view, importSettings, multipleFiles ? index + 1 : 0);
+	    	}
     	});
+
+        switch(importSettings.action)
+    	{
+    	case ImportActionType.MOVE:
+			new Notice(`Moved successfully ${results.length} files to the attachments folder.`);
+			break;
+    	case ImportActionType.COPY:
+			new Notice(`Copied successfully ${results.length} files to the attachments folder.`);
+			break;
+		}
     }
 
 	async ensureDirectoryExists(path: string) {
@@ -370,7 +389,7 @@ export default class ImportAttachments extends Plugin {
 		shell.openPath(path.join(vaultPath,attachmentsFolder.attachmentsFolderPath));
 	}
 
-	insertLinkToEditor(activeFile: TFile, attachmentsFolderPath: string, fileName: string, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface, counter: number) {
+	insertLinkToEditor(attachmentsFolderPath: string, fileName: string, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface, counter: number) {
 		// Extract just the file name from the path
 		const baseName = path.basename(fileName, path.extname(fileName));
 		const fullPath = path.join(attachmentsFolderPath, fileName);
@@ -459,7 +478,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 
         containerEl.empty();
 
-        containerEl.createEl('h2', { text: 'Settings for Import Attachments Plus Plugin' });
+        containerEl.createEl('h2', { text: 'Settings for Import Attachments+ Plugin' });
 
         new Setting(containerEl)
         	.setName('Whether to Move or Copy Files that are Drag and Dropped?')

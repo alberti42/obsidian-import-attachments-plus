@@ -15,7 +15,8 @@
     "lib": [
       "DOM",
       "ES2020"
-    ]
+    ],
+    //"jsx": "react-jsx", // Required by React
   },
   "typeRoots": ["./src/global"],
   "include": [
