@@ -466,15 +466,15 @@ export default class ImportAttachments extends Plugin {
 		
 		if(! await Utils.checkDirectoryExists(attachmentsFolderPath))
 		{
-			let msg="This note does not have an attachment folder";
+			let msg="This note does not have an attachment folder.";
             console.error(msg+":", attachmentsFolderPath);
         	new Notice(msg+".");
 		}
 
 		// Open the folder in the system's default file explorer
 		const { shell } = require('electron');
-		window.require('electron').remote.shell.showItemInFolder(attachmentsFolder.attachmentsFolderPath);
-		// shell.openPath(path.join(vaultPath,attachmentsFolder.attachmentsFolderPath));
+		// window.require('electron').remote.shell.showItemInFolder(attachmentsFolder.attachmentsFolderPath);
+		shell.openPath(attachmentsFolder.attachmentsFolderPath);
 	}
 
 	insertLinkToEditor(referencePath: string, importedFilePath: string, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface, counter: number) {
