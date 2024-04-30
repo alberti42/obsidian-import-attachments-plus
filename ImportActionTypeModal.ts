@@ -22,33 +22,55 @@ export default class ImportActionTypeModal extends Modal {
         });
     }
 
-    onOpen() {
-       const { contentEl } = this;
-
-	    // Main container that holds both the question and the toggle group
+     createToggle(contentEl, questionText, optionA, optionB, initialState, callback) {
+     	// Main container that holds both the question and the toggle group
 	    const container = contentEl.createDiv({ cls: 'action-container' });
 
 	    // Add the question aligned to the left
-	    container.createEl('span', { text: 'Do you want to move or copy files?', cls: 'action-question' });
+	    container.createEl('span', { text: questionText, cls: 'action-question' });
 
 	    // Container for the toggle group aligned to the right
 	    const toggleGroup = container.createDiv({ cls: 'toggle-group' });
-
-	    // Label "Move" to the left of the toggle
-	    toggleGroup.createEl('span', { text: 'Move', cls: 'toggle-label' });
-
+		
+	    // Label for option A (e.g., "Move")
+	    toggleGroup.createEl('span', { text: optionA, cls: 'toggle-label' });
+	    
 	    // Create the toggle switch
 	    const switchLabel = toggleGroup.createEl('label', { cls: 'switch' });
-	    const input = switchLabel.createEl('input', { type: 'checkbox' });
+	    const input = switchLabel.createEl('input', {
+	        type: 'checkbox',
+	        checked: initialState
+	    });
 	    const slider = switchLabel.createEl('span', { cls: 'slider' });
 
-	    // Label "Copy" to the right of the toggle
-	    toggleGroup.createEl('span', { text: 'Copy', cls: 'toggle-label' });
+	    // Label for option B (e.g., "Copy")
+	    toggleGroup.createEl('span', { text: optionB, cls: 'toggle-label' });
 
 	    // Event listener for toggle
 	    input.addEventListener('change', () => {
-	        console.log(input.checked ? 'Copy selected' : 'Move selected');
+	        if (callback) {
+	            callback(input.checked ? optionB : optionA);
+	        }
 	    });
+	}
+
+    onOpen() {
+       const { contentEl } = this;
+        // Main container that holds both the question and the toggle group
+	    const container = contentEl.createDiv({ cls: 'action-container' });
+
+	    // Creating action toggle
+	    this.createToggle(contentEl, 'Do you want to move or copy files?', 'Move', 'Copy', false, (selectedOption) => {
+	        console.log(`${selectedOption} selected`);
+	    });
+
+	    // Creating remember toggle
+	    this.createToggle(contentEl, 'Remember this answer for the future?', 'Yes', 'No', false, (selectedOption) => {
+	        console.log(`${selectedOption} selected`);
+	    });
+
+
+
 
 		/*
 		let { contentEl } = this;
@@ -96,6 +118,7 @@ export default class ImportActionTypeModal extends Modal {
     	// 	this.moveButton.focus();
 		// }, 0); // A timeout of 0 ms is often enough
 
+    	/*
 	    new Setting(contentEl)
         .setName('Remember this choice')
         .addToggle(toggle => toggle
@@ -103,6 +126,7 @@ export default class ImportActionTypeModal extends Modal {
             .onChange(async value => {
                 this.rememberChoice = value;  // Update the private variable when the toggle changes
             }));
+        */
     }
 
     async import() {

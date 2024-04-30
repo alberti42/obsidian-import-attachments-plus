@@ -7,10 +7,21 @@ If your plugin does not need CSS, delete this file.
 
 */
 
-.toggle-container {
+.action-container {
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    justify-content: center;
+    padding: 20px 0;  /* Adjust padding as needed */
+}
+
+.action-question {
+    /* Ensure this takes minimum space and aligns left */
+    margin-right: auto;  /* Pushes everything else to the right */
+}
+
+.toggle-group {
+    display: flex;
+    align-items: center;  /* Align items in the toggle group vertically */
 }
 
 .toggle-label {
@@ -59,5 +70,5 @@ input:checked + .slider:before {
 }
 
 .slider:hover {
-    background-color: #bbb;  /* Slight color change on hover */
+	    background-color: var(--interactive-accent);  /* Keep the original accent color on hover */
 }
