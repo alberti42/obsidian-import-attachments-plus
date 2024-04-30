@@ -46,7 +46,7 @@ export default class ImportAttachments extends Plugin {
 			name: "Move File to Vault as Link",
 			callback: () => this.chooseFileToImport({
 				embed: false,
-				action: ImportActionType.COPY,
+				action: ImportActionType.MOVE,
 			}),
 		});
 
@@ -59,6 +59,27 @@ export default class ImportAttachments extends Plugin {
 				action: ImportActionType.MOVE,
 			}),
 		});
+
+		// Command for importing as a standard link
+		this.addCommand({
+			id: "copy-file-to-vault-link",
+			name: "Copy File to Vault as Link",
+			callback: () => this.chooseFileToImport({
+				embed: false,
+				action: ImportActionType.COPY,
+			}),
+		});
+
+		// Command for importing as an embedded image/link
+		this.addCommand({
+			id: "copy-file-to-vault-embed",
+			name: "Copy File to Vault as Embedded",
+			callback: () => this.chooseFileToImport({
+				embed: true,
+				action: ImportActionType.COPY,
+			}),
+		});
+
 		// Register the command to open the attachments folder
 		this.addCommand({
 			id: "open-attachments-folder",
@@ -297,7 +318,6 @@ export default class ImportAttachments extends Plugin {
 		if (filesToImport.length>1 && this.settings.multipleFilesImportType != MultipleFilesImportTypes.INLINE) {
         	// Check if the cursor is at the beginning of a line
         	if (cursor.ch !== 0) {
-        		console.log(cursor.ch);
         		// If not, insert a newline before the link
         		editor.replaceRange('\n', cursor);
         		// You need to explicitly set the cursor to the new position after the newline
@@ -336,15 +356,13 @@ export default class ImportAttachments extends Plugin {
 			}
 		});
 
-		// this.insertLinkToEditor(attachmentsFolderPath, fileToImport.name, editor, view, importSettings, multipleFiles?counter:0);
-
 		// Wait for all tasks to complete
 		const results = await Promise.all(tasks);
 
 		// Now process the results
 		results.forEach((importedFilename, index) => {
 	    	if (importedFilename) { // Ensure the filename was processed successfully
-	        	this.insertLinkToEditor(attachmentsFolderPath, importedFilename, editor, view, importSettings, multipleFiles ? index + 1 : 0);
+	        	this.insertLinkToEditor(attachmentsFolderPath, importedFilename, editor, view, importSettings, multipleFiles ? index+1 : 0);
 	    	}
     	});
 
@@ -404,11 +422,11 @@ export default class ImportAttachments extends Plugin {
 					postfix = '\n';
 					break;
 				case MultipleFilesImportTypes.NUMBERED:
-					prefix = `${counter+1}. `;
+					prefix = `${counter}. `;
 					postfix = '\n';
 					break;
 				case MultipleFilesImportTypes.INLINE:
-					if(counter>0){
+					if(counter>1){
 						// if it is not the first item
 						prefix = '\n\n';
 					}
@@ -533,8 +551,8 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
                 dropdown.addOption(MultipleFilesImportTypes.INLINE, 'Inline');
                 dropdown.setValue(this.plugin.settings.multipleFilesImportType)
                 .onChange(async (value: string) => {
-                	if (value in ImportActionType) {
-                    	this.plugin.settings.multipleFilesImportType = value as MultipleFilesImportTypes;
+                	if (Object.values(MultipleFilesImportTypes).includes(value as MultipleFilesImportTypes)) {
+                		this.plugin.settings.multipleFilesImportType = value as MultipleFilesImportTypes;
                     	await this.plugin.saveSettings();
 					} else {
                     	console.error('Invalid import action type:', value);

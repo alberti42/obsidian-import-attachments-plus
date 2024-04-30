@@ -50,7 +50,7 @@ export default class ImportActionTypeModal extends Modal {
 			// Set focus with a slight delay:
 			// this method leverages JavaScript's event loop, ensuring that focusing the button
 	    	// is enqueued after all the elements are properly rendered and the DOM is fully updated.
-    		copyButton.focus();
+    		moveButton.focus();
 		}, 0); // A timeout of 0 ms is often enough
 
 	    new Setting(contentEl)
