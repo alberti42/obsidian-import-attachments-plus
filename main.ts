@@ -25,11 +25,13 @@ const fs = require("fs").promises; // Ensure you're using the promise-based vers
 const path = require("path"); // Node.js path module to handle path operations
 
 const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
-	actionDroppedFilesOnImport: ImportActionType.MOVE,  // Default to moving files
-	actionPastedFilesOnImport: ImportActionType.ASK_USER,  // Default to moving files
-	embedFilesOnImport: false, // Default to linking files
-	multipleFilesImportType: MultipleFilesImportTypes.BULLETED,  // Default to bulleted list when importing multiple files
-	customDisplayText: true,
+    actionDroppedFilesOnImport: ImportActionType.ASK_USER, // Default to asking the user
+    actionPastedFilesOnImport: ImportActionType.ASK_USER, // Default to asking the user
+    lastActionPastedFilesOnImport: ImportActionType.COPY, // Default to copying files
+    lastActionDroppedFilesOnImport: ImportActionType.COPY, // Default to copying files
+    embedFilesOnImport: false, // Default to linking files
+    multipleFilesImportType: MultipleFilesImportTypes.BULLETED, // Default to bulleted list when importing multiple files
+    customDisplayText: true,
 };
 
 export default class ImportAttachments extends Plugin {
@@ -201,42 +203,47 @@ export default class ImportAttachments extends Plugin {
         const { attachmentsFolderPath, vaultPath, activeFile } = attachmentsFolder;
 
         let doMove=false;  // default value, if something goes wrong with parsing the configuration
-        let actionPastedFilesOnImport=ImportActionType.COPY; // for safety, the defualt is COPY
+        let actionFilesOnImport=ImportActionType.COPY; // for safety, the defualt is COPY
+        let lastActionFilesOnImport=ImportActionType.COPY; // for safety, the defualt is COPY
         switch(importType)
         {
         case ImportOperationType.DRAG_AND_DROP:
-        	actionPastedFilesOnImport=this.settings.actionPastedFilesOnImport;
+        	actionFilesOnImport=this.settings.actionPastedFilesOnImport;
+        	lastActionFilesOnImport=this.settings.lastActionPastedFilesOnImport;
         	break;
         case ImportOperationType.PASTE:
-        	actionPastedFilesOnImport=this.settings.actionDroppedFilesOnImport;
+        	actionFilesOnImport=this.settings.actionDroppedFilesOnImport;
+        	lastActionFilesOnImport=this.settings.lastActionDroppedFilesOnImport;
     		break;
         }
-        if(actionPastedFilesOnImport==ImportActionType.ASK_USER)
-        {
-        	let modal = new ImportActionTypeModal(this.app, this);
-    		modal.open();
-		    const choice = await modal.promise;
-		    if(choice==null) return; // return if the user closes the modal without preferences        		
-    		actionPastedFilesOnImport=choice.action;
-    		if(choice.rememberChoice){
-    			switch(importType)
-        		{
+        if (actionFilesOnImport == ImportActionType.ASK_USER) {
+        	let modal = new ImportActionTypeModal(this.app, this, lastActionFilesOnImport);
+        	modal.open();
+        	const choice = await modal.promise;
+        	if (choice == null) return; // return if the user closes the modal without preferences        		
+        	actionFilesOnImport = choice.action;
+        	switch (importType) {
         		case ImportOperationType.DRAG_AND_DROP:
-        			this.settings.actionPastedFilesOnImport=actionPastedFilesOnImport;
+        			if (choice.rememberChoice) {
+        				this.settings.actionPastedFilesOnImport = actionFilesOnImport;
+        			}
+        			this.settings.lastActionPastedFilesOnImport = actionFilesOnImport;
         			break;
         		case ImportOperationType.PASTE:
-        			this.settings.actionDroppedFilesOnImport=actionPastedFilesOnImport;
-    				break;
-        		}
-    			await this.saveSettings();
-    		}
+        			if (choice.rememberChoice) {
+        				this.settings.actionDroppedFilesOnImport = actionFilesOnImport;
+        			}
+        			this.settings.lastActionDroppedFilesOnImport = actionFilesOnImport;
+        			break;
+        	}
+        	await this.saveSettings();
         }
-
-		const doEmbed = this.settings.embedFilesOnImport;
+        
+        const doEmbed = this.settings.embedFilesOnImport;
 
         const importSettings = {
         	embed: doToggleEmbedPreference ? !doEmbed : doEmbed,
-        	action: actionPastedFilesOnImport,
+        	action: actionFilesOnImport,
         };
 
         this.moveFileToAttachmentsFolder(files, attachmentsFolderPath, vaultPath, activeFile, editor, view, importSettings);
@@ -509,6 +516,10 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
                 .onChange(async (value: string) => {
                 	if (value in ImportActionType) {
                     	this.plugin.settings.actionDroppedFilesOnImport = value as ImportActionType;
+                    	if(value != ImportActionType.ASK_USER)
+                    	{
+                    		this.plugin.settings.lastActionDroppedFilesOnImport = value as ImportActionType;
+                    	}
                     	await this.plugin.saveSettings();
                     } else {
                     	console.error('Invalid import action type:', value);

@@ -6,6 +6,11 @@ import {
 	} from './types';
 import type ImportAttachments from './main'; // Import the type of your plugin class if needed for type hinting
 
+enum CheckboxOptions {
+	A,
+	B
+}
+
 export default class ImportActionTypeModal extends Modal {
     promise: Promise<ImportActionChoiceResult | null>;
     private resolveChoice: (result: ImportActionChoiceResult) => void = () => {};  // To resolve the promise. Initialize with a no-op function
@@ -14,7 +19,7 @@ export default class ImportActionTypeModal extends Modal {
     private copyButton: HTMLButtonElement | null = null;
     private moveButton: HTMLButtonElement | null = null;
 
-    constructor(app: App, private plugin: ImportAttachments) {
+    constructor(app: App, private plugin: ImportAttachments,private lastActionFilesOnImport: ImportActionType) {
     	// use TypeScript `parameter properties` to initialize `plugin`.
         super(app);
         this.promise = new Promise<ImportActionChoiceResult>((resolve) => {
@@ -22,48 +27,91 @@ export default class ImportActionTypeModal extends Modal {
         });
     }
 
-    createToggle(contentEl, questionText, optionA, optionB, initialState, callback, withSeparator: boolean = false) {
+    createToggle(table: HTMLTableElement, questionText: string, optionA: string, optionB: string, initialOption: CheckboxOptions, callback: (selectedOption:CheckboxOptions) => void, withSeparator: boolean = false) {
 	    // Main container that holds both the question and the toggle group
-	    const container = contentEl.createDiv({ cls: ['action-container', 'separator'] });
+	    const tr = table.createEl('tr');
+	    if(withSeparator) {
+	    	tr.addClass('sep');
+	    }
 
 	    // Add the question aligned to the left
-	    container.createEl('span', { text: questionText, cls: 'action-question' });
-
-	    // Container for the toggle group aligned to the right
-	    const toggleGroup = container.createDiv({ cls: 'toggle-group' });
+	    tr.createEl('td', { text: questionText, cls: 'action-question' });
 
 	    // Label for option A (e.g., "Move")
-	    toggleGroup.createEl('span', { text: optionA, cls: 'toggle-label', attr: { style: 'text-align: left' } });
+	    tr.createEl('td', { text: optionA, cls: 'toggle-option-A' });
 
 	    // Create the toggle switch
-	    const switchLabel = toggleGroup.createEl('label', { cls: 'switch' });
-	    const input = switchLabel.createEl('input', { type: 'checkbox', checked: initialState });
+	    const td = tr.createEl('td');
+	    const switchLabel = td.createEl('label', { cls: 'switch' });
+	    const input = switchLabel.createEl('input', { type: 'checkbox' });
+	    if(initialOption==CheckboxOptions.A) {
+	    	input.checked = false;
+	    } else {
+	    	input.checked = true;
+	    }
 	    const slider = switchLabel.createEl('span', { cls: 'slider' });
 
 	    // Label for option B (e.g., "Copy")
-	    toggleGroup.createEl('span', { text: optionB, cls: 'toggle-label', attr: { style: 'text-align: right' } });
+	    tr.createEl('td', { text: optionB, cls: 'toggle-option-B' });
 
 	    // Event listener for toggle
 	    input.addEventListener('change', () => {
 	        if (callback) {
-	            callback(input.checked ? optionB : optionA);
+	            callback(input.checked ? CheckboxOptions.B : CheckboxOptions.A);
 	        }
 	    });
 	}
 
     onOpen() {
     	const { contentEl } = this;
-       	contentEl.createEl('h2', { text: 'Import Files' });
-    	contentEl.createEl('p', { text: 'Do you want to move or copy the files into the vault?' });
+
+    	const container = contentEl.createDiv({ cls: 'import-attach-plugin' });
+
+       	container.createEl('h2', { text: 'Import Files' });
+    	container.createEl('p', { text: 'Configure the import options and then press either enter or the import button.' });
+
+	    const table = container.createEl('table');
+
+		let initialOption;
+
+		switch(this.lastActionFilesOnImport){
+		case ImportActionType.MOVE:
+			initialOption = CheckboxOptions.A;
+			break;
+		case ImportActionType.COPY:
+		default:
+			initialOption = CheckboxOptions.B;
+			break;
+		}
 
 	    // Creating action toggle
-	    this.createToggle(contentEl, 'Do you want to move or copy files?', 'Move', 'Copy', false, (selectedOption) => {
-	        console.log(`${selectedOption} selected`);
-	    });
+	    this.createToggle(table, 'Do you want to move or copy files?', 'Move', 'Copy', initialOption, (selectedOption:CheckboxOptions) => {
+	    	if(selectedOption==CheckboxOptions.A){
+		    	this.selectedAction = ImportActionType.MOVE;
+		    } else {
+		    	this.selectedAction = ImportActionType.COPY;
+		    }
+	        console.log(`${this.selectedAction} selected`);
+	    }, true);
 
 	    // Creating remember toggle
-	    this.createToggle(contentEl, 'Remember this answer for the future?', 'Yes', 'No', false, (selectedOption) => {
-	        console.log(`${selectedOption} selected`);
+	    this.createToggle(table, 'Save this answer in the settings for the future?', 'Yes', 'No', CheckboxOptions.B, (selectedOption:CheckboxOptions) => {
+	    	if(selectedOption==CheckboxOptions.A){
+		    	this.rememberChoice = true;
+		    } else {
+		    	this.rememberChoice = false;
+		    }
+	        console.log(`${this.rememberChoice} selected`);
+	    }, true);
+
+	     // Create the 'Move' button inside the container
+	    const importButtonContainer = contentEl.createDiv({cls:'importButton'});
+	    const importButton = importButtonContainer.createEl('button', {
+	        text: 'Import',
+	        cls: 'mod-cta'
+	    });
+	    importButton.addEventListener('click', () => {
+	        this.import();
 	    });
     }
 

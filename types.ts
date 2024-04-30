@@ -23,7 +23,9 @@ export enum ImportOperationType {
 
 export interface ImportAttachmentsSettings {
     actionDroppedFilesOnImport: ImportActionType;
+    lastActionDroppedFilesOnImport: ImportActionType;
     actionPastedFilesOnImport: ImportActionType;
+    lastActionPastedFilesOnImport: ImportActionType;
     embedFilesOnImport: boolean;
     multipleFilesImportType: MultipleFilesImportTypes;
     customDisplayText: boolean;

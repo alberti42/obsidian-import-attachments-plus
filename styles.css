@@ -7,72 +7,96 @@ If your plugin does not need CSS, delete this file.
 
 */
 
-.action-container {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 20px 0;  /* Adjust padding as needed */
+.import-attach-plugin table {
+	width: 100%;
+	border-collapse: collapse;
 }
 
-.separator .action-container {
+.import-attach-plugin tr.sep {
+	padding-top: 10px;
 	border-top: 1px solid var(--background-modifier-border);
+	border-bottom: 1px solid var(--background-modifier-border);
 }
 
-.action-question {
-    /* Ensure this takes minimum space and aligns left */
-    margin-right: auto;  /* Pushes everything else to the right */
+.import-attach-plugin td {
+	padding: 18px 0 18px 0;
 }
 
-.toggle-group {
-    display: flex;
-    align-items: center;  /* Align items in the toggle group vertically */
+.import-attach-plugin .action-question {
+	width: 75%;
+	text-align: left;
 }
 
-.toggle-label {
-    margin: 0 10px;  /* Spacing around labels */
+.import-attach-plugin .toggle-option-A {
+	width: auto;
+	text-align: right;
+	padding-right: 5px;
+}
+
+.import-attach-plugin .toggle-option-B {
+	width: auto;
+	text-align: left;
+	padding-left: 5px;
+	padding-right: 5px;
+}
+
+.importButton {
+	display: flex;              /* Establishes this container as a flex container */
+    justify-content: flex-end;  /* Aligns children (the button) to the right */
+    padding: 0 0 0 0;           /* Adds padding on the bottom */
+}
+
+/* Style for the container that holds the buttons */
+.importButton button {
+	padding: 16px 32px;
+    margin: 15px 0 0 0;         /* Optional: Adds margin on the right for spacing from container edge */
 }
 
 .switch {
-    position: relative;
-    display: inline-block;
-    width: 50px;  /* Width of the slider */
-    height: 24px;  /* Height of the slider */
+	position: relative;
+	display: inline-block;
+	width: 50px;
+	/* Width of the slider */
+	height: 24px;
+	/* Height of the slider */
 }
 
 .switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
+	opacity: 0;
+	width: 0;
+	height: 0;
 }
 
 .slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: var(--interactive-accent); /* Use Obsidian accent color */
-    transition: .4s;
-    border-radius: 24px;
+	position: absolute;
+	cursor: pointer;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background-color: var(--color-base-60);
+	transition: .4s;
+	border-radius: 24px;
 }
 
 .slider:before {
-    position: absolute;
-    content: "";
-    height: 20px;
-    width: 20px;
-    left: 2px;
-    bottom: 2px;
-    background-color: white;
-    transition: .4s;
-    border-radius: 50%;
+	position: absolute;
+	content: "";
+	height: 20px;
+	width: 20px;
+	left: 2px;
+	bottom: 2px;
+	background-color: white;
+	transition: .2s;
+	border-radius: 50%;
 }
 
-input:checked + .slider:before {
-    transform: translateX(26px);  /* Adjust translation distance */
+input:checked+.slider:before {
+	transform: translateX(26px);
+	/* Adjust translation distance */
 }
 
 .slider:hover {
-	    background-color: var(--interactive-accent);  /* Keep the original accent color on hover */
+	/* Keep the original accent color on hover */
+	background-color: var(--color-base-70);
 }
