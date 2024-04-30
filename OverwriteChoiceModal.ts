@@ -1,8 +1,10 @@
-// ImportActionTypeModal.ts
+// ImportAttachmentsModal.ts
 import { Modal, App, Notice, Setting } from 'obsidian';
 import {
 		ImportActionType,
 		ImportActionChoiceResult,
+		OverwriteChoiceResult,
+		OverwriteChoiceOptions
 	} from './types';
 import type ImportAttachments from './main'; // Import the type of your plugin class if needed for type hinting
 
@@ -11,14 +13,12 @@ enum CheckboxOptions {
 	B
 }
 
-export default class ImportActionTypeModal extends Modal {
-    promise: Promise<ImportActionChoiceResult | null>;
+export class ImportActionTypeModal extends Modal {
+    promise: Promise<ImportActionChoiceResult>;
     private resolveChoice: (result: ImportActionChoiceResult) => void = () => {};  // To resolve the promise. Initialize with a no-op function
 	private selectedAction: ImportActionType = ImportActionType.COPY;
 	private rememberChoice: boolean = false;  // Private variable to store the checkbox state
-    private copyButton: HTMLButtonElement | null = null;
-    private moveButton: HTMLButtonElement | null = null;
-
+    
     constructor(app: App, private plugin: ImportAttachments,private lastActionFilesOnImport: ImportActionType) {
     	// use TypeScript `parameter properties` to initialize `plugin`.
         super(app);
@@ -105,7 +105,7 @@ export default class ImportActionTypeModal extends Modal {
 	    }, true);
 
 	     // Create the 'Move' button inside the container
-	    const importButtonContainer = contentEl.createDiv({cls:'importButton'});
+	    const importButtonContainer = container.createDiv({cls:'importButton'});
 	    const importButton = importButtonContainer.createEl('button', {
 	        text: 'Import',
 	        cls: 'mod-cta'
@@ -114,7 +114,7 @@ export default class ImportActionTypeModal extends Modal {
 	        this.import();
 	    });
 
-	    contentEl.addEventListener('keyup', (event) => {
+	    container.addEventListener('keyup', (event) => {
 	        if (event.key === 'Enter') {
 	            importButton.click();
 	        }
@@ -129,27 +129,48 @@ export default class ImportActionTypeModal extends Modal {
     	this.close(); 
     }
 
-    async handleActionType(choice: ImportActionType) {
-    	// When a choice is made, resolve the promise with both the choice and remember status
-    	this.selectedAction = choice;
-    	console.log(choice);
-    	// Ensure buttons are not null (they should not be but just safe guarding)
-	    if (this.copyButton && this.moveButton) {
-	        switch (choice) {
-	            case ImportActionType.MOVE:
-	                this.moveButton.classList.add('active');
-	                this.copyButton.classList.remove('active');
-	                break;
-	            case ImportActionType.COPY:
-	                this.copyButton.classList.add('active');
-	                this.moveButton.classList.remove('active');
-	                break;
-	        }
-	    }
-    }
-
     onClose() {
         this.contentEl.empty();
         this.resolveChoice(null);  // Resolve with null if the modal is closed without a choice
+    }
+}
+
+export class OverwriteChoiceModal extends Modal {
+    promise: Promise<OverwriteChoiceOptions>;
+    private resolveChoice: (result: OverwriteChoiceOptions) => void = () => {};  // To resolve the promise. Initialize with a no-op function
+	
+    constructor(app: App, private plugin: ImportAttachments) {
+    	// use TypeScript `parameter properties` to initialize `plugin`.
+        super(app);
+        this.promise = new Promise<OverwriteChoiceOptions>((resolve) => {
+            this.resolveChoice = resolve;
+        });
+    }
+
+    onOpen() {
+    	const { contentEl } = this;
+
+    	const container = contentEl.createDiv({ cls: 'import-attach-plugin' });
+
+       	container.createEl('h2', { text: 'Import Files' });
+    	container.createEl('p', { text: 'Configure the import options and then press either enter or the import button.' });
+
+
+
+	     // Create the 'Move' button inside the container
+	    const importButtonContainer = container.createDiv({cls:'importButton'});
+	    const importButton = importButtonContainer.createEl('button', {
+	        text: 'Import',
+	        cls: 'mod-cta'
+	    });
+	    importButton.addEventListener('click', () => {
+	        
+	    });
+
+	    container.addEventListener('keyup', (event) => {
+	        if (event.key === 'Enter') {
+	            importButton.click();
+	        }
+    	});
     }
 }

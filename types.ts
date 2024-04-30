@@ -48,3 +48,12 @@ export type ImportActionChoiceResult = {
     action: ImportActionType;
     rememberChoice: boolean;
 } | null;
+
+export enum OverwriteChoiceOptions {
+	OVERWRITE,
+	KEEPBOTH,
+	SKIP
+}
+
+// Define a type for what resolveChoice will accept
+export type OverwriteChoiceResult = OverwriteChoiceOptions | null;

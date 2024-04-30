@@ -11,7 +11,7 @@ import {
 	TFile,
 } from "obsidian";
 
-import ImportActionTypeModal from './ImportActionTypeModal';
+import {ImportActionTypeModal, OverwriteChoiceModal} from './ImportActionTypeModal';
 import {
 		ImportActionType,
 		MultipleFilesImportTypes,
@@ -217,6 +217,11 @@ export default class ImportAttachments extends Plugin {
     		break;
         }
         if (actionFilesOnImport == ImportActionType.ASK_USER) {
+        	let modal1 = new OverwriteChoiceModal(this.app, this);
+        	modal1.open();
+        	const choice1 = await modal1.promise;
+
+
         	let modal = new ImportActionTypeModal(this.app, this, lastActionFilesOnImport);
         	modal.open();
         	const choice = await modal.promise;
@@ -339,7 +344,9 @@ export default class ImportAttachments extends Plugin {
 			const originalFilePath = fileToImport.path;
 
 			// Check if file already exists in the vault
-			const existingFile = this.app.vault.getAbstractFileByPath(originalFilePath);
+			console.log(destFilePath);
+			const existingFile = this.app.vault.getAbstractFileByPath(destFilePath);
+			console.log(existingFile);
 			if (existingFile) {
 				console.error("A file with the same name already exists. No file was imported.");
 				return null; // Skip this file
@@ -367,20 +374,27 @@ export default class ImportAttachments extends Plugin {
 		const results = await Promise.all(tasks);
 
 		// Now process the results
+		let counter = 0;
 		results.forEach((importedFilename, index) => {
 	    	if (importedFilename) { // Ensure the filename was processed successfully
+	    		console.log(importedFilename);
+	    		counter += 1;
 	        	this.insertLinkToEditor(attachmentsFolderPath, importedFilename, editor, view, importSettings, multipleFiles ? index+1 : 0);
 	    	}
     	});
 
-        switch(importSettings.action)
-    	{
-    	case ImportActionType.MOVE:
-			new Notice(`Moved successfully ${results.length} files to the attachments folder.`);
-			break;
-    	case ImportActionType.COPY:
-			new Notice(`Copied successfully ${results.length} files to the attachments folder.`);
-			break;
+		if(counter>0) {
+			let operation = '';
+	        switch(importSettings.action)
+	    	{
+	    	case ImportActionType.MOVE:
+				operation = 'Moved';
+				break;
+	    	case ImportActionType.COPY:
+	    		operation = 'Copied';
+				break;
+			}
+			new Notice(`${operation} successfully ${counter} files to the attachments folder.`);
 		}
     }
 
