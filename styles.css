@@ -14,6 +14,10 @@ If your plugin does not need CSS, delete this file.
     padding: 20px 0;  /* Adjust padding as needed */
 }
 
+.separator .action-container {
+	border-top: 1px solid var(--background-modifier-border);
+}
+
 .action-question {
     /* Ensure this takes minimum space and aligns left */
     margin-right: auto;  /* Pushes everything else to the right */

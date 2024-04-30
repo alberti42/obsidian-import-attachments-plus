@@ -22,29 +22,26 @@ export default class ImportActionTypeModal extends Modal {
         });
     }
 
-     createToggle(contentEl, questionText, optionA, optionB, initialState, callback) {
-     	// Main container that holds both the question and the toggle group
-	    const container = contentEl.createDiv({ cls: 'action-container' });
+    createToggle(contentEl, questionText, optionA, optionB, initialState, callback, withSeparator: boolean = false) {
+	    // Main container that holds both the question and the toggle group
+	    const container = contentEl.createDiv({ cls: ['action-container', 'separator'] });
 
 	    // Add the question aligned to the left
 	    container.createEl('span', { text: questionText, cls: 'action-question' });
 
 	    // Container for the toggle group aligned to the right
 	    const toggleGroup = container.createDiv({ cls: 'toggle-group' });
-		
+
 	    // Label for option A (e.g., "Move")
-	    toggleGroup.createEl('span', { text: optionA, cls: 'toggle-label' });
-	    
+	    toggleGroup.createEl('span', { text: optionA, cls: 'toggle-label', attr: { style: 'text-align: left' } });
+
 	    // Create the toggle switch
 	    const switchLabel = toggleGroup.createEl('label', { cls: 'switch' });
-	    const input = switchLabel.createEl('input', {
-	        type: 'checkbox',
-	        checked: initialState
-	    });
+	    const input = switchLabel.createEl('input', { type: 'checkbox', checked: initialState });
 	    const slider = switchLabel.createEl('span', { cls: 'slider' });
 
 	    // Label for option B (e.g., "Copy")
-	    toggleGroup.createEl('span', { text: optionB, cls: 'toggle-label' });
+	    toggleGroup.createEl('span', { text: optionB, cls: 'toggle-label', attr: { style: 'text-align: right' } });
 
 	    // Event listener for toggle
 	    input.addEventListener('change', () => {
@@ -55,9 +52,9 @@ export default class ImportActionTypeModal extends Modal {
 	}
 
     onOpen() {
-       const { contentEl } = this;
-        // Main container that holds both the question and the toggle group
-	    const container = contentEl.createDiv({ cls: 'action-container' });
+    	const { contentEl } = this;
+       	contentEl.createEl('h2', { text: 'Import Files' });
+    	contentEl.createEl('p', { text: 'Do you want to move or copy the files into the vault?' });
 
 	    // Creating action toggle
 	    this.createToggle(contentEl, 'Do you want to move or copy files?', 'Move', 'Copy', false, (selectedOption) => {
@@ -68,65 +65,6 @@ export default class ImportActionTypeModal extends Modal {
 	    this.createToggle(contentEl, 'Remember this answer for the future?', 'Yes', 'No', false, (selectedOption) => {
 	        console.log(`${selectedOption} selected`);
 	    });
-
-
-
-
-		/*
-		let { contentEl } = this;
-
-	    contentEl.createEl('h2', { text: 'Import Files' });
-	    contentEl.createEl('p', { text: 'Do you want to move or copy the files into the vault?' });
-
-		// Create a container for buttons to control layout
-	    const actionToggleContainer = contentEl.createEl('div', { cls: 'button-container' });
-
-	    // Create the 'Move' button inside the container
-	    this.moveButton = actionToggleContainer.createEl('button', {
-	        text: 'Move',
-	    });
-	    this.moveButton.addEventListener('click', () => {
-	        this.handleActionType(ImportActionType.MOVE);
-	    });
-
-	    // Create the 'Copy' button inside the container
-	    this.copyButton = actionToggleContainer.createEl('button', {
-	        text: 'Copy',
-	    });
-	    this.copyButton.addEventListener('click', () => {
-	    	this.handleActionType(ImportActionType.COPY);
-	    });
-
-	    // Create a container for buttons to control layout
-	    const buttonContainer = contentEl.createEl('div', { cls: 'button-container' });
-
-	    // Create the 'Import' button inside the container
-	    const importButton = buttonContainer.createEl('button', {
-	        text: 'Import',
-	        cls: 'mod-cta'
-	    });
-
-	    importButton.addEventListener('click', () => {
-	    	this.import();
-	    });
-	    */
-
-		// setTimeout(() => {
-		// 	// Set focus with a slight delay:
-		// 	// this method leverages JavaScript's event loop, ensuring that focusing the button
-	    // 	// is enqueued after all the elements are properly rendered and the DOM is fully updated.
-    	// 	this.moveButton.focus();
-		// }, 0); // A timeout of 0 ms is often enough
-
-    	/*
-	    new Setting(contentEl)
-        .setName('Remember this choice')
-        .addToggle(toggle => toggle
-            .setValue(false)
-            .onChange(async value => {
-                this.rememberChoice = value;  // Update the private variable when the toggle changes
-            }));
-        */
     }
 
     async import() {
