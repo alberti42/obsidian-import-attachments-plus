@@ -36,7 +36,7 @@ export interface ImportAttachmentsSettings {
 export interface AttachmentFolderPath {
     attachmentsFolderPath: string;
     vaultPath: string;
-    relativePath: string;
+    referencePath: string;
 }
 
 export interface ImportSettingsInterface {

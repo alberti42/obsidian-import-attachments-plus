@@ -361,7 +361,7 @@ export default class ImportAttachments extends Plugin {
 			const inVault = await Utils.isFileInVault(vaultPath,originalFilePath)
 			if(inVault)
 			{
-				let modal = new ImportFromVaultChoiceModal(this.app, this, inVault, vaultPath, importSettings.action);
+				let modal = new ImportFromVaultChoiceModal(this.app, this, inVault, importSettings.action);
 	        	modal.open();
 	        	const choice = await modal.promise;
 	        	if(choice==null) { return null; }
@@ -378,7 +378,7 @@ export default class ImportAttachments extends Plugin {
 	        	}
 			}
 			
-			// Decide what to do if a file with the same already exists at the destination
+			// Decide what to do if a file with the same name already exists at the destination
 			if (existingFile && importSettings.action != ImportActionType.LINK) {
 				let modal = new OverwriteChoiceModal(this.app, this, originalFilePath, destFilePath);
 	        	modal.open();
@@ -403,15 +403,14 @@ export default class ImportAttachments extends Plugin {
 				switch (importSettings.action) {
 					case ImportActionType.MOVE:
 						await fs.rename(originalFilePath,destFilePath);
-						break;
+						return destFilePath;
 					case ImportActionType.COPY:
 						await fs.copyFile(originalFilePath,destFilePath);
-						break;
+						return destFilePath;
 					case ImportActionType.LINK:
-						console.log(inVault);
-						break;
+					default:
+						return originalFilePath;
 				}
-				return destFilePath;
 			} catch (error) {
 				let msg = "Failed to process the file";
 				new Notice(msg + ".");
@@ -430,26 +429,6 @@ export default class ImportAttachments extends Plugin {
 		    	this.insertLinkToEditor(path.join(vaultPath,referencePath), importedFilePath, editor, view, importSettings, multipleFiles ? index+1 : 0);
 		    }
 		});
-
-		
-// 		const transformedResults = results.map((importedFile: ImportedFileType, index): boolean => {
-//    	 	if (importedFile) {
-//     	    console.log(importedFile);
-//         // Perform some transformation and return new value
-//         //return { ...importedFile, processed: true };
-    	    
-//     	}
-//     	return true;
-//     	}
-//     return null;
-// });
-		// results.forEach((importedFile: ImportedFileInterface | null, index: number) => {
-    	// 	if (importedFile) {
-        // 		counter += 1;
-        // 		console.log(importedFile);
-        // 		// this.insertLinkToEditor(attachmentsFolderPath, importedFile.filename, editor, view, importSettings, multipleFiles ? index+1 : 0);
-    	// 	}
-		// });
 
 		if(counter>0) {
 			let operation = '';
@@ -503,6 +482,8 @@ export default class ImportAttachments extends Plugin {
 
 		const filename=Utils.getFilename(importedFilePath);
 		const relativePath=path.relative(referencePath, importedFilePath);
+
+		console.log(relativePath);
 
 		let prefix = '';
 		let postfix = '';

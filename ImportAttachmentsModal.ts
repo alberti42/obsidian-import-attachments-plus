@@ -220,14 +220,6 @@ export class OverwriteChoiceModal extends Modal {
 	    	// is enqueued after all the elements are properly rendered and the DOM is fully updated.
     		keepButton.focus();
 		}, 0); // A timeout of 0 ms is often enough
-
-	    /*
-	    contentEl.addEventListener('keyup', (event) => {
-	        if (event.key === 'Enter') {
-	            keepButton.click();
-	        }
-    	});
-    	*/
     }
 
     onClose() {
@@ -240,7 +232,7 @@ export class ImportFromVaultChoiceModal extends Modal {
     promise: Promise<ImportFromVaultChoiceResult>;
     private resolveChoice: (result: ImportFromVaultChoiceResult) => void = () => {};  // To resolve the promise. Initialize with a no-op function
 	
-    constructor(app: App, private plugin: ImportAttachments, private originalFilePath: string, private vaultPath: string, private importAction: ImportActionType) {
+    constructor(app: App, private plugin: ImportAttachments, private originalFilePath: string, private importAction: ImportActionType) {
     	// use TypeScript `parameter properties` to initialize `plugin`.
         super(app);
         this.promise = new Promise<ImportFromVaultChoiceResult>((resolve) => {
@@ -266,7 +258,7 @@ export class ImportFromVaultChoiceModal extends Modal {
 	    fileLink.addEventListener('click', (e) => {
 	        e.preventDefault(); // Prevent the default anchor behavior
 	        // Open the folder in the system's default file explorer
-			window.require('electron').remote.shell.showItemInFolder(path.join(this.vaultPath,this.originalFilePath));
+			window.require('electron').remote.shell.showItemInFolder(this.originalFilePath);
 	    });
 
         paragraph.append(' is already in the vault.');
@@ -328,5 +320,3 @@ export class ImportFromVaultChoiceModal extends Modal {
         this.resolveChoice(null);  // Resolve with null if the modal is closed without a choice
     }
 }
-
-

@@ -50,7 +50,8 @@ namespace Utils {
 	        // Ensure the folder path ends with a path separator to avoid partial folder name matches
 
 	        if(normalizedFilePath.startsWith(`${normalizedVaultFolderPath}${path.sep}`)) {
-	        	return normalizedFilePath.substring(normalizedVaultFolderPath.length).replace(/^\//,'');
+	        	// return normalizedFilePath.substring(normalizedVaultFolderPath.length).replace(/^\//,'');
+	        	return normalizedFilePath;
 	        } else {
 	        	return false;
 	        }
