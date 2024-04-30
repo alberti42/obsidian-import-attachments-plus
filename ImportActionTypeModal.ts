@@ -113,6 +113,12 @@ export default class ImportActionTypeModal extends Modal {
 	    importButton.addEventListener('click', () => {
 	        this.import();
 	    });
+
+	    contentEl.addEventListener('keyup', (event) => {
+	        if (event.key === 'Enter') {
+	            importButton.click();
+	        }
+    	});
     }
 
     async import() {
