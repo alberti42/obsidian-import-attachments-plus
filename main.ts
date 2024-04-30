@@ -11,7 +11,7 @@ import {
 	TFile,
 } from "obsidian";
 
-import {ImportActionTypeModal, OverwriteChoiceModal} from './ImportActionTypeModal';
+import {ImportActionTypeModal, OverwriteChoiceModal} from './ImportAttachmentsModal';
 import {
 		ImportActionType,
 		MultipleFilesImportTypes,
