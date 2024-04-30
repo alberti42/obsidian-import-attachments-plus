@@ -11,7 +11,7 @@ import {
 	TFile,
 } from "obsidian";
 
-import {ImportActionTypeModal, OverwriteChoiceModal} from './ImportAttachmentsModal';
+import {ImportActionTypeModal, OverwriteChoiceModal, ImportFromVaultChoiceModal} from './ImportAttachmentsModal';
 import {
 		ImportActionType,
 		MultipleFilesImportTypes,
@@ -19,7 +19,12 @@ import {
 		ImportAttachmentsSettings,
 		AttachmentFolderPath,
 		ImportSettingsInterface,
+		OverwriteChoiceResult,
+		OverwriteChoiceOptions,
+		ImportFromVaultOptions,
 	} from './types';
+import { Utils } from "utils";
+import { relative } from "path";
 
 const fs = require("fs").promises; // Ensure you're using the promise-based version of fs
 const path = require("path"); // Node.js path module to handle path operations
@@ -193,14 +198,15 @@ export default class ImportAttachments extends Plugin {
             	console.error(error.message);
             	new Notice(error.message);
             } else {
-         	   // If it's not an Error, log it as a string or use a default message
-            	console.error("An unknown error occurred:", error);
-            	new Notice("An unknown error occurred");
+            	// If it's not an Error, log it as a string or use a default message
+            	let msg="An unknown error occurred";
+            	console.error(msg+":", error);
+            	new Notice(msg);
         	}
             return;
         }
 
-        const { attachmentsFolderPath, vaultPath, activeFile } = attachmentsFolder;
+        const { attachmentsFolderPath, vaultPath, referencePath } = attachmentsFolder;
 
         let doMove=false;  // default value, if something goes wrong with parsing the configuration
         let actionFilesOnImport=ImportActionType.COPY; // for safety, the defualt is COPY
@@ -208,20 +214,16 @@ export default class ImportAttachments extends Plugin {
         switch(importType)
         {
         case ImportOperationType.DRAG_AND_DROP:
+        	actionFilesOnImport=this.settings.actionDroppedFilesOnImport;
+        	lastActionFilesOnImport=this.settings.lastActionDroppedFilesOnImport;
+        	break;
+        case ImportOperationType.PASTE:
         	actionFilesOnImport=this.settings.actionPastedFilesOnImport;
         	lastActionFilesOnImport=this.settings.lastActionPastedFilesOnImport;
         	break;
-        case ImportOperationType.PASTE:
-        	actionFilesOnImport=this.settings.actionDroppedFilesOnImport;
-        	lastActionFilesOnImport=this.settings.lastActionDroppedFilesOnImport;
-    		break;
         }
+
         if (actionFilesOnImport == ImportActionType.ASK_USER) {
-        	let modal1 = new OverwriteChoiceModal(this.app, this);
-        	modal1.open();
-        	const choice1 = await modal1.promise;
-
-
         	let modal = new ImportActionTypeModal(this.app, this, lastActionFilesOnImport);
         	modal.open();
         	const choice = await modal.promise;
@@ -251,7 +253,7 @@ export default class ImportAttachments extends Plugin {
         	action: actionFilesOnImport,
         };
 
-        this.moveFileToAttachmentsFolder(files, attachmentsFolderPath, vaultPath, activeFile, editor, view, importSettings);
+        this.moveFileToAttachmentsFolder(files, attachmentsFolderPath, referencePath, vaultPath, editor, view, importSettings);
     }
 
 	getAttachmentFolder(): AttachmentFolderPath {
@@ -264,12 +266,15 @@ export default class ImportAttachments extends Plugin {
 			throw new Error("No Markdown file is currently open in a directory. Please open a Markdown file to use this feature.");
 		}
 
-		const attachmentsFolderPath = path.join(activeFile.parent.path, activeFile.basename + ' (attachments)');
+		const vaultPath = adapter.getBasePath();
+		const referencePath = activeFile.parent.path;
+		
+		const attachmentsFolderPath = path.join(vaultPath,path.join(referencePath, activeFile.basename + ' (attachments)'));
 
 		return {
 			attachmentsFolderPath,
-			vaultPath: adapter.getBasePath(),
-			activeFile,
+			vaultPath: vaultPath,
+			referencePath: activeFile.parent.path,
 		};
 	}
 
@@ -300,7 +305,7 @@ export default class ImportAttachments extends Plugin {
             return;
         }
 
-        const { attachmentsFolderPath, vaultPath, activeFile } = attachmentsFolder;
+        const { attachmentsFolderPath, vaultPath, referencePath } = attachmentsFolder;
 
         const input = document.createElement("input");
         input.type = "file";
@@ -312,7 +317,7 @@ export default class ImportAttachments extends Plugin {
 
 		    if (files && files.length > 0) {
 		        // Directly pass the FileList to the processing function
-		        await this.moveFileToAttachmentsFolder(files, attachmentsFolderPath, vaultPath, activeFile, editor, markdownView, importSettings);
+		        await this.moveFileToAttachmentsFolder(files, attachmentsFolderPath, referencePath, vaultPath, editor, markdownView, importSettings);
 		    } else {
 		        let msg = "No files selected or file access error.";
 		        console.error(msg);
@@ -321,9 +326,10 @@ export default class ImportAttachments extends Plugin {
 		};
 		input.click(); // Trigger the file input dialog
     }
-    async moveFileToAttachmentsFolder(filesToImport: FileList, attachmentsFolderPath: string, vaultPath: string, activeFile: TFile, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface) {
+
+    async moveFileToAttachmentsFolder(filesToImport: FileList, attachmentsFolderPath: string, referencePath: string, vaultPath: string, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface) {
         // Ensure the directory exists before moving the file
-        await this.ensureDirectoryExists(attachmentsFolderPath);
+        await Utils.ensureDirectoryExists(attachmentsFolderPath);
 
 		let cursor = editor.getCursor(); // Get the current cursor position before insertion
 
@@ -339,33 +345,77 @@ export default class ImportAttachments extends Plugin {
 
         const multipleFiles = filesToImport.length>1;
 
-		const tasks = Array.from(filesToImport).map(async (fileToImport) => {
-			const destFilePath = path.join(attachmentsFolderPath, fileToImport.name);
+		const tasks = Array.from(filesToImport).map(async (fileToImport):Promise<string|null> => {
 			const originalFilePath = fileToImport.path;
+			let destFilePath = path.join(attachmentsFolderPath,fileToImport.name);
 
 			// Check if file already exists in the vault
-			console.log(destFilePath);
-			const existingFile = this.app.vault.getAbstractFileByPath(destFilePath);
-			console.log(existingFile);
-			if (existingFile) {
-				console.error("A file with the same name already exists. No file was imported.");
-				return null; // Skip this file
+			const existingFile = await Utils.checkFileExists(destFilePath);
+
+			// If they are the same file, then skip copying/moving, we are alrady done
+			if(existingFile && await Utils.arePathsSameFile(originalFilePath,destFilePath)) {
+				return destFilePath;
 			}
 
+			// If the original file is already in the vault
+			const inVault = await Utils.isFileInVault(vaultPath,originalFilePath)
+			if(inVault)
+			{
+				let modal = new ImportFromVaultChoiceModal(this.app, this, inVault, vaultPath, importSettings.action);
+	        	modal.open();
+	        	const choice = await modal.promise;
+	        	if(choice==null) { return null; }
+	        	switch(choice) {
+	        	case ImportFromVaultOptions.SKIP:
+	        		return null;
+	        		break;
+	        	case ImportFromVaultOptions.LINK:
+	        		importSettings.action = ImportActionType.LINK;
+	        		break;
+	        	case ImportFromVaultOptions.COPY:
+	        		importSettings.action = ImportActionType.COPY;
+	        		break;
+	        	}
+			}
+			
+			// Decide what to do if a file with the same already exists at the destination
+			if (existingFile && importSettings.action != ImportActionType.LINK) {
+				let modal = new OverwriteChoiceModal(this.app, this, originalFilePath, destFilePath);
+	        	modal.open();
+	        	const choice = await modal.promise;
+	        	if(choice==null) { return null; }
+	        	switch(choice) {
+	        	case OverwriteChoiceOptions.OVERWRITE:
+	        		// continue
+	        		break;
+				case OverwriteChoiceOptions.KEEPBOTH:
+	        		const newDestFilePath = await Utils.findNewFilename(destFilePath);
+	        		if(newDestFilePath==null) { return null; }
+	        		destFilePath = newDestFilePath;
+	        		break;
+				case OverwriteChoiceOptions.SKIP:
+	        		return null;
+	        		break;
+	        	}
+			}
+			
 			try {
 				switch (importSettings.action) {
 					case ImportActionType.MOVE:
-						await fs.rename(originalFilePath, path.join(vaultPath, destFilePath));
+						await fs.rename(originalFilePath,destFilePath);
 						break;
 					case ImportActionType.COPY:
-						await fs.copyFile(originalFilePath, path.join(vaultPath, destFilePath));
+						await fs.copyFile(originalFilePath,destFilePath);
+						break;
+					case ImportActionType.LINK:
+						console.log(inVault);
 						break;
 				}
-				return fileToImport.name;
+				return destFilePath;
 			} catch (error) {
 				let msg = "Failed to process the file";
 				new Notice(msg + ".");
-				console.error( msg + ":", fileToImport.name, error);
+				console.error( msg + ":", originalFilePath, error);
 				return null; // Indicate failure in processing this file
 			}
 		});
@@ -375,13 +425,31 @@ export default class ImportAttachments extends Plugin {
 
 		// Now process the results
 		let counter = 0;
-		results.forEach((importedFilename, index) => {
-	    	if (importedFilename) { // Ensure the filename was processed successfully
-	    		console.log(importedFilename);
-	    		counter += 1;
-	        	this.insertLinkToEditor(attachmentsFolderPath, importedFilename, editor, view, importSettings, multipleFiles ? index+1 : 0);
-	    	}
-    	});
+		results.forEach((importedFilePath: (string|null), index: number) => {
+		    if (importedFilePath) {
+		    	this.insertLinkToEditor(path.join(vaultPath,referencePath), importedFilePath, editor, view, importSettings, multipleFiles ? index+1 : 0);
+		    }
+		});
+
+		
+// 		const transformedResults = results.map((importedFile: ImportedFileType, index): boolean => {
+//    	 	if (importedFile) {
+//     	    console.log(importedFile);
+//         // Perform some transformation and return new value
+//         //return { ...importedFile, processed: true };
+    	    
+//     	}
+//     	return true;
+//     	}
+//     return null;
+// });
+		// results.forEach((importedFile: ImportedFileInterface | null, index: number) => {
+    	// 	if (importedFile) {
+        // 		counter += 1;
+        // 		console.log(importedFile);
+        // 		// this.insertLinkToEditor(attachmentsFolderPath, importedFile.filename, editor, view, importSettings, multipleFiles ? index+1 : 0);
+    	// 	}
+		// });
 
 		if(counter>0) {
 			let operation = '';
@@ -398,13 +466,6 @@ export default class ImportAttachments extends Plugin {
 		}
     }
 
-	async ensureDirectoryExists(path: string) {
-		const folder = this.app.vault.getAbstractFileByPath(path);
-		if (!folder) {
-			await this.app.vault.createFolder(path);
-		}
-	}
-
 	async openAttachmentsFolder() {
 		let attachmentsFolder;
 		try {
@@ -414,24 +475,34 @@ export default class ImportAttachments extends Plugin {
             	console.error(error.message);
             	new Notice(error.message);
             } else {
-         	   // If it's not an Error, log it as a string or use a default message
-            	console.error("An unknown error occurred:", error);
-            	new Notice("An unknown error occurred");
+            	// If it's not an Error, log it as a string or use a default message
+            	let msg="An unknown error occurred";
+            	console.error(msg+":", error);
+            	new Notice(msg);
         	}
             return;
         }
 
 		const { attachmentsFolderPath, vaultPath } = attachmentsFolder;
+		
+		if(! await Utils.checkDirectoryExists(attachmentsFolderPath))
+		{
+			let msg="This note does not have an attachment folder";
+            console.error(msg+":", attachmentsFolderPath);
+        	new Notice(msg+".");
+		}
 
 		// Open the folder in the system's default file explorer
 		const { shell } = require('electron');
-		shell.openPath(path.join(vaultPath,attachmentsFolder.attachmentsFolderPath));
+		window.require('electron').remote.shell.showItemInFolder(attachmentsFolder.attachmentsFolderPath);
+		// shell.openPath(path.join(vaultPath,attachmentsFolder.attachmentsFolderPath));
 	}
 
-	insertLinkToEditor(attachmentsFolderPath: string, fileName: string, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface, counter: number) {
+	insertLinkToEditor(referencePath: string, importedFilePath: string, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface, counter: number) {
 		// Extract just the file name from the path
-		const baseName = path.basename(fileName, path.extname(fileName));
-		const fullPath = path.join(attachmentsFolderPath, fileName);
+
+		const filename=Utils.getFilename(importedFilePath);
+		const relativePath=path.relative(referencePath, importedFilePath);
 
 		let prefix = '';
 		let postfix = '';
@@ -455,13 +526,13 @@ export default class ImportAttachments extends Plugin {
 			}
 		}
 		if(this.settings.customDisplayText) {
-			customDisplay = '|' + baseName;
+			customDisplay = '|' + filename;
 		}
 		if(importSettings.embed) {
 			prefix = prefix + '!';
 		}
 
-		const linkText = prefix + '[[' + fullPath + customDisplay + ']]' + postfix;
+		const linkText = prefix + '[[' + relativePath + customDisplay + ']]' + postfix;
 
 		const cursor = editor.getCursor(); // Get the current cursor position before insertion
 
@@ -473,11 +544,11 @@ export default class ImportAttachments extends Plugin {
 				// Define the start and end positions for selecting 'baseName' within the inserted link
 				const startCursorPos = {
 					line: cursor.line,
-					ch: cursor.ch + fullPath.length + prefix.length + 3,
+					ch: cursor.ch + relativePath.length + prefix.length + 3,
 				};
 				const endCursorPos = {
 					line: cursor.line,
-					ch: startCursorPos.ch + baseName.length,
+					ch: startCursorPos.ch + filename.length,
 				};
 
 				// Set the selection range to highlight 'baseName'

@@ -40,16 +40,15 @@ If your plugin does not need CSS, delete this file.
 	padding-right: 5px;
 }
 
-.importButton {
+.import-buttons {
 	display: flex;              /* Establishes this container as a flex container */
-    justify-content: flex-end;  /* Aligns children (the button) to the right */
-    padding: 0 0 0 0;           /* Adds padding on the bottom */
+    justify-content: flex-end;  /* Aligns children (the button) to the right */    
 }
 
 /* Style for the container that holds the buttons */
-.importButton button {
-	padding: 16px 32px;
-    margin: 15px 0 0 0;         /* Optional: Adds margin on the right for spacing from container edge */
+.import-buttons button {
+	padding: 16px 16px;
+    margin: 15px 0 0 15px;         /* Optional: Adds margin on the right for spacing from container edge */
 }
 
 .switch {

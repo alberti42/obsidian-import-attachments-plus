@@ -7,6 +7,7 @@ import {
 export enum ImportActionType {
 	MOVE='MOVE',
 	COPY='COPY',
+	LINK='LINK',
 	ASK_USER='ASK_USER'
 }
 
@@ -35,7 +36,7 @@ export interface ImportAttachmentsSettings {
 export interface AttachmentFolderPath {
     attachmentsFolderPath: string;
     vaultPath: string;
-    activeFile: TFile;
+    relativePath: string;
 }
 
 export interface ImportSettingsInterface {
@@ -52,8 +53,22 @@ export type ImportActionChoiceResult = {
 export enum OverwriteChoiceOptions {
 	OVERWRITE,
 	KEEPBOTH,
-	SKIP
+	SKIP,
 }
 
 // Define a type for what resolveChoice will accept
 export type OverwriteChoiceResult = OverwriteChoiceOptions | null;
+
+export enum ImportFromVaultOptions {
+	COPY,
+	LINK,
+	SKIP
+}
+
+// Define a type for what resolveChoice will accept
+export type ImportFromVaultChoiceResult = ImportFromVaultOptions | null;
+
+export enum CheckboxOptions {
+	A,
+	B
+}
