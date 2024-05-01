@@ -374,7 +374,6 @@ export default class ImportAttachments extends Plugin {
 
 		const tasks = Array.from(filesToImport).map(async (fileToImport):Promise<string|null> => {
 			const originalFilePath = fileToImport.path;
-			let destFilePath = path.join(attachmentsFolderPath,await Utils.createAttachmentName(this.settings.attachmentName,this.settings.dateFormat,originalFilePath));
 
 			// Check if file already exists in the vault
 			const existingFile = await Utils.checkFileExists(destFilePath);
@@ -779,4 +778,3 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
             })});
 
     }
-}
