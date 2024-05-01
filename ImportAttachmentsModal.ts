@@ -32,8 +32,6 @@ export class ImportActionTypeModal extends Modal {
         });
         this.selectedAction = lastActionFilesOnImport;
         this.selectedEmbedOption = lastEmbedOnImport;
-        
-        console.log("Last embed option:",lastEmbedOnImport);
     }
 
     createToggle(table: HTMLTableElement, questionText: string, optionA: string, optionB: string, initialOption: CheckboxOptions, callback: (selectedOption:CheckboxOptions) => void, withSeparator: boolean = false) {
@@ -316,12 +314,12 @@ export class ImportFromVaultChoiceModal extends Modal {
         			only copying and linking operations are allowed.'});
         }
 
-        container.createEl('p',{text: 'Do you want to make a copy or a link in the new location of the vault?'});
+        container.createEl('p',{text: 'Do you want to make a copy or refer to the original file in the vault through a relative path?'});
 
 	     // Create the 'Move' button inside the container
 	    const buttonContainer = container.createDiv({cls:'import-buttons'});
 	    const linkButton = buttonContainer.createEl('button', {
-	        text: 'Link',
+	        text: 'Relative path',
 	        cls: 'mod-cta'
 	    });
 	    linkButton.addEventListener('click', () => {

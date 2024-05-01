@@ -23,6 +23,7 @@ import {
 		OverwriteChoiceOptions,
 		ImportFromVaultOptions,
         YesNoTypes,
+        RelativeLocation,
 	} from './types';
 import { Utils } from "utils";
 import { relative } from "path";
@@ -38,6 +39,8 @@ const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
     embedFilesOnImport: YesNoTypes.ASK_USER, // Default to linking files
     lastEmbedFilesOnImport: YesNoTypes.NO, // Default to linking
     multipleFilesImportType: MultipleFilesImportTypes.BULLETED, // Default to bulleted list when importing multiple files
+    relativeLocation: RelativeLocation.VAULT, // Default to vault
+    folderPath: '00 Meta/Attachments', // Default to a folder in the vault
     customDisplayText: true,
 };
 
@@ -208,7 +211,7 @@ export default class ImportAttachments extends Plugin {
             return;
         }
 
-        const { attachmentsFolderPath, vaultPath, referencePath } = attachmentsFolder;
+        const { attachmentsFolderPath, vaultPath, currentNoteFolderPath } = attachmentsFolder;
 
         let doMove=false;  // default value, if something goes wrong with parsing the configuration
         let actionFilesOnImport=ImportActionType.COPY; // for safety, the defualt is COPY
@@ -249,19 +252,18 @@ export default class ImportAttachments extends Plugin {
         			break;
         	}
         	embedOption = choice.embed;
-        	console.log("Selected embed option:",embedOption);
         	this.settings.lastEmbedFilesOnImport = embedOption;
         	await this.saveSettings();
         }
 
 		const doEmbed = (embedOption == YesNoTypes.YES);
-		
+
         const importSettings = {
         	embed: doToggleEmbedPreference ? !doEmbed : doEmbed,
         	action: actionFilesOnImport,
         };
 
-        this.moveFileToAttachmentsFolder(files, attachmentsFolderPath, referencePath, vaultPath, editor, view, importSettings);
+        this.moveFileToAttachmentsFolder(files, attachmentsFolderPath, currentNoteFolderPath, vaultPath, editor, view, importSettings);
     }
 
 	getAttachmentFolder(): AttachmentFolderPath {
@@ -275,14 +277,27 @@ export default class ImportAttachments extends Plugin {
 		}
 
 		const vaultPath = adapter.getBasePath();
-		const referencePath = activeFile.parent.path;
+		const currentNoteFolderPath = path.join(vaultPath,activeFile.parent.path);
+		const notename = activeFile.basename;
 		
-		const attachmentsFolderPath = path.join(vaultPath,path.join(referencePath, activeFile.basename + ' (attachments)'));
+		let referencePath = '';
+		switch(this.settings.relativeLocation) {
+		case RelativeLocation.VAULT:
+			referencePath = vaultPath;
+			break;
+		case RelativeLocation.SAME:
+			referencePath = currentNoteFolderPath;
+			break;
+		}
+		
+		let relativePath = this.settings.folderPath.replace(/\$\{notename\}/g, notename);
+
+		const attachmentsFolderPath = path.join(referencePath,relativePath);
 
 		return {
 			attachmentsFolderPath,
 			vaultPath: vaultPath,
-			referencePath: activeFile.parent.path,
+			currentNoteFolderPath: currentNoteFolderPath,
 		};
 	}
 
@@ -313,7 +328,7 @@ export default class ImportAttachments extends Plugin {
             return;
         }
 
-        const { attachmentsFolderPath, vaultPath, referencePath } = attachmentsFolder;
+        const { attachmentsFolderPath, vaultPath, currentNoteFolderPath: referencePath } = attachmentsFolder;
 
         const input = document.createElement("input");
         input.type = "file";
@@ -335,7 +350,7 @@ export default class ImportAttachments extends Plugin {
 		input.click(); // Trigger the file input dialog
     }
 
-    async moveFileToAttachmentsFolder(filesToImport: FileList, attachmentsFolderPath: string, referencePath: string, vaultPath: string, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface) {
+    async moveFileToAttachmentsFolder(filesToImport: FileList, attachmentsFolderPath: string, currentNoteFolderPath: string, vaultPath: string, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface) {
         // Ensure the directory exists before moving the file
         await Utils.ensureDirectoryExists(attachmentsFolderPath);
 
@@ -434,7 +449,7 @@ export default class ImportAttachments extends Plugin {
 		let counter = 0;
 		results.forEach((importedFilePath: (string|null), index: number) => {
 		    if (importedFilePath) {
-		    	this.insertLinkToEditor(path.join(vaultPath,referencePath), importedFilePath, editor, view, importSettings, multipleFiles ? index+1 : 0);
+		    	this.insertLinkToEditor(currentNoteFolderPath, importedFilePath, editor, view, importSettings, multipleFiles ? index+1 : 0);
 		    }
 		});
 
@@ -485,12 +500,12 @@ export default class ImportAttachments extends Plugin {
 		shell.openPath(attachmentsFolder.attachmentsFolderPath);
 	}
 
-	insertLinkToEditor(referencePath: string, importedFilePath: string, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface, counter: number) {
+	insertLinkToEditor(currentNoteFolderPath: string, importedFilePath: string, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface, counter: number) {
 		// Extract just the file name from the path
 
 		const filename=Utils.getFilename(importedFilePath);
-		const relativePath=path.relative(referencePath, importedFilePath);
-
+		const relativePath=path.relative(currentNoteFolderPath, importedFilePath);
+		
 		let prefix = '';
 		let postfix = '';
 		let customDisplay = '';
@@ -575,8 +590,11 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 
         containerEl.empty();
 
-        containerEl.createEl('h2', { text: 'Settings for Import Attachments+ Plugin' });
+		
+		containerEl.createEl('h2', { text: 'Settings for Import Attachments+ Plugin' });
 
+		containerEl.createEl('h3', { text: 'Import options' });
+		
         new Setting(containerEl)
         	.setName('Whether to move or copy files that are drag-and-dropped?')
             .setDesc('Choose whether files that are dragged and dropped into the editor should be moved or copied. Alternatively, the user is asked each time.')
@@ -663,5 +681,34 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
                     this.plugin.settings.customDisplayText = value;
                     await this.plugin.saveSettings();
             }));
+
+		containerEl.createEl('h3', { text: 'Attachment folder configuration' });
+
+        new Setting(containerEl)
+            .setName('Default location for new attachments:')
+            .setDesc('The reference folder for importing new attachments.')
+            .addDropdown(dropdown => {
+                dropdown.addOption(RelativeLocation.VAULT, 'Vault folder');
+                dropdown.addOption(RelativeLocation.SAME, 'Same folder as current file');
+                dropdown.setValue(this.plugin.settings.relativeLocation)
+                .onChange(async (value: string) => {
+                	if (Object.values(RelativeLocation).includes(value as RelativeLocation)) {
+                		this.plugin.settings.relativeLocation = value as RelativeLocation;
+                    	await this.plugin.saveSettings();
+					} else {
+                    	console.error('Invalid option selection:', value);
+                    }
+            })});
+
+        new Setting(containerEl)
+            .setName('Folder relative to the default location to import new attachments:')
+            .setDesc('Where newly created notes are placed. Use ${notename} as a placeholder for the name of the note.')
+            .addText(text => {
+                text.setPlaceholder('Enter folder path');
+                text.setValue(this.plugin.settings.folderPath);
+                text.onChange(async (value: string) => {
+            		this.plugin.settings.folderPath = value;
+                	await this.plugin.saveSettings();
+            })});
     }
 }

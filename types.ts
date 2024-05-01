@@ -28,6 +28,11 @@ export enum ImportOperationType {
     DRAG_AND_DROP
 }
 
+export enum RelativeLocation {
+   	SAME='SAME', // Same folder as current file
+   	VAULT='VAULT', // Vault folder
+}
+
 export interface ImportAttachmentsSettings {
     actionDroppedFilesOnImport: ImportActionType;
     lastActionDroppedFilesOnImport: ImportActionType;
@@ -37,13 +42,15 @@ export interface ImportAttachmentsSettings {
     lastEmbedFilesOnImport: YesNoTypes;
     multipleFilesImportType: MultipleFilesImportTypes;
     customDisplayText: boolean;
+    relativeLocation: RelativeLocation;
+    folderPath: string;
 }
 
 // Define an interface for the return type
 export interface AttachmentFolderPath {
     attachmentsFolderPath: string;
     vaultPath: string;
-    referencePath: string;
+    currentNoteFolderPath: string;
 }
 
 export interface ImportSettingsInterface {
