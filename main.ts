@@ -24,6 +24,7 @@ import {
 		ImportFromVaultOptions,
         YesNoTypes,
         RelativeLocation,
+        LinkFormat,
 	} from './types';
 import { Utils } from "utils";
 import { relative } from "path";
@@ -41,6 +42,7 @@ const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
     multipleFilesImportType: MultipleFilesImportTypes.BULLETED, // Default to bulleted list when importing multiple files
     relativeLocation: RelativeLocation.VAULT, // Default to vault
     folderPath: '00 Meta/Attachments', // Default to a folder in the vault
+    linkFormat: LinkFormat.ABSOLUTE,
     customDisplayText: true,
 };
 
@@ -449,7 +451,7 @@ export default class ImportAttachments extends Plugin {
 		let counter = 0;
 		results.forEach((importedFilePath: (string|null), index: number) => {
 		    if (importedFilePath) {
-		    	this.insertLinkToEditor(currentNoteFolderPath, importedFilePath, editor, view, importSettings, multipleFiles ? index+1 : 0);
+		    	this.insertLinkToEditor(currentNoteFolderPath, vaultPath, importedFilePath, editor, view, importSettings, multipleFiles ? index+1 : 0);
 		    }
 		});
 
@@ -500,11 +502,20 @@ export default class ImportAttachments extends Plugin {
 		shell.openPath(attachmentsFolder.attachmentsFolderPath);
 	}
 
-	insertLinkToEditor(currentNoteFolderPath: string, importedFilePath: string, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface, counter: number) {
+	insertLinkToEditor(currentNoteFolderPath: string, vaultPath: string, importedFilePath: string, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface, counter: number) {
 		// Extract just the file name from the path
 
 		const filename=Utils.getFilename(importedFilePath);
-		const relativePath=path.relative(currentNoteFolderPath, importedFilePath);
+
+		switch(this.settings.linkFormat) {
+		case LinkFormat.RELATIVE:
+			var relativePath=path.relative(currentNoteFolderPath, importedFilePath);	
+			break;
+		case LinkFormat.ABSOLUTE:
+		default:
+			var relativePath=path.relative(vaultPath,importedFilePath);	
+			break;
+		}	
 		
 		let prefix = '';
 		let postfix = '';
@@ -709,6 +720,22 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
                 text.onChange(async (value: string) => {
             		this.plugin.settings.folderPath = value;
                 	await this.plugin.saveSettings();
+            })});
+
+        new Setting(containerEl)
+            .setName('Attachment link format:')
+            .setDesc('What types of links to use for the imported attachments.')
+            .addDropdown(dropdown => {
+                dropdown.addOption(LinkFormat.RELATIVE, 'With respect to the note\'s path (relative path)');
+                dropdown.addOption(LinkFormat.ABSOLUTE, 'With respect to the vault\'s path (absolute path)');
+                dropdown.setValue(this.plugin.settings.linkFormat)
+                .onChange(async (value: string) => {
+                	if (Object.values(LinkFormat).includes(value as LinkFormat)) {
+                		this.plugin.settings.linkFormat = value as LinkFormat;
+                    	await this.plugin.saveSettings();
+					} else {
+                    	console.error('Invalid option selection:', value);
+                    }
             })});
     }
 }

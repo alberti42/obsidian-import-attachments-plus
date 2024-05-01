@@ -88,7 +88,7 @@ namespace Utils {
 	export async function ensureDirectoryExists(path: string): Promise<boolean> {
 		const doExist = await checkDirectoryExists(path);
 		if (!doExist) {
-			await fs.mkdir(path);
+			await fs.mkdir(path,{recursive: true});
 		}
 		return true;
 	}

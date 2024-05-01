@@ -33,6 +33,11 @@ export enum RelativeLocation {
    	VAULT='VAULT', // Vault folder
 }
 
+export enum LinkFormat {
+   	RELATIVE='RELATIVE', // Same folder as current file
+   	ABSOLUTE='ABSOLUTE', // Vault folder
+}
+
 export interface ImportAttachmentsSettings {
     actionDroppedFilesOnImport: ImportActionType;
     lastActionDroppedFilesOnImport: ImportActionType;
@@ -44,6 +49,7 @@ export interface ImportAttachmentsSettings {
     customDisplayText: boolean;
     relativeLocation: RelativeLocation;
     folderPath: string;
+    linkFormat: LinkFormat;
 }
 
 // Define an interface for the return type
