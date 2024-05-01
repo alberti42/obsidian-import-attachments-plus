@@ -1,4 +1,4 @@
-# Obsidian Sample Plugin
+# Import Attachments+
 
 This is a sample plugin for Obsidian (https://obsidian.md).
 
