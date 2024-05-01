@@ -22,6 +22,7 @@ import {
 		OverwriteChoiceResult,
 		OverwriteChoiceOptions,
 		ImportFromVaultOptions,
+        YesNoTypes,
 	} from './types';
 import { Utils } from "utils";
 import { relative } from "path";
@@ -34,7 +35,8 @@ const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
     actionPastedFilesOnImport: ImportActionType.ASK_USER, // Default to asking the user
     lastActionPastedFilesOnImport: ImportActionType.COPY, // Default to copying files
     lastActionDroppedFilesOnImport: ImportActionType.COPY, // Default to copying files
-    embedFilesOnImport: false, // Default to linking files
+    embedFilesOnImport: YesNoTypes.ASK_USER, // Default to linking files
+    lastEmbedFilesOnImport: YesNoTypes.NO, // Default to linking
     multipleFilesImportType: MultipleFilesImportTypes.BULLETED, // Default to bulleted list when importing multiple files
     customDisplayText: true,
 };
@@ -223,8 +225,11 @@ export default class ImportAttachments extends Plugin {
         	break;
         }
 
-        if (actionFilesOnImport == ImportActionType.ASK_USER) {
-        	let modal = new ImportActionTypeModal(this.app, this, lastActionFilesOnImport);
+		let embedOption = this.settings.embedFilesOnImport;
+		const lastEmbedOption = this.settings.lastEmbedFilesOnImport;
+
+        if (actionFilesOnImport == ImportActionType.ASK_USER || embedOption == YesNoTypes.ASK_USER) {
+        	let modal = new ImportActionTypeModal(this.app, this, lastActionFilesOnImport, lastEmbedOption);
         	modal.open();
         	const choice = await modal.promise;
         	if (choice == null) return; // return if the user closes the modal without preferences        		
@@ -232,22 +237,25 @@ export default class ImportAttachments extends Plugin {
         	switch (importType) {
         		case ImportOperationType.DRAG_AND_DROP:
         			if (choice.rememberChoice) {
-        				this.settings.actionPastedFilesOnImport = actionFilesOnImport;
-        			}
-        			this.settings.lastActionPastedFilesOnImport = actionFilesOnImport;
-        			break;
-        		case ImportOperationType.PASTE:
-        			if (choice.rememberChoice) {
         				this.settings.actionDroppedFilesOnImport = actionFilesOnImport;
         			}
         			this.settings.lastActionDroppedFilesOnImport = actionFilesOnImport;
         			break;
+        		case ImportOperationType.PASTE:
+        			if (choice.rememberChoice) {
+        				this.settings.actionPastedFilesOnImport = actionFilesOnImport;
+        			}
+        			this.settings.lastActionPastedFilesOnImport = actionFilesOnImport;
+        			break;
         	}
+        	embedOption = choice.embed;
+        	console.log("Selected embed option:",embedOption);
+        	this.settings.lastEmbedFilesOnImport = embedOption;
         	await this.saveSettings();
         }
-        
-        const doEmbed = this.settings.embedFilesOnImport;
 
+		const doEmbed = (embedOption == YesNoTypes.YES);
+		
         const importSettings = {
         	embed: doToggleEmbedPreference ? !doEmbed : doEmbed,
         	action: actionFilesOnImport,
@@ -570,18 +578,17 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
         containerEl.createEl('h2', { text: 'Settings for Import Attachments+ Plugin' });
 
         new Setting(containerEl)
-        	.setName('Whether to Move or Copy Files that are Drag and Dropped?')
+        	.setName('Whether to move or copy files that are drag-and-dropped?')
             .setDesc('Choose whether files that are dragged and dropped into the editor should be moved or copied. Alternatively, the user is asked each time.')
         	.addDropdown(dropdown => {
+                dropdown.addOption(ImportActionType.ASK_USER, 'Ask each time');
                 dropdown.addOption(ImportActionType.MOVE, 'Move');
                 dropdown.addOption(ImportActionType.COPY, 'Copy');
-                dropdown.addOption(ImportActionType.ASK_USER, 'Ask the user');
                 dropdown.setValue(this.plugin.settings.actionDroppedFilesOnImport)
                 .onChange(async (value: string) => {
                 	if (value in ImportActionType) {
                     	this.plugin.settings.actionDroppedFilesOnImport = value as ImportActionType;
-                    	if(value != ImportActionType.ASK_USER)
-                    	{
+                    	if(value != ImportActionType.ASK_USER) {
                     		this.plugin.settings.lastActionDroppedFilesOnImport = value as ImportActionType;
                     	}
                     	await this.plugin.saveSettings();
@@ -591,16 +598,19 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
             })});
 
         new Setting(containerEl)
-        	.setName('Whether to Move or Copy Files that are Copy and Pasted?')
+        	.setName('Whether to move or copy files that are copy-and-pasted?')
             .setDesc('Choose whether files that are copy and pasted into the editor should be moved or copied. Alternatively, the user is asked each time.')
         	.addDropdown(dropdown => {
+                dropdown.addOption(ImportActionType.ASK_USER, 'Ask each time');
                 dropdown.addOption(ImportActionType.MOVE, 'Move');
                 dropdown.addOption(ImportActionType.COPY, 'Copy');
-                dropdown.addOption(ImportActionType.ASK_USER, 'Ask the user');
                 dropdown.setValue(this.plugin.settings.actionPastedFilesOnImport)
                 .onChange(async (value: string) => {
                 	if (value in ImportActionType) {
                     	this.plugin.settings.actionPastedFilesOnImport = value as ImportActionType;
+                    	if(value != ImportActionType.ASK_USER) {
+                    		this.plugin.settings.lastActionPastedFilesOnImport = value as ImportActionType;
+                    	}
                     	await this.plugin.saveSettings();
                     } else {
                     	console.error('Invalid import action type:', value);
@@ -608,14 +618,24 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
             })});
 
         new Setting(containerEl)
-            .setName('Embed Imported Documents')
+            .setName('Embed imported documents:')
             .setDesc('If this option is activated, the files are imported as an embedded document; if it is deactivated, they are imported as a linked document.  However, by holding the SHIFT key pressed, the plugin\'s behavior will be the opposite of what is here selected.')
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.embedFilesOnImport)
-                .onChange(async (value: boolean) => {
-                    this.plugin.settings.embedFilesOnImport = value;
-                    await this.plugin.saveSettings();
-            }));
+            .addDropdown(dropdown => {
+                dropdown.addOption(YesNoTypes.ASK_USER, 'Ask each time');
+                dropdown.addOption(YesNoTypes.YES, 'Yes');
+                dropdown.addOption(YesNoTypes.NO, 'No');
+                dropdown.setValue(this.plugin.settings.embedFilesOnImport)
+                .onChange(async (value: string) => {
+                	if (Object.values(YesNoTypes).includes(value as YesNoTypes)) {
+                		this.plugin.settings.embedFilesOnImport = value as YesNoTypes;
+                		if(value != YesNoTypes.ASK_USER) {
+                    		this.plugin.settings.lastEmbedFilesOnImport = value as YesNoTypes;
+                    	}
+                    	await this.plugin.saveSettings();
+					} else {
+                    	console.error('Invalid option selection:', value);
+                    }
+            })});
 
         new Setting(containerEl)
             .setName('Import multiple files as:')
@@ -630,12 +650,12 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
                 		this.plugin.settings.multipleFilesImportType = value as MultipleFilesImportTypes;
                     	await this.plugin.saveSettings();
 					} else {
-                    	console.error('Invalid import action type:', value);
+                    	console.error('Invalid option selection:', value);
                     }
             })});
 
 	    new Setting(containerEl)
-            .setName('Set Custom Display Text for Links')
+            .setName('Insert display text for links based on filename:')
             .setDesc('If this option is activated, the basename of the imported document is used as in place of the custom display text.')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.customDisplayText)

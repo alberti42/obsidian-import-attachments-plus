@@ -11,6 +11,12 @@ export enum ImportActionType {
 	ASK_USER='ASK_USER'
 }
 
+export enum YesNoTypes {
+	YES='YES',
+	NO='NO',
+	ASK_USER='ASK_USER'
+}
+
 export enum MultipleFilesImportTypes {
 	BULLETED='BULLETED',
 	NUMBERED='NUMBERED',
@@ -27,7 +33,8 @@ export interface ImportAttachmentsSettings {
     lastActionDroppedFilesOnImport: ImportActionType;
     actionPastedFilesOnImport: ImportActionType;
     lastActionPastedFilesOnImport: ImportActionType;
-    embedFilesOnImport: boolean;
+    embedFilesOnImport: YesNoTypes;
+    lastEmbedFilesOnImport: YesNoTypes;
     multipleFilesImportType: MultipleFilesImportTypes;
     customDisplayText: boolean;
 }
@@ -47,6 +54,7 @@ export interface ImportSettingsInterface {
 // Define a type for what resolveChoice will accept
 export type ImportActionChoiceResult = {
     action: ImportActionType;
+    embed: YesNoTypes;
     rememberChoice: boolean;
 } | null;
 

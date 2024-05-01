@@ -9,6 +9,7 @@ import {
 		ImportFromVaultChoiceResult,
 		CheckboxOptions,
         ImportSettingsInterface,
+        YesNoTypes,
         // ImportOperationType,
 	} from './types';
 import { Utils } from "utils";
@@ -19,15 +20,20 @@ const path = require("path"); // Node.js path module to handle path operations
 export class ImportActionTypeModal extends Modal {
     promise: Promise<ImportActionChoiceResult>;
     private resolveChoice: (result: ImportActionChoiceResult) => void = () => {};  // To resolve the promise. Initialize with a no-op function
-	private selectedAction: ImportActionType = ImportActionType.COPY;
+	private selectedAction: ImportActionType;
+	private selectedEmbedOption: YesNoTypes;
 	private rememberChoice: boolean = false;  // Private variable to store the checkbox state
     
-    constructor(app: App, private plugin: ImportAttachments,private lastActionFilesOnImport: ImportActionType) {
+    constructor(app: App, private plugin: ImportAttachments, private lastActionFilesOnImport: ImportActionType, private lastEmbedOnImport: YesNoTypes) {
     	// use TypeScript `parameter properties` to initialize `plugin`.
         super(app);
         this.promise = new Promise<ImportActionChoiceResult>((resolve) => {
             this.resolveChoice = resolve;
         });
+        this.selectedAction = lastActionFilesOnImport;
+        this.selectedEmbedOption = lastEmbedOnImport;
+        
+        console.log("Last embed option:",lastEmbedOnImport);
     }
 
     createToggle(table: HTMLTableElement, questionText: string, optionA: string, optionB: string, initialOption: CheckboxOptions, callback: (selectedOption:CheckboxOptions) => void, withSeparator: boolean = false) {
@@ -66,6 +72,8 @@ export class ImportActionTypeModal extends Modal {
 	}
 
     onOpen() {
+    	let initialOption;
+
     	const { contentEl } = this;
 
     	const container = contentEl.createDiv({ cls: 'import-attach-plugin' });
@@ -74,9 +82,7 @@ export class ImportActionTypeModal extends Modal {
     	container.createEl('p', { text: 'Configure the import options and then press either enter or the import button.' });
 
 	    const table = container.createEl('table');
-
-		let initialOption;
-
+		
 		switch(this.lastActionFilesOnImport){
 		case ImportActionType.MOVE:
 			initialOption = CheckboxOptions.A;
@@ -88,11 +94,30 @@ export class ImportActionTypeModal extends Modal {
 		}
 
 	    // Creating action toggle
-	    this.createToggle(table, 'Do you want to move or copy files?', 'Move', 'Copy', initialOption, (selectedOption:CheckboxOptions) => {
+	    this.createToggle(table, 'Do you want to move or copy the files to the vault?', 'Move', 'Copy', initialOption, (selectedOption:CheckboxOptions) => {
 	    	if(selectedOption==CheckboxOptions.A){
 		    	this.selectedAction = ImportActionType.MOVE;
 		    } else {
 		    	this.selectedAction = ImportActionType.COPY;
+		    }
+	    }, true);
+
+		switch(this.lastEmbedOnImport){
+		case YesNoTypes.YES:
+			initialOption = CheckboxOptions.A;
+			break;
+		case YesNoTypes.NO:
+		default:
+			initialOption = CheckboxOptions.B;
+			break;
+		}
+
+	    // Creating action toggle
+	    this.createToggle(table, 'Do you want to embed or link the files to the vault?', 'Embed', 'Link', initialOption, (selectedOption:CheckboxOptions) => {
+	    	if(selectedOption==CheckboxOptions.A){
+		    	this.selectedEmbedOption = YesNoTypes.YES;
+		    } else {
+		    	this.selectedEmbedOption = YesNoTypes.NO;
 		    }
 	    }, true);
 
@@ -145,6 +170,7 @@ export class ImportActionTypeModal extends Modal {
     async import() {
         this.resolveChoice({
             action: this.selectedAction,
+            embed: this.selectedEmbedOption,
             rememberChoice: this.rememberChoice
         });
     	this.close(); 
