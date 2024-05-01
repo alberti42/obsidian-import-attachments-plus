@@ -43,6 +43,7 @@ const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
     relativeLocation: RelativeLocation.VAULT, // Default to vault
     folderPath: '00 Meta/Attachments', // Default to a folder in the vault
     linkFormat: LinkFormat.ABSOLUTE,
+    dateFormat: 'YYYY_MM_DDTHH_mm_ss',
     customDisplayText: true,
 };
 
@@ -185,7 +186,7 @@ export default class ImportAttachments extends Plugin {
 			})
 		);
 
-		console.log('Loaded plugin Import Attachments+');
+		console.log('Loaded plugin Import Attachments+!!!');
 	}
 
     async loadSettings() {
@@ -737,5 +738,35 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
                     	console.error('Invalid option selection:', value);
                     }
             })});
+
+        new Setting(containerEl)
+            .setName('Name of the imported attachments:')
+            .setDesc('Choose how to name the imported attachments, using the following variables as a placeholder:<br>\'${notename}\' for the note name, \
+             		\'${date}\' for the current date, \'${original}\' for the name of the original file, \'${md5}\' for a MD5 hash of the attachment.')
+            .addText(text => {
+                text.setPlaceholder('Enter attachment name');
+                text.setValue(this.plugin.settings.attachmentName);
+                text.onChange(async (value: string) => {
+            		this.plugin.settings.attachmentName = value;
+                	await this.plugin.saveSettings();
+            })});
+
+        new Setting(containerEl)
+            .setName('Date formattt:')
+            .setDesc(createFragment((frag) => {
+            		frag.appendText('Choose the date format, based on ');
+                    frag.createEl('a', {
+                        href: 'https://momentjscom.readthedocs.io/en/latest/moment/04-displaying/01-format',
+                        text: 'momentjs',
+                    });
+                    frag.appendText('syntax.')}))
+            .addText(text => {
+                text.setPlaceholder('Enter attachment name');
+                text.setValue(this.plugin.settings.attachmentName);
+                text.onChange(async (value: string) => {
+            		this.plugin.settings.attachmentName = value;
+                	await this.plugin.saveSettings();
+            })});
+
     }
 }

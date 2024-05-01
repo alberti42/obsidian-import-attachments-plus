@@ -50,6 +50,8 @@ export interface ImportAttachmentsSettings {
     relativeLocation: RelativeLocation;
     folderPath: string;
     linkFormat: LinkFormat;
+    dateFormat: string;
+    attachmentName: string;
 }
 
 // Define an interface for the return type
