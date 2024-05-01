@@ -9,9 +9,10 @@ import {
 	PluginSettingTab,
 	Setting,
 	TFile,
+	TAbstractFile,
 } from "obsidian";
 
-import {ImportActionTypeModal, OverwriteChoiceModal, ImportFromVaultChoiceModal} from './ImportAttachmentsModal';
+import {ImportActionTypeModal, OverwriteChoiceModal, ImportFromVaultChoiceModal, DeleteAttachmentFolderModal} from './ImportAttachmentsModal';
 import {
 		ImportActionType,
 		MultipleFilesImportTypes,
@@ -27,7 +28,7 @@ import {
         LinkFormat,
 	} from './types';
 import { Utils } from "utils";
-import { relative } from "path";
+import { ParsedPath, relative } from "path";
 
 const fs = require("fs").promises; // Ensure you're using the promise-based version of fs
 const path = require("path"); // Node.js path module to handle path operations
@@ -45,13 +46,26 @@ const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
     linkFormat: LinkFormat.ABSOLUTE,
     attachmentName: '${original}', // Default to the original name of the attachment
     dateFormat: 'YYYY_MM_DDTHH_mm_ss',
-    customDisplayText: true,
+    customDisplayText: true,  // Default to true
+    autoRenameAttachmentFolder: true, // Default to true
+    autoDeleteAttachmentFolder: true, // Default to true
+    confirmDeleteAttachmentFolder: true, // Default to true
 };
 
 export default class ImportAttachments extends Plugin {
 	settings: ImportAttachmentsSettings = DEFAULT_SETTINGS;
+	private vaultPath: string | null = null;
+	private renameCallbackEnabled: boolean = true;
+	private deleteCallbackEnabled: boolean = true;
 
 	async onload() {
+		// store the vault path
+		const adapter = this.app.vault.adapter;
+		if (!(adapter instanceof FileSystemAdapter)) {
+			throw new Error("The vault folder could not be determined.");
+		}
+		this.vaultPath = adapter.getBasePath();
+
 		await this.loadSettings();
         // Add settings tab
         this.addSettingTab(new ImportAttachmentsSettingTab(this.app, this));
@@ -187,6 +201,81 @@ export default class ImportAttachments extends Plugin {
 			})
 		);
 
+	     this.registerEvent(
+            this.app.vault.on('rename', async (newFile: TAbstractFile, oldPath: string) => {
+            	if(!this.settings.autoRenameAttachmentFolder) { return }
+
+            	if(this.renameCallbackEnabled) {
+            		const oldPath_parsed = path.parse(oldPath);
+            		if(oldPath_parsed.ext != ".md") { return }
+
+	            	const oldAttachmentFolderPath = this.getAttachmentFolder(oldPath_parsed);
+					if(!oldAttachmentFolderPath) { return }
+	
+					if(await Utils.checkDirectoryExists(oldAttachmentFolderPath.attachmentsFolderPath)) {
+	
+						const newAttachmentFolderPath = this.getAttachmentFolder(path.parse(newFile.path));
+						if(!newAttachmentFolderPath) { return };
+						
+						const oldPath = path.relative(this.vaultPath,oldAttachmentFolderPath.attachmentsFolderPath);
+						const newPath = path.relative(this.vaultPath,newAttachmentFolderPath.attachmentsFolderPath);
+						try {
+							this.renameCallbackEnabled = false;
+							await this.renameFile(oldPath,newPath);
+						} catch (error: unknown) {
+        					const msg = 'Failed to rename the attachment folder';
+            				console.error(msg);
+            				console.error("Original attachment folder:",oldPath);
+            				console.error("New attachment folder:",newPath);
+            				console.error("Error msg:", error);
+            				new Notice(msg+'.');
+            			} finally {
+							this.renameCallbackEnabled = true;
+						}
+					}
+				}
+            })
+        );
+
+	    this.registerEvent(
+	    	this.app.vault.on("delete", async (file: TAbstractFile) => {
+	    		if(!this.settings.autoDeleteAttachmentFolder) { return }
+    	
+	    		// automatic deletion only works when the attachment name contains ${notename}
+	    		// in order to avoid deleting common attachment folder, shared between multiple notes
+    			if(!this.settings.folderPath.includes('${notename}')) { return }
+
+            	if(this.deleteCallbackEnabled) {
+            		const file_parsed = path.parse(file.path);
+            		if(file_parsed.ext != ".md") { return }
+
+	            	const attachmentFolderPath = this.getAttachmentFolder(file_parsed);
+					if(!attachmentFolderPath) { return }
+
+					if(await Utils.checkDirectoryExists(attachmentFolderPath.attachmentsFolderPath)) {
+						let modal = new DeleteAttachmentFolderModal(this.app, this, attachmentFolderPath.attachmentsFolderPath);
+				    	modal.open();
+	    				const choice = await modal.promise;
+	    				if (!choice) return;
+
+						const filePath = path.relative(this.vaultPath,attachmentFolderPath.attachmentsFolderPath);
+					
+						try {
+							this.deleteCallbackEnabled = false;
+							await this.trashFile(filePath);
+						} catch (error: unknown) {
+        					const msg = 'Failed to remove the attachment folder';
+            				console.error(msg + ":", filePath);
+            				console.error("Error msg:", error);
+            				new Notice(msg+'.');
+            			} finally {
+							this.deleteCallbackEnabled = true;
+						}
+					}
+				}
+	    	})
+	    );
+
 		console.log('Loaded plugin Import Attachments+');
 	}
 
@@ -198,24 +287,43 @@ export default class ImportAttachments extends Plugin {
         await this.saveData(this.settings);
     }
 
-    async handleFiles(files: FileList, editor: Editor, view: MarkdownView, doToggleEmbedPreference: boolean, importType: ImportOperationType) {
-        let attachmentsFolder;
+	async renameFile(oldFilePath: string, newFilePath: string): Promise<void> {
         try {
-            attachmentsFolder = this.getAttachmentFolder();
-        } catch (error: unknown) {
-        	if (error instanceof Error) {
-            	console.error(error.message);
-            	new Notice(error.message);
+            const file = this.app.vault.getAbstractFileByPath(oldFilePath);
+            if (file instanceof TAbstractFile) {
+                await this.app.fileManager.renameFile(file, newFilePath);
+                new Notice('Attachment folder renamed successfully.');
             } else {
-            	// If it's not an Error, log it as a string or use a default message
-            	let msg="An unknown error occurred";
-            	console.error(msg+":", error);
-            	new Notice(msg);
-        	}
-            return;
+                new Notice('Attachment folder could not be found at the given location.');
+            }
+        } catch (error: unknown) {
+        	const msg = 'Failed to rename file';
+            console.error(msg+':', error);
+            new Notice(msg+'.');
         }
+    }
 
-        const { attachmentsFolderPath, vaultPath, currentNoteFolderPath } = attachmentsFolder;
+    async trashFile(filePath: string): Promise<void> {
+        try {
+            const file = this.app.vault.getAbstractFileByPath(filePath);
+            if (file instanceof TAbstractFile) {
+                await await this.app.vault.adapter.trashSystem(filePath);
+                new Notice('Attachment folder moved to system trash successfully.');
+            } else {
+                new Notice('Attachment folder could not be found at the given location.');
+            }
+        } catch (error: unknown) {
+        	const msg = 'Failed to rename file';
+            console.error(msg+':', error);
+            new Notice(msg+'.');
+        }
+    }
+
+    async handleFiles(files: FileList, editor: Editor, view: MarkdownView, doToggleEmbedPreference: boolean, importType: ImportOperationType) {
+        const attachmentsFolder = this.getAttachmentFolder();
+        if(!attachmentsFolder){ return };
+
+        const { attachmentsFolderPath, currentNoteFolderPath } = attachmentsFolder;
 
         let doMove=false;  // default value, if something goes wrong with parsing the configuration
         let actionFilesOnImport=ImportActionType.COPY; // for safety, the defualt is COPY
@@ -256,6 +364,9 @@ export default class ImportAttachments extends Plugin {
         			break;
         	}
         	embedOption = choice.embed;
+        	if (choice.rememberChoice) {
+	        	this.settings.embedFilesOnImport = embedOption;	
+        	}
         	this.settings.lastEmbedFilesOnImport = embedOption;
         	await this.saveSettings();
         }
@@ -267,42 +378,60 @@ export default class ImportAttachments extends Plugin {
         	action: actionFilesOnImport,
         };
 
-        this.moveFileToAttachmentsFolder(files, attachmentsFolderPath, currentNoteFolderPath, vaultPath, editor, view, importSettings);
+        this.moveFileToAttachmentsFolder(files, attachmentsFolderPath, currentNoteFolderPath, editor, view, importSettings);
     }
 
-	getAttachmentFolder(): AttachmentFolderPath {
-		const activeFile = this.app.workspace.getActiveFile();
-		const adapter = this.app.vault.adapter;
-		if (!(adapter instanceof FileSystemAdapter)) {
-			throw new Error("The vault folder could not be determined.");
-		}
-		if (!activeFile || activeFile.extension !== "md" || !activeFile.parent) {
-			throw new Error("No Markdown file is currently open in a directory. Please open a Markdown file to use this feature.");
-		}
+	getAttachmentFolder(noteFilePath: ParsedPath | null = null): AttachmentFolderPath | null {
+		try {
+			// Get the current active note if noteFilePath is not provided
+			if(!noteFilePath) {
+				noteFilePath = ( ():ParsedPath => {
+					const activeFile = this.app.workspace.getActiveFile();
+					if(activeFile==null) {
+						throw new Error("The active note could not be determined.");
+					}
+					return path.parse(activeFile.path);
+				})()
+			};
+			
+			if (!noteFilePath || noteFilePath.ext !== ".md") {
+				throw new Error("No Markdown file was found.");
+			}
 
-		const vaultPath = adapter.getBasePath();
-		const currentNoteFolderPath = path.join(vaultPath,activeFile.parent.path);
-		const notename = activeFile.basename;
-		
-		let referencePath = '';
-		switch(this.settings.relativeLocation) {
-		case RelativeLocation.VAULT:
-			referencePath = vaultPath;
-			break;
-		case RelativeLocation.SAME:
-			referencePath = currentNoteFolderPath;
-			break;
-		}
-		
-		let relativePath = this.settings.folderPath.replace(/\$\{notename\}/g, notename);
+			if(!this.vaultPath) return null;
 
-		const attachmentsFolderPath = path.join(referencePath,relativePath);
+			const noteFolderPath = path.join(this.vaultPath,noteFilePath.dir);
+			const notename = noteFilePath.name;
+			
+			let referencePath = '';
+			switch(this.settings.relativeLocation) {
+			case RelativeLocation.VAULT:
+				referencePath = this.vaultPath;
+				break;
+			case RelativeLocation.SAME:
+				referencePath = noteFolderPath;
+				break;
+			}
+			
+			let relativePath = this.settings.folderPath.replace(/\$\{notename\}/g, notename);
 
-		return {
-			attachmentsFolderPath,
-			vaultPath: vaultPath,
-			currentNoteFolderPath: currentNoteFolderPath,
-		};
+			const attachmentsFolderPath = path.join(referencePath,relativePath);
+
+			return {
+				attachmentsFolderPath,
+				currentNoteFolderPath: noteFolderPath,
+			};
+		} catch (error: unknown) {
+        	if (error instanceof Error) {
+            	console.error(error.message);
+            	new Notice(error.message);
+            } else {
+         	   // If it's not an Error, log it as a string or use a default message
+            	console.error("An unknown error occurred:", error);
+            	new Notice("An unknown error occurred");
+        	}
+            return null;
+        }
 	}
 
 	async chooseFileToImport(importSettings: ImportSettingsInterface) {
@@ -317,22 +446,10 @@ export default class ImportAttachments extends Plugin {
 			return;
 		}
 
-        let attachmentsFolder;
-        try {
-            attachmentsFolder = this.getAttachmentFolder();
-        } catch (error: unknown) {
-        	if (error instanceof Error) {
-            	console.error(error.message);
-            	new Notice(error.message);
-            } else {
-         	   // If it's not an Error, log it as a string or use a default message
-            	console.error("An unknown error occurred:", error);
-            	new Notice("An unknown error occurred");
-        	}
-            return;
-        }
+        const attachmentsFolder = this.getAttachmentFolder();
+        if(!attachmentsFolder){ return };
 
-        const { attachmentsFolderPath, vaultPath, currentNoteFolderPath: referencePath } = attachmentsFolder;
+        const { attachmentsFolderPath, currentNoteFolderPath: referencePath } = attachmentsFolder;
 
         const input = document.createElement("input");
         input.type = "file";
@@ -344,7 +461,7 @@ export default class ImportAttachments extends Plugin {
 
 		    if (files && files.length > 0) {
 		        // Directly pass the FileList to the processing function
-		        await this.moveFileToAttachmentsFolder(files, attachmentsFolderPath, referencePath, vaultPath, editor, markdownView, importSettings);
+		        await this.moveFileToAttachmentsFolder(files, attachmentsFolderPath, referencePath, editor, markdownView, importSettings);
 		    } else {
 		        let msg = "No files selected or file access error.";
 		        console.error(msg);
@@ -354,7 +471,7 @@ export default class ImportAttachments extends Plugin {
 		input.click(); // Trigger the file input dialog
     }
 
-    async moveFileToAttachmentsFolder(filesToImport: FileList, attachmentsFolderPath: string, currentNoteFolderPath: string, vaultPath: string, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface) {
+    async moveFileToAttachmentsFolder(filesToImport: FileList, attachmentsFolderPath: string, currentNoteFolderPath: string, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface) {
         // Ensure the directory exists before moving the file
         await Utils.ensureDirectoryExists(attachmentsFolderPath);
 
@@ -374,7 +491,8 @@ export default class ImportAttachments extends Plugin {
 
 		const tasks = Array.from(filesToImport).map(async (fileToImport):Promise<string|null> => {
 			const originalFilePath = fileToImport.path;
-			let destFilePath = path.join(attachmentsFolderPath,await Utils.createAttachmentName(this.settings.attachmentName,this.settings.dateFormat,originalFilePath));
+			let destFilePath = path.join(attachmentsFolderPath,
+							await Utils.createAttachmentName(this.settings.attachmentName,this.settings.dateFormat,originalFilePath));
 
 			// Check if file already exists in the vault
 			const existingFile = await Utils.checkFileExists(destFilePath);
@@ -385,10 +503,11 @@ export default class ImportAttachments extends Plugin {
 			}
 
 			// If the original file is already in the vault
-			const inVault = await Utils.isFileInVault(vaultPath,originalFilePath)
+			if(!this.vaultPath) return null;
+			const inVault = await Utils.isFileInVault(this.vaultPath,originalFilePath)
 			if(inVault)
 			{
-				let modal = new ImportFromVaultChoiceModal(this.app, this, inVault, importSettings.action);
+				let modal = new ImportFromVaultChoiceModal(this.app, this, this.vaultPath, inVault, importSettings.action);
 	        	modal.open();
 	        	const choice = await modal.promise;
 	        	if(choice==null) { return null; }
@@ -453,7 +572,7 @@ export default class ImportAttachments extends Plugin {
 		let counter = 0;
 		results.forEach((importedFilePath: (string|null), index: number) => {
 		    if (importedFilePath) {
-		    	this.insertLinkToEditor(currentNoteFolderPath, vaultPath, importedFilePath, editor, view, importSettings, multipleFiles ? index+1 : 0);
+		    	this.insertLinkToEditor(currentNoteFolderPath, importedFilePath, editor, view, importSettings, multipleFiles ? index+1 : 0);
 		    }
 		});
 
@@ -473,23 +592,10 @@ export default class ImportAttachments extends Plugin {
     }
 
 	async openAttachmentsFolder() {
-		let attachmentsFolder;
-		try {
-			attachmentsFolder = this.getAttachmentFolder();
-        } catch (error: unknown) {
-        	if (error instanceof Error) {
-            	console.error(error.message);
-            	new Notice(error.message);
-            } else {
-            	// If it's not an Error, log it as a string or use a default message
-            	let msg="An unknown error occurred";
-            	console.error(msg+":", error);
-            	new Notice(msg);
-        	}
-            return;
-        }
+		const attachmentsFolder = this.getAttachmentFolder();
+        if(!attachmentsFolder){ return };
 
-		const { attachmentsFolderPath, vaultPath } = attachmentsFolder;
+		const { attachmentsFolderPath } = attachmentsFolder;
 		
 		if(! await Utils.checkDirectoryExists(attachmentsFolderPath))
 		{
@@ -504,7 +610,7 @@ export default class ImportAttachments extends Plugin {
 		shell.openPath(attachmentsFolder.attachmentsFolderPath);
 	}
 
-	insertLinkToEditor(currentNoteFolderPath: string, vaultPath: string, importedFilePath: string, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface, counter: number) {
+	insertLinkToEditor(currentNoteFolderPath: string, importedFilePath: string, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface, counter: number) {
 		// Extract just the file name from the path
 
 		const filename=Utils.getFilename(importedFilePath);
@@ -515,7 +621,7 @@ export default class ImportAttachments extends Plugin {
 			break;
 		case LinkFormat.ABSOLUTE:
 		default:
-			var relativePath=path.relative(vaultPath,importedFilePath);	
+			var relativePath=path.relative(this.vaultPath,importedFilePath);	
 			break;
 		}	
 		
@@ -714,7 +820,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
             })});
 
         new Setting(containerEl)
-            .setName('Folder relative to the default location to import new attachments:')
+            .setName('Attachment folder where to import new attachments, relative to the default location:')
             .setDesc('Where newly created notes are placed. Use ${notename} as a placeholder for the name of the note.')
             .addText(text => {
                 text.setPlaceholder('Enter folder path');
@@ -777,6 +883,41 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
             		this.plugin.settings.dateFormat = value;
                 	await this.plugin.saveSettings();
             })});
+
+        containerEl.createEl('h3', { text: 'Attachment management' });
+
+        new Setting(containerEl)
+            .setName('Rename the attachment folder automatically and update all links correspondingly:')
+            .setDesc('If this option is activated, when you rename/move an note, if the renamed note has an attachment folder connected to it, \
+            	its attachment folder is renamed/moved to a new name/location corresponding to the new name of the note.')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.autoRenameAttachmentFolder)
+                .onChange(async (value: boolean) => {
+                    this.plugin.settings.autoRenameAttachmentFolder = value;
+                    await this.plugin.saveSettings();
+            }));
+
+		new Setting(containerEl)
+            .setName('Delete the attachment folder automatically when the corresponding note is deleted:')
+            .setDesc('If this option is activated, when you delete a note, if the deleted note has an attachment folder connected to it, \
+            	its attachment folder will be deleted as well. \
+            	Note: automatic deletion only works when the name of the attachment folder contains ${notename}.')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.autoDeleteAttachmentFolder)
+                .onChange(async (value: boolean) => {
+                    this.plugin.settings.autoDeleteAttachmentFolder = value;
+                    await this.plugin.saveSettings();
+            }));
+
+        new Setting(containerEl)
+            .setName('Ask confirmation before deleting the attachment folder:')
+            .setDesc('If enabled, the user is asked each time whether to delete the attachment folder.')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.confirmDeleteAttachmentFolder)
+                .onChange(async (value: boolean) => {
+                    this.plugin.settings.confirmDeleteAttachmentFolder = value;
+                    await this.plugin.saveSettings();
+            }));
 
     }
 }

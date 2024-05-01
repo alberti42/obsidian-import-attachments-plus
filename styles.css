@@ -52,10 +52,12 @@ If your plugin does not need CSS, delete this file.
 }
 
 /* Focus styles for accessibility */
+/*
 .import-buttons button:focus {
     outline: 3px solid var(--interactive-accent-hover);
     outline-offset: 2px;
 }
+*/
 
 .switch {
 	position: relative;

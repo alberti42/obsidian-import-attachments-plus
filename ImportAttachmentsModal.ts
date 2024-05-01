@@ -201,7 +201,7 @@ export class OverwriteChoiceModal extends Modal {
 
        	container.createEl('h2', { text: 'Import Files' });
     	const paragraph = container.createEl('p');
-    	paragraph.append('You are trying to copy the file ');
+    	paragraph.append('You are trying to copy the file \"');
     	
 		// Create a hyperlink for the filename
 	    const origFileLink = paragraph.createEl('a', {
@@ -214,7 +214,7 @@ export class OverwriteChoiceModal extends Modal {
 			window.require('electron').remote.shell.showItemInFolder(this.originalFilePath);
 	    });
 
-		paragraph.append(' into the vault, where a ');
+		paragraph.append('\" into the vault, where a \"');
 
 		// Create a hyperlink for the filename
 	    const vaultFileLink = paragraph.createEl('a', {
@@ -227,7 +227,7 @@ export class OverwriteChoiceModal extends Modal {
 			window.require('electron').remote.shell.showItemInFolder(this.destFilePath);
 	    });
 
-	    paragraph.append(' with the same name is already present.');
+	    paragraph.append('\" with the same name is already present.');
 
 	    container.createEl('p',{text: 'How do you want to proceed?'});
 
@@ -243,7 +243,7 @@ export class OverwriteChoiceModal extends Modal {
 	    });
 	    const overwriteButton = buttonContainer.createEl('button', {
 	        text: 'Overwrite',
-	        cls: 'mod-cta'
+	        cls: 'mod-warning'
 	    });
 	    overwriteButton.addEventListener('click', () => {
 	    	this.resolveChoice(OverwriteChoiceOptions.OVERWRITE);
@@ -251,7 +251,7 @@ export class OverwriteChoiceModal extends Modal {
 	    });
 	    const skipButton = buttonContainer.createEl('button', {
 	        text: 'Skip',
-	        cls: 'mod-cta'
+	        cls: 'mod-cancel'
 	    });
 	    skipButton.addEventListener('click', () => {
 	    	this.resolveChoice(OverwriteChoiceOptions.SKIP);
@@ -272,11 +272,84 @@ export class OverwriteChoiceModal extends Modal {
     }
 }
 
+
+export class DeleteAttachmentFolderModal extends Modal {
+    promise: Promise<boolean>;
+    private resolveChoice: (result: boolean) => void = () => {};  // To resolve the promise. Initialize with a no-op function
+	
+    constructor(app: App, private plugin: ImportAttachments, private attachmentFolderPath: string) {
+    	// use TypeScript `parameter properties` to initialize `plugin`.
+        super(app);
+        this.promise = new Promise<boolean>((resolve) => {
+            this.resolveChoice = resolve;
+        });
+    }
+
+    onOpen() {
+
+    	const attachmentFolderPath_parsed = path.parse(this.attachmentFolderPath);
+
+    	const { contentEl } = this;
+
+    	const container = contentEl.createDiv({ cls: 'import-attach-plugin' });
+
+       	container.createEl('h2', { text: 'Import Files' });
+	 	const paragraph = container.createEl('p');
+    	paragraph.append('Do you want to move the attachment folder \"');
+    	
+    	// Create a hyperlink for the filename
+	    const fileLink = paragraph.createEl('a', {
+	        text: attachmentFolderPath_parsed.name,
+	        href: '#',
+	    });
+	    fileLink.addEventListener('click', (e) => {
+	        e.preventDefault(); // Prevent the default anchor behavior
+	        // Open the folder in the system's default file explorer
+			// window.require('electron').remote.shell.showItemInFolder(this.attachmentFolderPath);
+			window.require('electron').remote.shell.openPath(this.attachmentFolderPath);
+	    });
+
+        paragraph.append('\" to the system trash?');
+
+	    const buttonContainer = container.createDiv({cls:'import-buttons'});
+	    const deleteButton = buttonContainer.createEl('button', {
+	        text: 'Delete',
+	        cls: 'mod-warning'
+	    });
+	    deleteButton.addEventListener('click', () => {
+	    	this.resolveChoice(true);
+	    	this.close(); 
+	    });	    
+	    const cancelButton = buttonContainer.createEl('button', {
+	        text: 'Skip',
+	        cls: 'mod-cancel'
+	    });
+	    cancelButton.addEventListener('click', () => {
+	    	this.resolveChoice(false);
+	    	this.close(); 
+	    });
+	    
+	    setTimeout(() => {
+			// Set focus with a slight delay:
+			// this method leverages JavaScript's event loop, ensuring that focusing the button
+	    	// is enqueued after all the elements are properly rendered and the DOM is fully updated.
+    		cancelButton.focus();
+		}, 0); // A timeout of 0 ms is often enough
+    }
+
+    onClose() {
+        this.contentEl.empty();
+        this.resolveChoice(false);  // Resolve with null if the modal is closed without a choice
+    }
+}
+
+
+
 export class ImportFromVaultChoiceModal extends Modal {
     promise: Promise<ImportFromVaultChoiceResult>;
     private resolveChoice: (result: ImportFromVaultChoiceResult) => void = () => {};  // To resolve the promise. Initialize with a no-op function
 	
-    constructor(app: App, private plugin: ImportAttachments, private originalFilePath: string, private importAction: ImportActionType) {
+    constructor(app: App, private plugin: ImportAttachments, private vaultPath: string, private originalFilePath: string, private importAction: ImportActionType) {
     	// use TypeScript `parameter properties` to initialize `plugin`.
         super(app);
         this.promise = new Promise<ImportFromVaultChoiceResult>((resolve) => {
@@ -291,12 +364,11 @@ export class ImportFromVaultChoiceModal extends Modal {
 
        	container.createEl('h2', { text: 'Import Files' });
 	 	const paragraph = container.createEl('p');
-    	paragraph.append('The file you are trying to import ');
-    	 // already exists in the folder \'${this.folder}\':`});
+    	paragraph.append('The file you are trying to import \"');
     	
     	// Create a hyperlink for the filename
 	    const fileLink = paragraph.createEl('a', {
-	        text: this.originalFilePath,
+	        text: path.relative(this.vaultPath,this.originalFilePath),
 	        href: '#',
 	    });
 	    fileLink.addEventListener('click', (e) => {
@@ -305,7 +377,7 @@ export class ImportFromVaultChoiceModal extends Modal {
 			window.require('electron').remote.shell.showItemInFolder(this.originalFilePath);
 	    });
 
-        paragraph.append(' is already in the vault.');
+        paragraph.append('\" is already stored in the vault.');
 
         if(this.importAction==ImportActionType.MOVE) {
         	container.createEl('p',{text: 'You intended to move the file. \
@@ -328,7 +400,7 @@ export class ImportFromVaultChoiceModal extends Modal {
 	    });
 	    const copyButton = buttonContainer.createEl('button', {
 	        text: 'Copy',
-	        cls: 'mod-cta'
+	        cls: 'mod-warning'
 	    });
 	    copyButton.addEventListener('click', () => {
 	    	this.resolveChoice(ImportFromVaultOptions.COPY);
@@ -336,7 +408,7 @@ export class ImportFromVaultChoiceModal extends Modal {
 	    });	    
 	    const skipButton = buttonContainer.createEl('button', {
 	        text: 'Skip',
-	        cls: 'mod-cta'
+	        cls: 'mod-cancel'
 	    });
 	    skipButton.addEventListener('click', () => {
 	    	this.resolveChoice(ImportFromVaultOptions.SKIP);

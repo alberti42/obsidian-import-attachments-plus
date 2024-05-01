@@ -52,12 +52,14 @@ export interface ImportAttachmentsSettings {
     linkFormat: LinkFormat;
     dateFormat: string;
     attachmentName: string;
+    autoRenameAttachmentFolder: boolean;
+    autoDeleteAttachmentFolder: boolean;
+    confirmDeleteAttachmentFolder: boolean;
 }
 
 // Define an interface for the return type
 export interface AttachmentFolderPath {
     attachmentsFolderPath: string;
-    vaultPath: string;
     currentNoteFolderPath: string;
 }
 

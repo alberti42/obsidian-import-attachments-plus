@@ -43,30 +43,30 @@ namespace Utils {
 	    }
 	}
 
-	export async function createAttachmentName(namePattern:string,dateFormat:string,originalFilePath:string): Promise<string> {
-
-		const originalFilePath_parsed = path.parse(originalFilePath);
-
-		const fileToImportName = originalFilePath_parsed.name;
-
-		let dateTime = ''
+	function formatDateTime(dateFormat:string):string {
 		try {
 	        // use of Moment.js to format the current date
-	        dateTime = window.moment().format(dateFormat);
-	        return dateTime;
+	        const dateTime = window.moment().format(dateFormat);
+	        return dateTime; 
 	    } catch (error: unknown) {
 	    	if(error instanceof Error) {
 	    		console.error('Error formatting date:', error.message);
 	    	} else {
 	    		console.error('Error formatting date:', error);
 	    	}
+	    	return 'DATE_ERROR';
 	    }
+	}
 
-		const uuid = uuidv4();
+	export async function createAttachmentName(namePattern:string,dateFormat:string,originalFilePath:string): Promise<string> {
+
+		const originalFilePath_parsed = path.parse(originalFilePath);
+
+		const fileToImportName = originalFilePath_parsed.name;
 		
 		let attachmentName = namePattern.replace(/\$\{original\}/g, fileToImportName)
-										.replace(/\$\{uuid\}/g, uuid)
-										.replace(/\$\{date\}/g, dateTime);
+										.replace(/\$\{uuid\}/g, uuidv4())
+										.replace(/\$\{date\}/g, formatDateTime(dateFormat));
 
 		if(namePattern.includes('${md5}') || true) {
 			let hash = ''
@@ -78,6 +78,9 @@ namespace Utils {
 		    attachmentName = attachmentName.replace(/\$\{md5\}/g, hash);
 		}
 
+		// add the extension
+		attachmentName += originalFilePath_parsed.ext;
+		
 		return attachmentName;
 	}
 
@@ -98,7 +101,7 @@ namespace Utils {
     }
 
 	export async function isFileInVault(vaultPath:string,filePath:string) {
-	    try {
+		try {
 	    	// Resolve the real (absolute) paths to handle symlinks and relative paths
 	        const realFilePath = await fs.realpath(filePath);
 	        const realVaultFolderPath = await fs.realpath(vaultPath);
