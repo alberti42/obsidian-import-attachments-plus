@@ -49,7 +49,18 @@ namespace Utils {
 
 		const fileToImportName = originalFilePath_parsed.name;
 
-		const dateTime = window.moment().format(dateFormat);
+		let dateTime = ''
+		try {
+	        // use of Moment.js to format the current date
+	        dateTime = window.moment().format(dateFormat);
+	        return dateTime;
+	    } catch (error: unknown) {
+	    	if(error instanceof Error) {
+	    		console.error('Error formatting date:', error.message);
+	    	} else {
+	    		console.error('Error formatting date:', error);
+	    	}
+	    }
 
 		const uuid = uuidv4();
 		
@@ -62,7 +73,7 @@ namespace Utils {
 		    try {
 		        hash = await hashFile(originalFilePath);
 		    } catch (err: unknown) {
-		        console.error('Error:', err);
+		        console.error('Error hashing the file:', err);
 		    }
 		    attachmentName = attachmentName.replace(/\$\{md5\}/g, hash);
 		}
