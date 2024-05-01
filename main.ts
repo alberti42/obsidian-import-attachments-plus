@@ -43,6 +43,8 @@ const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
     relativeLocation: RelativeLocation.VAULT, // Default to vault
     folderPath: '00 Meta/Attachments', // Default to a folder in the vault
     linkFormat: LinkFormat.ABSOLUTE,
+    attachmentName: '${original}', // Default to the original name of the attachment
+    dateFormat: 'YYYY_MM_DDTHH_mm_ss',
     customDisplayText: true,
 };
 
@@ -372,7 +374,7 @@ export default class ImportAttachments extends Plugin {
 
 		const tasks = Array.from(filesToImport).map(async (fileToImport):Promise<string|null> => {
 			const originalFilePath = fileToImport.path;
-			let destFilePath = path.join(attachmentsFolderPath,fileToImport.name);
+			let destFilePath = path.join(attachmentsFolderPath,await Utils.createAttachmentName(this.settings.attachmentName,this.settings.dateFormat,originalFilePath));
 
 			// Check if file already exists in the vault
 			const existingFile = await Utils.checkFileExists(destFilePath);
@@ -737,5 +739,44 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
                     	console.error('Invalid option selection:', value);
                     }
             })});
+
+        new Setting(containerEl)
+            .setName('Name of the imported attachments:')
+            .setDesc(createFragment((frag) => {
+            	frag.appendText('Choose how to name the imported attachments, using the following variables as a placeholder:');
+            	frag.createEl('ul')
+            	.createEl('li',{text: '${original} for the name of the original file'})
+				.createEl('li',{text: '${date} for the current date'})
+            	.createEl('li',{text: '${uuid} for a 128-bit Universally Unique Identifier'})
+            	.createEl('li',{text: '${md5} for a MD5 hash of the imported file'});
+            }))
+            .addText(text => {
+                text.setPlaceholder('Enter attachment name');
+                text.setValue(this.plugin.settings.attachmentName);
+                text.onChange(async (value: string) => {
+                	if(value.trim()=='') {
+                		value = '${original}'; // TODO: improve checking the input by the user that it is not empty
+                	}
+            		this.plugin.settings.attachmentName = value;
+                	await this.plugin.saveSettings();
+            })});
+
+        new Setting(containerEl)
+            .setName('Date format:')
+            .setDesc(createFragment((frag) => {
+            		frag.appendText('Choose the date format, based on ');
+                    frag.createEl('a', {
+                        href: 'https://momentjscom.readthedocs.io/en/latest/moment/04-displaying/01-format',
+                        text: 'momentjs',
+                    });
+                    frag.appendText(' syntax.')}))
+            .addText(text => {
+                text.setPlaceholder('Enter date format');
+                text.setValue(this.plugin.settings.dateFormat);
+                text.onChange(async (value: string) => {
+            		this.plugin.settings.dateFormat = value;
+                	await this.plugin.saveSettings();
+            })});
+
     }
 }

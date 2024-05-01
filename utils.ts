@@ -2,6 +2,9 @@
 
 const fs = require("fs").promises; // Ensure you're using the promise-based version of fs
 const path = require("path"); // Node.js path module to handle path operations
+const crypto = require("crypto");
+
+import { v4 as uuidv4 } from 'uuid';
 
 namespace Utils {
 
@@ -18,6 +21,64 @@ namespace Utils {
 	        console.error('Error resolving paths:', error);
 	        return false;
 	    }
+	}
+
+	async function hashFile(filePath: string): Promise<string> {
+	    const hash = crypto.createHash('md5');
+	    let fileHandle = null;
+	    try {
+	        fileHandle = await fs.open(filePath, 'r'); // Open the file to get a filehandle
+	        const stream = fileHandle.createReadStream();  // Create a read stream from the file handle
+
+	        for await (const chunk of stream) {
+	            hash.update(chunk);  // Update hash with data chunk
+	        }
+	        return hash.digest('hex');  // Return the hex digest
+	    } catch (error) {
+	        throw error;  // Rethrow or handle error as appropriate
+	    } finally {
+	        if (fileHandle) {
+	            await fileHandle.close();  // Make sure to close the file handle
+	        }
+	    }
+	}
+
+	export async function createAttachmentName(namePattern:string,dateFormat:string,originalFilePath:string): Promise<string> {
+
+		const originalFilePath_parsed = path.parse(originalFilePath);
+
+		const fileToImportName = originalFilePath_parsed.name;
+
+		let dateTime = ''
+		try {
+	        // use of Moment.js to format the current date
+	        dateTime = window.moment().format(dateFormat);
+	        return dateTime;
+	    } catch (error: unknown) {
+	    	if(error instanceof Error) {
+	    		console.error('Error formatting date:', error.message);
+	    	} else {
+	    		console.error('Error formatting date:', error);
+	    	}
+	    }
+
+		const uuid = uuidv4();
+		
+		let attachmentName = namePattern.replace(/\$\{original\}/g, fileToImportName)
+										.replace(/\$\{uuid\}/g, uuid)
+										.replace(/\$\{date\}/g, dateTime);
+
+		if(namePattern.includes('${md5}') || true) {
+			let hash = ''
+		    try {
+		        hash = await hashFile(originalFilePath);
+		    } catch (err: unknown) {
+		        console.error('Error hashing the file:', err);
+		    }
+		    attachmentName = attachmentName.replace(/\$\{md5\}/g, hash);
+		}
+
+		return attachmentName;
 	}
 
 	export async function findNewFilename(destFilePath: string,)
