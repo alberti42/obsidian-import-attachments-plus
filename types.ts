@@ -55,6 +55,7 @@ export interface ImportAttachmentsSettings {
     autoRenameAttachmentFolder: boolean;
     autoDeleteAttachmentFolder: boolean;
     confirmDeleteAttachmentFolder: boolean;
+    hideAttachmentFolders: boolean;
 }
 
 // Define an interface for the return type

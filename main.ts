@@ -50,6 +50,7 @@ const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
     autoRenameAttachmentFolder: true, // Default to true
     autoDeleteAttachmentFolder: true, // Default to true
     confirmDeleteAttachmentFolder: true, // Default to true
+    hideAttachmentFolders: true, // Default to true
 };
 
 export default class ImportAttachments extends Plugin {
@@ -57,6 +58,95 @@ export default class ImportAttachments extends Plugin {
 	private vaultPath: string | null = null;
 	private renameCallbackEnabled: boolean = true;
 	private deleteCallbackEnabled: boolean = true;
+	private observer: MutationObserver | null = null;
+	private hideFolderNames : Array<string> = [];
+
+	setupObserver() {
+		this.configureHideFolderNames();
+
+        const callback: MutationCallback = (mutationsList, observer) => {
+        	mutationsList.forEach(record => {
+        		if(record.target?.parentElement?.classList.contains("nav-folder")) {
+	        		this.hideAttachmentFolders();
+        		}});
+        };
+
+        const targetNode = document.body; // Or any specific element you're interested in
+
+        this.observer = new MutationObserver(callback);
+
+        const config = {
+        	childList: true,
+        	subtree: true,
+        };
+
+        this.observer.observe(targetNode, config);
+    }
+
+    async hideAttachmentFolders(recheckPreviouslyHiddenFolders?: boolean) {
+		if (recheckPreviouslyHiddenFolders) {
+			document.querySelectorAll(".import-attach-hidden").forEach((folder) => {
+				folder.parentElement!.style.height = "";
+				folder.parentElement!.style.overflow = "";
+				folder.removeClass(".import-attach-hidden");
+			});
+		}
+
+		this.hideFolderNames.forEach(folderPattern => {
+			if(folderPattern === "") return;
+			const folderElements = document.querySelectorAll(folderPattern);
+			
+			folderElements.forEach((folder) => {
+				if (!folder || !folder.parentElement) {	return; }
+				
+				folder.addClass("import-attach-hidden");
+				folder.parentElement.style.height = this.settings.hideAttachmentFolders ? "0" : "";
+				folder.parentElement.style.overflow = this.settings.hideAttachmentFolders ? "hidden" : "";
+			});
+		});
+	}
+
+	splitAroundOriginal(input: string, placeholder: string): [string, string] {
+	    // Find the index of the first occurrence of the placeholder
+	    const firstIndex = input.indexOf(placeholder);
+	    
+	    // If the placeholder is not found, return the whole string as the first part and an empty string as the second part
+	    if (firstIndex === -1) {
+	        return [input, ""];
+	    }
+
+	    // Find the index of the last occurrence of the placeholder
+	    const lastIndex = input.lastIndexOf(placeholder);
+
+	    // Calculate the starting index of the text after the placeholder
+	    const endOfPlaceholderIndex = lastIndex + placeholder.length;
+
+	    // Extract the parts before the first occurrence and after the last occurrence of the placeholder
+	    const beforeFirst = input.substring(0, firstIndex);
+	    const afterLast = input.substring(endOfPlaceholderIndex);
+
+	    return [beforeFirst, afterLast];
+	}
+
+	configureHideFolderNames() {
+		const placeholder = "${notename}";
+		if(this.settings.folderPath.includes(placeholder)) {
+			const [startsWith, endsWith] = this.splitAroundOriginal(this.settings.folderPath,placeholder);
+			if(endsWith!="") {
+				this.hideFolderNames = [
+						`[data-path$="${endsWith}"]`
+					];
+			} else if(startsWith!="") {
+				this.hideFolderNames = [
+						`.nav-folder-title[data-path^="${startsWith}"], .nav-folder-title[data-path*="/${startsWith}"]`
+					];
+			}
+		} else {
+			this.hideFolderNames = [
+				`[data-path$="/${this.settings.folderPath}"], [data-path="${this.settings.folderPath}"]`
+				];
+		}
+	}
 
 	async onload() {
 		// store the vault path
@@ -66,9 +156,12 @@ export default class ImportAttachments extends Plugin {
 		}
 		this.vaultPath = adapter.getBasePath();
 
+        // Load and add settings tab
 		await this.loadSettings();
-        // Add settings tab
         this.addSettingTab(new ImportAttachmentsSettingTab(this.app, this));
+
+		// set up the mutation observer for hiding folders
+		this.setupObserver();
 
 		// Command for importing as a standard link
 		this.addCommand({
@@ -278,6 +371,12 @@ export default class ImportAttachments extends Plugin {
 
 		console.log('Loaded plugin Import Attachments+');
 	}
+
+    onunload() {
+    	if(this.observer){
+    		this.observer.disconnect();	
+    	}
+    }
 
     async loadSettings() {
         this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
@@ -756,7 +855,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName('Embed imported documents:')
-            .setDesc('If this option is activated, the files are imported as an embedded document; if it is deactivated, they are imported as a linked document.  However, by holding the SHIFT key pressed, the plugin\'s behavior will be the opposite of what is here selected.')
+            .setDesc('If this option is enabled, the files are imported as an embedded document; if it is deactivated, they are imported as a linked document.  However, by holding the SHIFT key pressed, the plugin\'s behavior will be the opposite of what is here selected.')
             .addDropdown(dropdown => {
                 dropdown.addOption(YesNoTypes.ASK_USER, 'Ask each time');
                 dropdown.addOption(YesNoTypes.YES, 'Yes');
@@ -793,7 +892,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 
 	    new Setting(containerEl)
             .setName('Insert display text for links based on filename:')
-            .setDesc('If this option is activated, the basename of the imported document is used as in place of the custom display text.')
+            .setDesc('If this option is enabled, the basename of the imported document is used as in place of the custom display text.')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.customDisplayText)
                 .onChange(async (value: boolean) => {
@@ -827,7 +926,9 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
                 text.setValue(this.plugin.settings.folderPath);
                 text.onChange(async (value: string) => {
             		this.plugin.settings.folderPath = value;
-                	await this.plugin.saveSettings();
+            		await this.plugin.saveSettings();
+            		this.plugin.configureHideFolderNames();
+        		 	await this.plugin.hideAttachmentFolders(true);
             })});
 
         new Setting(containerEl)
@@ -888,7 +989,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName('Rename the attachment folder automatically and update all links correspondingly:')
-            .setDesc('If this option is activated, when you rename/move an note, if the renamed note has an attachment folder connected to it, \
+            .setDesc('If this option is enabled, when you rename/move an note, if the renamed note has an attachment folder connected to it, \
             	its attachment folder is renamed/moved to a new name/location corresponding to the new name of the note.')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.autoRenameAttachmentFolder)
@@ -899,7 +1000,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
             .setName('Delete the attachment folder automatically when the corresponding note is deleted:')
-            .setDesc('If this option is activated, when you delete a note, if the deleted note has an attachment folder connected to it, \
+            .setDesc('If this option is enabled, when you delete a note, if the deleted note has an attachment folder connected to it, \
             	its attachment folder will be deleted as well. \
             	Note: automatic deletion only works when the name of the attachment folder contains ${notename}.')
             .addToggle(toggle => toggle
@@ -919,5 +1020,17 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
             }));
 
+        containerEl.createEl('h3', { text: 'Display of attachment folders' });
+        
+        new Setting(containerEl)
+            .setName('Hide attachment folders:')
+            .setDesc('If this option is enabled, the attachment folders will not be shown.')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.hideAttachmentFolders)
+                .onChange(async (value: boolean) => {
+                    this.plugin.settings.hideAttachmentFolders = value;
+                    await this.plugin.saveSettings();
+                    await this.plugin.hideAttachmentFolders(true);
+            }));
     }
 }
