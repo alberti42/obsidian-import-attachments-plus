@@ -440,7 +440,20 @@ export default class ImportAttachments extends Plugin {
         }
 
 		let embedOption = this.settings.embedFilesOnImport;
-		const lastEmbedOption = this.settings.lastEmbedFilesOnImport;
+		let lastEmbedOption = this.settings.lastEmbedFilesOnImport;
+
+		if(doToggleEmbedPreference) {
+			if(lastEmbedOption == YesNoTypes.YES) {
+				lastEmbedOption = YesNoTypes.NO;
+			} else if (lastEmbedOption == YesNoTypes.NO) {
+				lastEmbedOption = YesNoTypes.YES
+			}
+			if(embedOption == YesNoTypes.YES) {
+				embedOption = YesNoTypes.NO;
+			} else if (embedOption == YesNoTypes.NO) {
+				embedOption = YesNoTypes.YES
+			}
+		}
 
         if (actionFilesOnImport == ImportActionType.ASK_USER || embedOption == YesNoTypes.ASK_USER) {
         	let modal = new ImportActionTypeModal(this.app, this, lastActionFilesOnImport, lastEmbedOption);
