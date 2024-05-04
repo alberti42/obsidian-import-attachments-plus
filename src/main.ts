@@ -54,7 +54,7 @@ const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 };
 
 export default class ImportAttachments extends Plugin {
-	settings: ImportAttachmentsSettings = DEFAULT_SETTINGS;
+	settings: ImportAttachmentsSettings = {...DEFAULT_SETTINGS};
 	private vaultPath: string | null = null;
 	private renameCallbackEnabled: boolean = true;
 	private deleteCallbackEnabled: boolean = true;
@@ -258,7 +258,6 @@ export default class ImportAttachments extends Plugin {
 				if (files && files.length > 0) {
 					await this.handleFiles(files, editor, view, doToggleEmbedPreference, ImportOperationType.DRAG_AND_DROP);
 				} else {
-					// new Notice('No files dropped');
 					console.error('No files dropped');
 				}
 			})
@@ -821,7 +820,6 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 
         containerEl.empty();
 
-		
 		containerEl.createEl('h2', { text: 'Settings for Import Attachments+ Plugin' });
 
 		containerEl.createEl('h3', { text: 'Import options' });
