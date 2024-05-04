@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
+   	"baseUrl": "src",
+   	"outDir": "dist",
     "inlineSourceMap": true,
     "inlineSources": true,
     "module": "ESNext",  // or "CommonJS" if you are targeting Node.js
@@ -20,6 +21,6 @@
   },
   "typeRoots": ["./src/global"],
   "include": [
-    "**/*.ts"
+	"./src/**/*.ts"
   ]
 }
