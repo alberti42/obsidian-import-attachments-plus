@@ -13,7 +13,7 @@ import {
 		// ImportOperationType,
 	} from './types';
 import * as Utils from "utils";
-import type ImportAttachments from './main'; // Import the type of your plugin class if needed for type hinting
+import type ImportAttachments from 'main'; // Import the type of your plugin class if needed for type hinting
 
 import * as path from "path"; // Node.js path module to handle path operations
 
@@ -57,6 +57,8 @@ export class ImportActionTypeModal extends Modal {
 			input.checked = true;
 		}
 		
+		switchLabel.createEl('span', { cls: 'slider' });
+
 		// Label for option B (e.g., "Copy")
 		tr.createEl('td', { text: optionB, cls: 'toggle-option-B' });
 
@@ -213,7 +215,7 @@ export class OverwriteChoiceModal extends Modal {
 			window.require('electron').remote.shell.showItemInFolder(this.originalFilePath);
 		});
 
-		paragraph.append('\" into the vault, where a \"');
+		paragraph.append('" into the vault, where a "');
 
 		// Create a hyperlink for the filename
 		const vaultFileLink = paragraph.createEl('a', {
