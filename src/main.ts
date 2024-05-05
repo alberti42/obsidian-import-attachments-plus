@@ -27,7 +27,7 @@ import {
 		RelativeLocation,
 		LinkFormat,
 	} from './types';
-import { Utils } from "utils";
+import * as Utils from "utils";
 import { ParsedPath } from "path";
 
 import { promises as fs } from 'fs';  // This imports the promises API from fs
@@ -548,7 +548,7 @@ export default class ImportAttachments extends Plugin {
 		}
 
 		const attachmentsFolder = this.getAttachmentFolder();
-		if(!attachmentsFolder){ return };
+		if(!attachmentsFolder){ return }
 
 		const { attachmentsFolderPath, currentNoteFolderPath: referencePath } = attachmentsFolder;
 
