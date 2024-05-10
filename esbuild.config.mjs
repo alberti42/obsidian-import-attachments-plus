@@ -1,7 +1,5 @@
 import esbuild from "esbuild";
 import process from "process";
-import os from "os";
-import fs from "fs/promises";
 import builtins from "builtin-modules";
 import copy from 'esbuild-plugin-copy';
 
@@ -13,43 +11,11 @@ if you want to view the source, please visit the github repository of this plugi
 */
 `;
 
-// Determine the platform and architecture
-const platform = process.platform; // 'darwin', 'win32', 'linux', etc.
-const arch = os.arch(); // 'arm64', 'x64', etc.
-
-// Generate a directory name based on platform and architecture
-const getOutDir = () => {
-	switch (platform) {
-		case 'darwin':
-			return arch === 'arm64' ? 'dist/apple-silicon' : 'dist/apple-intel';
-		case 'win32':
-			return 'dist/windows';
-		case 'linux':
-			return 'dist/linux';
-		default:
-			return 'dist/unknown';
-	}
-};
-
-// Ensure the output directory exists
-const ensureOutDirExists = async (outdir) => {
-	try {
-		await fs.mkdir(outdir, { recursive: true });
-		console.log(`Output directory created: ${outdir}`);
-	} catch (err) {
-		console.error(`Error creating output directory: ${err.message}`);
-		process.exit(1);
-	}
-};
-
 // Determine whether to build for production or development
 const prod = (process.argv[2] === "production");
 
 // Get the output directory
-const outdir = getOutDir();
-
-// Create the output directory if it doesn't exist
-await ensureOutDirExists(outdir);
+const outdir = '.';
 
 const context = await esbuild.context({
 	banner: {

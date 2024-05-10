@@ -614,6 +614,9 @@ function patchOpenFile(plugin) {
   originalOpenFile = import_obsidian2.WorkspaceLeaf.prototype.openFile;
   import_obsidian2.WorkspaceLeaf.prototype.openFile = async function patchedOpenFile(file, openState) {
     var _a;
+    if (file.extension === "md" && originalOpenFile) {
+      return originalOpenFile.call(this, file, openState);
+    }
     const newEmptyLeave = ((_a = this.getViewState()) == null ? void 0 : _a.type) == "empty";
     if (plugin.settings.revealAttachment && metaKeyPressed && altKeyPressed) {
       window.require("electron").remote.shell.showItemInFolder(path3.join(plugin.vaultPath, file.path));

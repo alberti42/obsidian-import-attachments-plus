@@ -80,7 +80,7 @@ var import_fs = require("fs");
 var path = __toESM(require("path"));
 var crypto2 = __toESM(require("crypto"));
 
-// node_modules/uuid/dist/esm-browser/rng.js
+// node_modules.nosync/uuid/dist/esm-browser/rng.js
 var getRandomValues;
 var rnds8 = new Uint8Array(16);
 function rng() {
@@ -93,7 +93,7 @@ function rng() {
   return getRandomValues(rnds8);
 }
 
-// node_modules/uuid/dist/esm-browser/stringify.js
+// node_modules.nosync/uuid/dist/esm-browser/stringify.js
 var byteToHex = [];
 for (let i = 0; i < 256; ++i) {
   byteToHex.push((i + 256).toString(16).slice(1));
@@ -102,13 +102,13 @@ function unsafeStringify(arr, offset = 0) {
   return byteToHex[arr[offset + 0]] + byteToHex[arr[offset + 1]] + byteToHex[arr[offset + 2]] + byteToHex[arr[offset + 3]] + "-" + byteToHex[arr[offset + 4]] + byteToHex[arr[offset + 5]] + "-" + byteToHex[arr[offset + 6]] + byteToHex[arr[offset + 7]] + "-" + byteToHex[arr[offset + 8]] + byteToHex[arr[offset + 9]] + "-" + byteToHex[arr[offset + 10]] + byteToHex[arr[offset + 11]] + byteToHex[arr[offset + 12]] + byteToHex[arr[offset + 13]] + byteToHex[arr[offset + 14]] + byteToHex[arr[offset + 15]];
 }
 
-// node_modules/uuid/dist/esm-browser/native.js
+// node_modules.nosync/uuid/dist/esm-browser/native.js
 var randomUUID = typeof crypto !== "undefined" && crypto.randomUUID && crypto.randomUUID.bind(crypto);
 var native_default = {
   randomUUID
 };
 
-// node_modules/uuid/dist/esm-browser/v4.js
+// node_modules.nosync/uuid/dist/esm-browser/v4.js
 function v4(options, buf, offset) {
   if (native_default.randomUUID && !buf && !options) {
     return native_default.randomUUID();
@@ -614,6 +614,9 @@ function patchOpenFile(plugin) {
   originalOpenFile = import_obsidian2.WorkspaceLeaf.prototype.openFile;
   import_obsidian2.WorkspaceLeaf.prototype.openFile = async function patchedOpenFile(file, openState) {
     var _a;
+    if (file.extension === "md" && originalOpenFile) {
+      return originalOpenFile.call(this, file, openState);
+    }
     const newEmptyLeave = ((_a = this.getViewState()) == null ? void 0 : _a.type) == "empty";
     if (plugin.settings.revealAttachment && metaKeyPressed && altKeyPressed) {
       window.require("electron").remote.shell.showItemInFolder(path3.join(plugin.vaultPath, file.path));
