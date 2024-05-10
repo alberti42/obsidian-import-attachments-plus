@@ -19,7 +19,8 @@
     ],
     //"jsx": "react-jsx", // Required by React
   },
-  "typeRoots": ["./src/global"],
+
+  "typeRoots": ["./src/types","./node_modules/@types"],
   "include": [
 	"./src/**/*.ts"
   ]

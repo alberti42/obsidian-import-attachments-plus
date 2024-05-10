@@ -74,17 +74,12 @@ function patchOpenFile(plugin: ImportAttachments) {
 	
 	// Monkey patch the openFile method
 	WorkspaceLeaf.prototype.openFile = async function patchedOpenFile(this: WorkspaceLeaf, file: TFile, openState?: OpenViewState): Promise<void> {
-
+		
 		// console.log(`Meta key is pressed: ${metaKeyPressed}`);
 		// console.log(`Alt key is pressed: ${altKeyPressed}`);
 
 		const newEmptyLeave = this.getViewState()?.type == 'empty';
 
-		if (newEmptyLeave) {
-			// close prepared empty tab
-			this.detach();
-		}
-		
 		if(metaKeyPressed){
 			if(altKeyPressed){
 				window.require('electron').remote.shell.showItemInFolder(path.join(plugin.vaultPath,file.path));
@@ -92,17 +87,18 @@ function patchOpenFile(plugin: ImportAttachments) {
 			else {
 				plugin.app.openWithDefaultApp(file.path);
 			}
-			return;
 		}
 		else
 		{
 			if(originalOpenFile) {
 				return originalOpenFile.call(this, file, openState);
-			} else {
-				return;
 			}
-
 		}
+		if (newEmptyLeave) {
+			// close prepared empty tab
+			this.detach();
+		}
+		return;
 	}
 }
 

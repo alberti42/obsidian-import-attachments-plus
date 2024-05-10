@@ -1,6 +1,7 @@
 import esbuild from "esbuild";
 import process from "process";
 import os from "os";
+import fs from "fs/promises";
 import builtins from "builtin-modules";
 import copy from 'esbuild-plugin-copy';
 
@@ -30,8 +31,25 @@ const getOutDir = () => {
 	}
 };
 
+// Ensure the output directory exists
+const ensureOutDirExists = async (outdir) => {
+	try {
+		await fs.mkdir(outdir, { recursive: true });
+		console.log(`Output directory created: ${outdir}`);
+	} catch (err) {
+		console.error(`Error creating output directory: ${err.message}`);
+		process.exit(1);
+	}
+};
+
 // Determine whether to build for production or development
 const prod = (process.argv[2] === "production");
+
+// Get the output directory
+const outdir = getOutDir();
+
+// Create the output directory if it doesn't exist
+await ensureOutDirExists(outdir);
 
 const context = await esbuild.context({
 	banner: {
@@ -60,7 +78,7 @@ const context = await esbuild.context({
 	logLevel: "info",
 	sourcemap: prod ? false : "inline",
 	treeShaking: true,
-	outdir: getOutDir(),
+	outdir,
 	plugins: [
 		copy({
 			assets: {
