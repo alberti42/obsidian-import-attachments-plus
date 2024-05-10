@@ -39,7 +39,7 @@ Once enabled, the plugin will work automatically based on your configured prefer
 The plugin offers a comprehensive set of options for managing attachments. Below is a screenshot of the settings tab:
 
 Settings screenshot
-<img src="docs/images/screenshot.png" style="max-width:400px;" alt="Screenshot settings"/>
+<img src="docs/images/screenshot.png" width=400 style="max-width:400px;" alt="Screenshot settings"/>
 
 ### Import Options
 1. **Whether to move or copy files that are drag-and-dropped?**
