@@ -53,6 +53,8 @@ const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 	autoDeleteAttachmentFolder: true, // Default to true
 	confirmDeleteAttachmentFolder: true, // Default to true
 	hideAttachmentFolders: true, // Default to true
+	revealAttachment: true, // Default to true
+	openAttachmentExternal: true, // Default to true
 };
 
 export default class ImportAttachments extends Plugin {
@@ -994,6 +996,43 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 					this.plugin.settings.dateFormat = value;
 					await this.plugin.saveSettings();
 			})});
+
+		containerEl.createEl('h3', { text: 'Attachment opening' });
+
+		let key;
+		const os = navigator.platform.toUpperCase();
+		if (os.includes('MAC')) {
+			key = '⌘';
+		} else { // Default to Windows/Linux bindings
+			key = 'Ctrl';
+		}
+
+		new Setting(containerEl)
+			.setName('Open attachment with default external application:')
+			.setDesc(`If this option is enabled, when you open an attachment by holding ${key}, the attachment opens in default external application.`)
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.openAttachmentExternal)
+				.onChange(async (value: boolean) => {
+					this.plugin.settings.openAttachmentExternal = value;
+					await this.plugin.saveSettings();
+			}));
+
+		if (os.includes('MAC')) {
+			key = '⌘+⌥';
+		} else { // Default to Windows/Linux bindings
+			key = 'Ctrl+Alt';
+		}
+
+		new Setting(containerEl)
+			.setName("Reveal attachment in system's file manager:")
+			.setDesc(`If this option is enabled, when you open an attachment by holding ${key}, the attachment is shown in the system's file manager.`)
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.revealAttachment)
+				.onChange(async (value: boolean) => {
+					this.plugin.settings.revealAttachment = value;
+					await this.plugin.saveSettings();
+			}));
+
 
 		containerEl.createEl('h3', { text: 'Attachment management' });
 

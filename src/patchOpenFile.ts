@@ -80,13 +80,11 @@ function patchOpenFile(plugin: ImportAttachments) {
 
 		const newEmptyLeave = this.getViewState()?.type == 'empty';
 
-		if(metaKeyPressed){
-			if(altKeyPressed){
+		if(plugin.settings.revealAttachment && metaKeyPressed && altKeyPressed){
 				window.require('electron').remote.shell.showItemInFolder(path.join(plugin.vaultPath,file.path));
-			}
-			else {
+		}
+		else if(plugin.settings.openAttachmentExternal && metaKeyPressed && !altKeyPressed) {
 				plugin.app.openWithDefaultApp(file.path);
-			}
 		}
 		else
 		{
