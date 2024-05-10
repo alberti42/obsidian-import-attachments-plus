@@ -117,16 +117,12 @@ The plugin offers a comprehensive set of options for managing attachments. Below
 ## Donations
 I would be grateful for any donation to support the development of this plugin.
 
-**Buy Me a Coffee:**
-[![Buy Me a Coffee](https://img.shields.io/badge/Donate-Buy%20Me%20a%20Coffee-orange)](https://buymeacoffee.com/alberti)
-
-**QR Code:**
 ![Buy Me a Coffee QR Code](docs/images/buy_me_coffee.png)
 
-## Author and Funding
+## Author
 - **Author:** Andrea Alberti
 - **GitHub Profile:** [alberti42](https://github.com/alberti42)
-- **Funding URL:** [GitHub Sponsors](https://buymeacoffee.com/alberti) 
+- **Donations:** [![Buy Me a Coffee](https://img.shields.io/badge/Donate-Buy%20Me%20a%20Coffee-orange)](https://buymeacoffee.com/alberti)
 
 Feel free to contribute to the development of this plugin or report any issues in the [GitHub repository](https://github.com/alberti42/obsidian-import-attachments-plus/issues).
 
