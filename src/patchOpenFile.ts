@@ -78,6 +78,10 @@ function patchOpenFile(plugin: ImportAttachments) {
 		// console.log(`Meta key is pressed: ${metaKeyPressed}`);
 		// console.log(`Alt key is pressed: ${altKeyPressed}`);
 
+		if(file.extension==='md' && originalOpenFile) {
+			return originalOpenFile.call(this, file, openState);
+		}
+
 		const newEmptyLeave = this.getViewState()?.type == 'empty';
 
 		if(plugin.settings.revealAttachment && metaKeyPressed && altKeyPressed){
