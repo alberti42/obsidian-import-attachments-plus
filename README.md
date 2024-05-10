@@ -39,7 +39,7 @@ Once enabled, the plugin will work automatically based on your configured prefer
 The plugin offers a comprehensive set of options for managing attachments. Below is a screenshot of the settings tab:
 
 Settings screenshot
-<img src="docs/images/screenshot.png" width=400 style="max-width:400px;" alt="Screenshot settings"/>
+<img src="docs/images/screenshot.png" width=600 alt="Screenshot settings"/>
 
 ### Import Options
 1. **Whether to move or copy files that are drag-and-dropped?**
@@ -118,7 +118,7 @@ Settings screenshot
 ## Donations
 I would be grateful for any donation to support the development of this plugin.
 
-![Buy Me a Coffee QR Code](docs/images/buy_me_coffee.png)
+[<img src="docs/images/buy_me_coffee.png" width=600 alt="Buy Me a Coffee QR Code"/>](https://github.com/alberti42/obsidian-import-attachments-plus/issues)
 
 ## Author
 - **Author:** Andrea Alberti
