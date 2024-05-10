@@ -38,14 +38,14 @@ import {patchOpenFile, unpatchOpenFile, addKeyListeners, removeKeyListeners} fro
 const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 	actionDroppedFilesOnImport: ImportActionType.ASK_USER, // Default to asking the user
 	actionPastedFilesOnImport: ImportActionType.ASK_USER, // Default to asking the user
+	embedFilesOnImport: YesNoTypes.ASK_USER, // Default to linking files
 	lastActionPastedFilesOnImport: ImportActionType.COPY, // Default to copying files
 	lastActionDroppedFilesOnImport: ImportActionType.COPY, // Default to copying files
-	embedFilesOnImport: YesNoTypes.ASK_USER, // Default to linking files
 	lastEmbedFilesOnImport: YesNoTypes.NO, // Default to linking
 	multipleFilesImportType: MultipleFilesImportTypes.BULLETED, // Default to bulleted list when importing multiple files
-	relativeLocation: RelativeLocation.VAULT, // Default to vault
-	folderPath: '00 Meta/Attachments', // Default to a folder in the vault
-	linkFormat: LinkFormat.ABSOLUTE,
+	relativeLocation: RelativeLocation.SAME, // Default to vault
+	folderPath: '${notename} (attachments)', // Default to a folder in the vault
+	linkFormat: LinkFormat.RELATIVE,
 	attachmentName: '${original}', // Default to the original name of the attachment
 	dateFormat: 'YYYY_MM_DDTHH_mm_ss',
 	customDisplayText: true,  // Default to true
