@@ -33,6 +33,8 @@ import { ParsedPath } from "path";
 import { promises as fs } from 'fs';  // This imports the promises API from fs
 import * as path from 'path';         // Standard import for the path module
 
+import {patchOpenFile, unpatchOpenFile, addKeyListeners, removeKeyListeners} from 'patchOpenFile';
+
 const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 	actionDroppedFilesOnImport: ImportActionType.ASK_USER, // Default to asking the user
 	actionPastedFilesOnImport: ImportActionType.ASK_USER, // Default to asking the user
@@ -55,7 +57,7 @@ const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 
 export default class ImportAttachments extends Plugin {
 	settings: ImportAttachmentsSettings = {...DEFAULT_SETTINGS};
-	private vaultPath: string;
+	vaultPath: string;
 	private renameCallbackEnabled: boolean = true;
 	private deleteCallbackEnabled: boolean = true;
 	private observer: MutationObserver | null = null;
@@ -166,6 +168,11 @@ export default class ImportAttachments extends Plugin {
 
 		// set up the mutation observer for hiding folders
 		this.setupObserver();
+
+		// monkey patch of the openFile function
+		patchOpenFile(this);
+		// add key listeners for modifying the behavior when opening files
+        addKeyListeners();
 
 		// Command for importing as a standard link
 		this.addCommand({
@@ -376,6 +383,8 @@ export default class ImportAttachments extends Plugin {
 	}
 
 	onunload() {
+        unpatchOpenFile();
+        removeKeyListeners();
 		if(this.observer){
 			this.observer.disconnect();	
 		}
