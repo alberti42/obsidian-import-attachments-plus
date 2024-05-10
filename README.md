@@ -26,7 +26,7 @@ Features include:
      - `dist/linux` (Linux)
 
 4. **Copy to Obsidian Plugins Directory:**
-   - Copy the contents of the relevant platform folder (e.g., `dist/windows`) into your vault's `.obsidian/plugins/obsidian-import-attachments-plus` directory.
+   - Copy the contents of the relevant platform folder (e.g., `dist/windows`) into your vault's `.obsidian/plugins/import-attachments-plus` directory.
 
 5. **Enable the Plugin:**
    - Open Obsidian and go to **Settings > Community Plugins**.
@@ -78,6 +78,4 @@ I would be grateful for any donation to support the development of this plugin.
 - **GitHub Profile:** [alberti42](https://github.com/alberti42)
 - **Donations:** [![Buy Me a Coffee](https://img.shields.io/badge/Donate-Buy%20Me%20a%20Coffee-orange)](https://buymeacoffee.com/alberti)
 
-Feel free to contribute to the development of this plugin or report any issues in the [GitHub repository](https://github.com/alberti42/obsidian-import-attachments-plus/issues).
-
-
+Feel free to contribute to the development of this plugin or report any issues in the [GitHub repository](https://github.com/alberti42/import-attachments-plus/issues).
