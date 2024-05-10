@@ -118,7 +118,7 @@ Settings screenshot
 ## Donations
 I would be grateful for any donation to support the development of this plugin.
 
-[<img src="docs/images/buy_me_coffee.png" width=600 alt="Buy Me a Coffee QR Code"/>](https://github.com/alberti42/obsidian-import-attachments-plus/issues)
+[<img src="docs/images/buy_me_coffee.png" width=300 alt="Buy Me a Coffee QR Code"/>](https://buymeacoffee.com/alberti)
 
 ## Author
 - **Author:** Andrea Alberti
