@@ -5,7 +5,7 @@
 	"minAppVersion": "1.5.0",
 	"description": "Import attachments by moving them into the vault.",
 	"author": "Andrea Alberti",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
+	"authorUrl": "https://github.com/alberti42/obsidian-import-attachments-plus",
+	"fundingUrl": "https://github.com/alberti42/obsidian-import-attachments-plus",
 	"isDesktopOnly": false
 }
