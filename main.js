@@ -80,7 +80,7 @@ var import_fs = require("fs");
 var path = __toESM(require("path"));
 var crypto2 = __toESM(require("crypto"));
 
-// node_modules.nosync/uuid/dist/esm-browser/rng.js
+// node_modules/uuid/dist/esm-browser/rng.js
 var getRandomValues;
 var rnds8 = new Uint8Array(16);
 function rng() {
@@ -93,7 +93,7 @@ function rng() {
   return getRandomValues(rnds8);
 }
 
-// node_modules.nosync/uuid/dist/esm-browser/stringify.js
+// node_modules/uuid/dist/esm-browser/stringify.js
 var byteToHex = [];
 for (let i = 0; i < 256; ++i) {
   byteToHex.push((i + 256).toString(16).slice(1));
@@ -102,13 +102,13 @@ function unsafeStringify(arr, offset = 0) {
   return byteToHex[arr[offset + 0]] + byteToHex[arr[offset + 1]] + byteToHex[arr[offset + 2]] + byteToHex[arr[offset + 3]] + "-" + byteToHex[arr[offset + 4]] + byteToHex[arr[offset + 5]] + "-" + byteToHex[arr[offset + 6]] + byteToHex[arr[offset + 7]] + "-" + byteToHex[arr[offset + 8]] + byteToHex[arr[offset + 9]] + "-" + byteToHex[arr[offset + 10]] + byteToHex[arr[offset + 11]] + byteToHex[arr[offset + 12]] + byteToHex[arr[offset + 13]] + byteToHex[arr[offset + 14]] + byteToHex[arr[offset + 15]];
 }
 
-// node_modules.nosync/uuid/dist/esm-browser/native.js
+// node_modules/uuid/dist/esm-browser/native.js
 var randomUUID = typeof crypto !== "undefined" && crypto.randomUUID && crypto.randomUUID.bind(crypto);
 var native_default = {
   randomUUID
 };
 
-// node_modules.nosync/uuid/dist/esm-browser/v4.js
+// node_modules/uuid/dist/esm-browser/v4.js
 function v4(options, buf, offset) {
   if (native_default.randomUUID && !buf && !options) {
     return native_default.randomUUID();
@@ -562,7 +562,7 @@ var metaKeyPressed = false;
 var altKeyPressed = false;
 var keyListenersInstalled = false;
 var originalOpenFile = null;
-function keydownHandler(event) {
+function keyDownHandler(event) {
   if (event.metaKey) {
     metaKeyPressed = true;
   }
@@ -570,7 +570,7 @@ function keydownHandler(event) {
     altKeyPressed = true;
   }
 }
-function keyupHandler(event) {
+function keyUpHandler(event) {
   if (event.key === "Meta") {
     metaKeyPressed = false;
   }
@@ -578,7 +578,19 @@ function keyupHandler(event) {
     altKeyPressed = false;
   }
 }
-function mouseHandler(event) {
+function mouseDownHandler(event) {
+  if (event.metaKey) {
+    metaKeyPressed = true;
+  } else {
+    metaKeyPressed = false;
+  }
+  if (event.altKey) {
+    altKeyPressed = true;
+  } else {
+    altKeyPressed = false;
+  }
+}
+function mouseUpHandler(event) {
   if (event.metaKey) {
     metaKeyPressed = true;
   } else {
@@ -591,16 +603,18 @@ function mouseHandler(event) {
   }
 }
 function addKeyListeners() {
-  document.addEventListener("keydown", keydownHandler);
-  document.addEventListener("keyup", keyupHandler);
-  document.addEventListener("mousedown", mouseHandler, { capture: true });
+  document.addEventListener("keydown", keyDownHandler);
+  document.addEventListener("keyup", keyUpHandler);
+  document.addEventListener("mousedown", mouseDownHandler, { capture: true });
+  document.addEventListener("mouseup", mouseUpHandler, { capture: true });
   keyListenersInstalled = true;
 }
 function removeKeyListeners() {
   if (keyListenersInstalled) {
-    document.removeEventListener("keydown", keydownHandler);
-    document.removeEventListener("keyup", keyupHandler);
-    document.removeEventListener("mousedown", mouseHandler, { capture: true });
+    document.removeEventListener("keydown", keyDownHandler);
+    document.removeEventListener("keyup", keyUpHandler);
+    document.removeEventListener("mousedown", mouseDownHandler, { capture: true });
+    document.addEventListener("mouseup", mouseUpHandler, { capture: true });
     keyListenersInstalled = false;
   }
 }

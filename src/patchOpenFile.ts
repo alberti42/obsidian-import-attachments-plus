@@ -10,73 +10,101 @@ let keyListenersInstalled = false
 
 // Save a reference to the original method for the monkey patch
 let originalOpenFile: ((this: WorkspaceLeaf, file: TFile, openState?: OpenViewState)=> Promise<void>) | null = null;
+// let originalOpenLinkText: ((e:any, t:any, n:any) => any) | null = null;
+// let originalOnSelfClick: ((e:any)=>void)|null = null;
 
 // Function references for event listeners
-function keydownHandler(event: KeyboardEvent) {
-    if (event.metaKey) { // || e.ctrlKey
-        metaKeyPressed = true;
-    }
-    if (event.altKey) {
-        altKeyPressed = true;
-    }
+function keyDownHandler(event: KeyboardEvent) {
+	if (event.metaKey) { // || e.ctrlKey
+		metaKeyPressed = true;
+	}
+	if (event.altKey) {
+		altKeyPressed = true;
+	}
 }
 
-function keyupHandler(event: KeyboardEvent) {
-    if (event.key === 'Meta') {
-        metaKeyPressed = false;
-    }
-    if (event.key === 'Alt') {
-        altKeyPressed = false;
-    }
+function keyUpHandler(event: KeyboardEvent) {
+	if (event.key === 'Meta') {
+		metaKeyPressed = false;
+	}
+	if (event.key === 'Alt') {
+		altKeyPressed = false;
+	}
 }
 
-function mouseHandler(event: MouseEvent) {
-    if (event.metaKey) {
-      metaKeyPressed = true;
-    } else {
-      metaKeyPressed = false;
-    }
-    if (event.altKey) {
-      altKeyPressed = true;
-    } else {
-      altKeyPressed = false;
-    }
+function mouseDownHandler(event: MouseEvent) {
+	if (event.metaKey) {
+		metaKeyPressed = true;
+	} else {
+		metaKeyPressed = false;
+	}
+	if (event.altKey) {
+		altKeyPressed = true;
+	} else {
+		altKeyPressed = false;
+	}
+}
+
+function mouseUpHandler(event: MouseEvent) {
+	if (event.metaKey) {
+		metaKeyPressed = true;
+	} else {
+		metaKeyPressed = false;
+	}
+	if (event.altKey) {
+		altKeyPressed = true;
+	} else {
+		altKeyPressed = false;
+	}
 }
 
 function addKeyListeners()
 {
-    // Listen for keyboard events to detect META key state
-    document.addEventListener('keydown', keydownHandler);
-    document.addEventListener('keyup', keyupHandler);
-	document.addEventListener('mousedown', mouseHandler, { capture: true });
-    keyListenersInstalled = true;
+	// Listen for keyboard events to detect META key state
+	document.addEventListener('keydown', keyDownHandler);
+	document.addEventListener('keyup', keyUpHandler);
+	document.addEventListener('mousedown', mouseDownHandler, { capture: true });
+	document.addEventListener('mouseup', mouseUpHandler, { capture: true });
+	keyListenersInstalled = true;
 }
 
 function removeKeyListeners()
 {
-    if(keyListenersInstalled) {
-        document.removeEventListener('keydown', keydownHandler);
-        document.removeEventListener('keyup', keyupHandler);
-        document.removeEventListener('mousedown', mouseHandler, { capture: true });
-        keyListenersInstalled = false;
-    }
+	if(keyListenersInstalled) {
+		document.removeEventListener('keydown', keyDownHandler);
+		document.removeEventListener('keyup', keyUpHandler);
+		document.removeEventListener('mousedown', mouseDownHandler, { capture: true });
+		document.addEventListener('mouseup', mouseUpHandler, { capture: true });
+		keyListenersInstalled = false;
+	}
 }
 
 function unpatchOpenFile() {
 	if(originalOpenFile) {
 		WorkspaceLeaf.prototype.openFile = originalOpenFile;
 		originalOpenFile = null;
-	} 	
+	}
 }
 
 function patchOpenFile(plugin: ImportAttachments) {
 	originalOpenFile = WorkspaceLeaf.prototype.openFile;
-	
+	// originalOpenLinkText = WorkspaceLeaf.prototype.openLinkText;
+	// originalOnSelfClick = WorkspaceLeaf.prototype.onSelfClick;
+
 	// Monkey patch the openFile method
 	WorkspaceLeaf.prototype.openFile = async function patchedOpenFile(this: WorkspaceLeaf, file: TFile, openState?: OpenViewState): Promise<void> {
-		
 		// console.log(`Meta key is pressed: ${metaKeyPressed}`);
 		// console.log(`Alt key is pressed: ${altKeyPressed}`);
+
+		/*
+		try {
+			// Code throwing an exception
+			throw new Error();
+		} catch(e) {
+			console.log(e.stack);
+			console.log(this);
+		}
+		*/
 
 		if(file.extension==='md' && originalOpenFile) {
 			return originalOpenFile.call(this, file, openState);
@@ -102,6 +130,16 @@ function patchOpenFile(plugin: ImportAttachments) {
 		}
 		return;
 	}
+	
+	/*
+	WorkspaceLeaf.prototype.openLinkText = async function patchedOpenLinkText(this:WorkspaceLeaf, t:any, n:any): any {
+		if(originalOpenLinkText){
+			console.log('Open link text');
+			return originalOpenLinkText.call(this,t,n);	
+		}
+		return;		
+	}
+	*/
 }
 
 export {patchOpenFile, addKeyListeners, removeKeyListeners, unpatchOpenFile};
