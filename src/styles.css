@@ -1,0 +1,109 @@
+/*
+
+This CSS file will be included with your plugin, and
+available in the app when your plugin is enabled.
+
+If your plugin does not need CSS, delete this file.
+
+*/
+
+.import-attach-plugin table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.import-attach-plugin tr.sep {
+	padding-top: 10px;
+	border-top: 1px solid var(--background-modifier-border);
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.import-attach-plugin td {
+	padding: 18px 0 18px 0;
+}
+
+.import-attach-plugin .action-question {
+	width: 75%;
+	text-align: left;
+}
+
+.import-attach-plugin .toggle-option-A {
+	width: auto;
+	text-align: right;
+	padding-right: 5px;
+}
+
+.import-attach-plugin .toggle-option-B {
+	width: auto;
+	text-align: left;
+	padding-left: 5px;
+	padding-right: 5px;
+}
+
+.import-buttons {
+	display: flex;              /* Establishes this container as a flex container */
+    justify-content: flex-end;  /* Aligns children (the button) to the right */    
+}
+
+/* Style for the container that holds the buttons */
+.import-buttons button {
+	padding: 16px 16px;
+    margin: 15px 0 0 15px;         /* Optional: Adds margin on the right for spacing from container edge */
+}
+
+/* Focus styles for accessibility */
+/*
+.import-buttons button:focus {
+    outline: 3px solid var(--interactive-accent-hover);
+    outline-offset: 2px;
+}
+*/
+
+.switch {
+	position: relative;
+	display: inline-block;
+	width: 50px;
+	/* Width of the slider */
+	height: 24px;
+	/* Height of the slider */
+}
+
+.switch input {
+	opacity: 0;
+	width: 0;
+	height: 0;
+}
+
+.slider {
+	position: absolute;
+	cursor: pointer;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background-color: var(--color-base-60);
+	transition: .4s;
+	border-radius: 24px;
+}
+
+.slider:before {
+	position: absolute;
+	content: "";
+	height: 20px;
+	width: 20px;
+	left: 2px;
+	bottom: 2px;
+	background-color: white;
+	transition: .2s;
+	border-radius: 50%;
+}
+
+input:checked+.slider:before {
+	transform: translateX(26px);
+	/* Adjust translation distance */
+}
+
+.slider:hover {
+	/* Keep the original accent color on hover */
+	background-color: var(--color-base-70);
+}

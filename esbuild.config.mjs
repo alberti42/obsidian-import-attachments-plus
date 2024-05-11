@@ -15,7 +15,7 @@ if you want to view the source, please visit the github repository of this plugi
 const prod = (process.argv[2] === "production");
 
 // Get the output directory
-const outdir = '.';
+const outdir = 'src';
 
 const context = await esbuild.context({
 	banner: {
