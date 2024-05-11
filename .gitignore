@@ -6,7 +6,9 @@
 .idea
 
 # npm
-node_modules*
+node_modules
+
+dist
 
 # Exclude sourcemaps
 *.map
