@@ -100,10 +100,12 @@ export default class ImportAttachments extends Plugin {
 
 	async hideAttachmentFolders(recheckPreviouslyHiddenFolders?: boolean) {
 		if (recheckPreviouslyHiddenFolders) {
-			document.querySelectorAll(".import-attach-hidden").forEach((folder) => {
-				if(folder.parentElement){ folder.parentElement.style.height = "" }
-				if(folder.parentElement){ folder.parentElement.style.overflow = "" }
-				folder.removeClass(".import-attach-hidden");
+			document.querySelectorAll("import-plugin-hidden").forEach((folder) => {
+				if (folder.parentNode && folder.parentNode instanceof HTMLElement) {
+					folder.parentNode.removeClass('import-plugin-hidden');
+				} else {
+					console.error('Parent node is not an HTML element.');
+				}
 			});
 		}
 
@@ -111,12 +113,12 @@ export default class ImportAttachments extends Plugin {
 			if(folderPattern === "") return;
 			const folderElements = document.querySelectorAll(folderPattern);
 			
-			folderElements.forEach((folder) => {
-				if (!folder || !folder.parentElement) {	return; }
-				
-				folder.addClass("import-attach-hidden");
-				folder.parentElement.style.height = this.settings.hideAttachmentFolders ? "0" : "";
-				folder.parentElement.style.overflow = this.settings.hideAttachmentFolders ? "hidden" : "";
+			folderElements.forEach((folder: Element) => {
+				if (folder.parentNode && folder.parentNode instanceof HTMLElement) {
+					folder.parentNode.addClass('import-plugin-hidden');
+				} else {
+					console.error('Parent node is not an HTML element.');
+				}
 			});
 		});
 	}
@@ -174,7 +176,7 @@ export default class ImportAttachments extends Plugin {
 		// monkey patch of the openFile function
 		patchOpenFile(this);
 		// add key listeners for modifying the behavior when opening files
-        addKeyListeners();
+		addKeyListeners();
 
 		// Command for importing as a standard link
 		this.addCommand({
@@ -385,8 +387,8 @@ export default class ImportAttachments extends Plugin {
 	}
 
 	onunload() {
-        unpatchOpenFile();
-        removeKeyListeners();
+		unpatchOpenFile();
+		removeKeyListeners();
 		if(this.observer){
 			this.observer.disconnect();	
 		}

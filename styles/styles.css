@@ -1,39 +1,36 @@
-/*
+.import-plugin-hidden {
+	background-color: red;
+	height: 0;
+    overflow: hidden;
+}
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
-
-If your plugin does not need CSS, delete this file.
-
-*/
-
-.import-attach-plugin table {
+.import-plugin table {
 	width: 100%;
 	border-collapse: collapse;
 }
 
-.import-attach-plugin tr.sep {
+.import-plugin tr.sep {
 	padding-top: 10px;
 	border-top: 1px solid var(--background-modifier-border);
 	border-bottom: 1px solid var(--background-modifier-border);
 }
 
-.import-attach-plugin td {
+.import-plugin td {
 	padding: 18px 0 18px 0;
 }
 
-.import-attach-plugin .action-question {
+.import-plugin .import-question {
 	width: 75%;
 	text-align: left;
 }
 
-.import-attach-plugin .toggle-option-A {
+.import-plugin .import-option-A {
 	width: auto;
 	text-align: right;
 	padding-right: 5px;
 }
 
-.import-attach-plugin .toggle-option-B {
+.import-plugin .import-option-B {
 	width: auto;
 	text-align: left;
 	padding-left: 5px;
@@ -59,7 +56,7 @@ If your plugin does not need CSS, delete this file.
 }
 */
 
-.switch {
+.import-switch {
 	position: relative;
 	display: inline-block;
 	width: 50px;
@@ -68,13 +65,13 @@ If your plugin does not need CSS, delete this file.
 	/* Height of the slider */
 }
 
-.switch input {
+.import-switch input {
 	opacity: 0;
 	width: 0;
 	height: 0;
 }
 
-.slider {
+.import-slider {
 	position: absolute;
 	cursor: pointer;
 	top: 0;
@@ -86,7 +83,7 @@ If your plugin does not need CSS, delete this file.
 	border-radius: 24px;
 }
 
-.slider:before {
+.import-slider:before {
 	position: absolute;
 	content: "";
 	height: 20px;
@@ -98,12 +95,12 @@ If your plugin does not need CSS, delete this file.
 	border-radius: 50%;
 }
 
-input:checked+.slider:before {
+input:checked+.import-slider:before {
 	transform: translateX(26px);
 	/* Adjust translation distance */
 }
 
-.slider:hover {
+.import-slider:hover {
 	/* Keep the original accent color on hover */
 	background-color: var(--color-base-70);
 }

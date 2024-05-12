@@ -42,14 +42,14 @@ export class ImportActionTypeModal extends Modal {
 		}
 
 		// Add the question aligned to the left
-		tr.createEl('td', { text: questionText, cls: 'action-question' });
+		tr.createEl('td', { text: questionText, cls: 'import-question' });
 
 		// Label for option A (e.g., "Move")
-		tr.createEl('td', { text: optionA, cls: 'toggle-option-A' });
+		tr.createEl('td', { text: optionA, cls: 'import-option-A' });
 
 		// Create the toggle switch
 		const td = tr.createEl('td');
-		const switchLabel = td.createEl('label', { cls: 'switch' });
+		const switchLabel = td.createEl('label', { cls: 'import-switch' });
 		const input = switchLabel.createEl('input', { type: 'checkbox' });
 		if(initialOption==CheckboxOptions.A) {
 			input.checked = false;
@@ -57,10 +57,10 @@ export class ImportActionTypeModal extends Modal {
 			input.checked = true;
 		}
 		
-		switchLabel.createEl('span', { cls: 'slider' });
+		switchLabel.createEl('span', { cls: 'import-slider' });
 
 		// Label for option B (e.g., "Copy")
-		tr.createEl('td', { text: optionB, cls: 'toggle-option-B' });
+		tr.createEl('td', { text: optionB, cls: 'import-option-B' });
 
 		// Event listener for toggle
 		input.addEventListener('change', () => {
@@ -75,7 +75,7 @@ export class ImportActionTypeModal extends Modal {
 
 		const { contentEl } = this;
 
-		const container = contentEl.createDiv({ cls: 'import-attach-plugin' });
+		const container = contentEl.createDiv({ cls: 'import-plugin' });
 
 		container.createEl('h2', { text: 'Import Files' });
 		container.createEl('p', { text: 'Configure the import options and then press either enter or the import button.' });
@@ -198,7 +198,7 @@ export class OverwriteChoiceModal extends Modal {
 	onOpen() {
 		const { contentEl } = this;
 
-		const container = contentEl.createDiv({ cls: 'import-attach-plugin' });
+		const container = contentEl.createDiv({ cls: 'import-plugin' });
 
 		container.createEl('h2', { text: 'Import Files' });
 		const paragraph = container.createEl('p');
@@ -292,7 +292,7 @@ export class DeleteAttachmentFolderModal extends Modal {
 
 		const { contentEl } = this;
 
-		const container = contentEl.createDiv({ cls: 'import-attach-plugin' });
+		const container = contentEl.createDiv({ cls: 'import-plugin' });
 
 		container.createEl('h2', { text: 'Import Files' });
 		const paragraph = container.createEl('p');
@@ -361,7 +361,7 @@ export class ImportFromVaultChoiceModal extends Modal {
 	onOpen() {
 		const { contentEl } = this;
 
-		const container = contentEl.createDiv({ cls: 'import-attach-plugin' });
+		const container = contentEl.createDiv({ cls: 'import-plugin' });
 
 		container.createEl('h2', { text: 'Import Files' });
 		const paragraph = container.createEl('p');
