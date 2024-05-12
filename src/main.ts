@@ -98,14 +98,10 @@ export default class ImportAttachments extends Plugin {
 		this.observer.observe(targetNode, config);
 	}
 
-	async hideAttachmentFolders(recheckPreviouslyHiddenFolders?: boolean) {
-		if (recheckPreviouslyHiddenFolders) {
-			document.querySelectorAll("import-plugin-hidden").forEach((folder) => {
-				if (folder.parentNode && folder.parentNode instanceof HTMLElement) {
-					folder.parentNode.removeClass('import-plugin-hidden');
-				} else {
-					console.error('Parent node is not an HTML element.');
-				}
+	async hideAttachmentFolders(forceRecheckingAllFolders?: boolean) {
+		if (forceRecheckingAllFolders) {
+			document.querySelectorAll(".import-plugin-hidden").forEach((divElement: Element) => {
+				divElement.removeClass('import-plugin-hidden');
 			});
 		}
 
@@ -115,9 +111,11 @@ export default class ImportAttachments extends Plugin {
 			
 			folderElements.forEach((folder: Element) => {
 				if (folder.parentNode && folder.parentNode instanceof HTMLElement) {
-					folder.parentNode.addClass('import-plugin-hidden');
+					if(this.settings.hideAttachmentFolders){
+						folder.parentNode.addClass('import-plugin-hidden');
+					}
 				} else {
-					console.error('Parent node is not an HTML element.');
+					console.error('Parent node is not an HTML element:',folder);
 				}
 			});
 		});
