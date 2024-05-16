@@ -611,7 +611,7 @@ export default class ImportAttachments extends Plugin {
 			// Check if file already exists in the vault
 			const existingFile = await Utils.checkFileExists(destFilePath);
 			// If they are the same file, then skip copying/moving, we are alrady done
-			console.log(existingFile);
+			
 			if(existingFile && await Utils.arePathsSameFile(originalFilePath,destFilePath)) {
 				return destFilePath;
 			}
