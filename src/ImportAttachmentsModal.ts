@@ -77,7 +77,7 @@ export class ImportActionTypeModal extends Modal {
 
 		const container = contentEl.createDiv({ cls: 'import-plugin' });
 
-		container.createEl('h2', { text: 'Import Files' });
+		container.createEl('h2', { text: 'Import files' });
 		container.createEl('p', { text: 'Configure the import options and then press either enter or the import button.' });
 
 		const table = container.createEl('table');
@@ -200,7 +200,7 @@ export class OverwriteChoiceModal extends Modal {
 
 		const container = contentEl.createDiv({ cls: 'import-plugin' });
 
-		container.createEl('h2', { text: 'Import Files' });
+		container.createEl('h2', { text: 'Import files' });
 		const paragraph = container.createEl('p');
 		paragraph.append('You are trying to copy the file "');
 		
@@ -294,7 +294,7 @@ export class DeleteAttachmentFolderModal extends Modal {
 
 		const container = contentEl.createDiv({ cls: 'import-plugin' });
 
-		container.createEl('h2', { text: 'Import Files' });
+		container.createEl('h2', { text: 'Import files' });
 		const paragraph = container.createEl('p');
 		paragraph.append('Do you want to move the attachment folder "');
 		
@@ -363,7 +363,7 @@ export class ImportFromVaultChoiceModal extends Modal {
 
 		const container = contentEl.createDiv({ cls: 'import-plugin' });
 
-		container.createEl('h2', { text: 'Import Files' });
+		container.createEl('h2', { text: 'Import files' });
 		const paragraph = container.createEl('p');
 		paragraph.append('The file you are trying to import "');
 		

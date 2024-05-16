@@ -10,6 +10,7 @@ import {
 	PluginSettingTab,
 	Setting,
 	TAbstractFile,
+	Platform,
 	PluginManifest,
 } from "obsidian";
 
@@ -179,7 +180,7 @@ export default class ImportAttachments extends Plugin {
 		// Command for importing as a standard link
 		this.addCommand({
 			id: "move-file-to-vault-link",
-			name: "Move File to Vault as Link",
+			name: "Move file to vault as linked attachment",
 			callback: () => this.chooseFileToImport({
 				embed: false,
 				action: ImportActionType.MOVE,
@@ -189,7 +190,7 @@ export default class ImportAttachments extends Plugin {
 		// Command for importing as an embedded image/link
 		this.addCommand({
 			id: "move-file-to-vault-embed",
-			name: "Move File to Vault as Embedded",
+			name: "Move file to vault as embedded attachment",
 			callback: () => this.chooseFileToImport({
 				embed: true,
 				action: ImportActionType.MOVE,
@@ -199,7 +200,7 @@ export default class ImportAttachments extends Plugin {
 		// Command for importing as a standard link
 		this.addCommand({
 			id: "copy-file-to-vault-link",
-			name: "Copy File to Vault as Link",
+			name: "Copy file to vault as linked attachment",
 			callback: () => this.chooseFileToImport({
 				embed: false,
 				action: ImportActionType.COPY,
@@ -209,7 +210,7 @@ export default class ImportAttachments extends Plugin {
 		// Command for importing as an embedded image/link
 		this.addCommand({
 			id: "copy-file-to-vault-embed",
-			name: "Copy File to Vault as Embedded",
+			name: "Copy file to vault as embedded attachment",
 			callback: () => this.chooseFileToImport({
 				embed: true,
 				action: ImportActionType.COPY,
@@ -219,7 +220,7 @@ export default class ImportAttachments extends Plugin {
 		// Register the command to open the attachments folder
 		this.addCommand({
 			id: "open-attachments-folder",
-			name: "Open Attachments Folder",
+			name: "Open attachments folder",
 			callback: () => this.openAttachmentsFolder(),
 		});
 
@@ -586,6 +587,7 @@ export default class ImportAttachments extends Plugin {
 	async moveFileToAttachmentsFolder(filesToImport: FileList, attachmentsFolderPath: string, currentNoteFolderPath: string, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface) {
 		// Ensure the directory exists before moving the file
 		await Utils.ensureDirectoryExists(attachmentsFolderPath);
+		
 
 		const cursor = editor.getCursor(); // Get the current cursor position before insertion
 
@@ -609,6 +611,7 @@ export default class ImportAttachments extends Plugin {
 			// Check if file already exists in the vault
 			const existingFile = await Utils.checkFileExists(destFilePath);
 			// If they are the same file, then skip copying/moving, we are alrady done
+			console.log(existingFile);
 			if(existingFile && await Utils.arePathsSameFile(originalFilePath,destFilePath)) {
 				return destFilePath;
 			}
@@ -821,9 +824,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		containerEl.createEl('h2', { text: 'Settings for Import Attachments+ Plugin' });
-
-		containerEl.createEl('h3', { text: 'Import options' });
+		new Setting(containerEl).setName('Importing').setHeading();
 		
 		new Setting(containerEl)
 			.setName('Whether to move or copy files that are drag-and-dropped?')
@@ -912,8 +913,79 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 			}));
 
-		containerEl.createEl('h3', { text: 'Attachment folder configuration' });
+		new Setting(containerEl).setName('Opening').setHeading();
+		
+		let key;
+		if (Platform.isMacOS) {
+			key = '⌘';
+		} else { // Default to Windows/Linux bindings
+			key = 'Ctrl';
+		}
 
+		new Setting(containerEl)
+			.setName('Open attachment with default external application:')
+			.setDesc(`If this option is enabled, when you open an attachment by holding ${key}, the attachment opens in default external application.`)
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.openAttachmentExternal)
+				.onChange(async (value: boolean) => {
+					this.plugin.settings.openAttachmentExternal = value;
+					await this.plugin.saveSettings();
+			}));
+
+		if (Platform.isMacOS) {
+			key = '⌘+⌥';
+		} else { // Default to Windows/Linux bindings
+			key = 'Ctrl+Alt';
+		}
+
+		new Setting(containerEl)
+			.setName("Reveal attachment in system's file manager:")
+			.setDesc(`If this option is enabled, when you open an attachment by holding ${key}, the attachment is shown in the system's file manager.`)
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.revealAttachment)
+				.onChange(async (value: boolean) => {
+					this.plugin.settings.revealAttachment = value;
+					await this.plugin.saveSettings();
+			}));
+
+
+		new Setting(containerEl).setName('Managing').setHeading();
+		
+		new Setting(containerEl)
+			.setName('Rename the attachment folder automatically and update all links correspondingly:')
+			.setDesc('If this option is enabled, when you rename/move an note, if the renamed note has an attachment folder connected to it, \
+				its attachment folder is renamed/moved to a new name/location corresponding to the new name of the note.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.autoRenameAttachmentFolder)
+				.onChange(async (value: boolean) => {
+					this.plugin.settings.autoRenameAttachmentFolder = value;
+					await this.plugin.saveSettings();
+			}));
+
+		new Setting(containerEl)
+			.setName('Delete the attachment folder automatically when the corresponding note is deleted:')
+			.setDesc('If this option is enabled, when you delete a note, if the deleted note has an attachment folder connected to it, \
+				its attachment folder will be deleted as well. \
+				Note: automatic deletion only works when the name of the attachment folder contains ${notename}.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.autoDeleteAttachmentFolder)
+				.onChange(async (value: boolean) => {
+					this.plugin.settings.autoDeleteAttachmentFolder = value;
+					await this.plugin.saveSettings();
+			}));
+
+		new Setting(containerEl)
+			.setName('Ask confirmation before deleting the attachment folder:')
+			.setDesc('If enabled, the user is asked each time whether to delete the attachment folder.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.confirmDeleteAttachmentFolder)
+				.onChange(async (value: boolean) => {
+					this.plugin.settings.confirmDeleteAttachmentFolder = value;
+					await this.plugin.saveSettings();
+			}));
+
+		new Setting(containerEl).setName('Attachment folder').setHeading();
+		
 		new Setting(containerEl)
 			.setName('Default location for new attachments:')
 			.setDesc('The reference folder for importing new attachments.')
@@ -996,80 +1068,6 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 					this.plugin.settings.dateFormat = value;
 					await this.plugin.saveSettings();
 			})});
-
-		containerEl.createEl('h3', { text: 'Attachment opening' });
-
-		let key;
-		const os = navigator.platform.toUpperCase();
-		if (os.includes('MAC')) {
-			key = '⌘';
-		} else { // Default to Windows/Linux bindings
-			key = 'Ctrl';
-		}
-
-		new Setting(containerEl)
-			.setName('Open attachment with default external application:')
-			.setDesc(`If this option is enabled, when you open an attachment by holding ${key}, the attachment opens in default external application.`)
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.openAttachmentExternal)
-				.onChange(async (value: boolean) => {
-					this.plugin.settings.openAttachmentExternal = value;
-					await this.plugin.saveSettings();
-			}));
-
-		if (os.includes('MAC')) {
-			key = '⌘+⌥';
-		} else { // Default to Windows/Linux bindings
-			key = 'Ctrl+Alt';
-		}
-
-		new Setting(containerEl)
-			.setName("Reveal attachment in system's file manager:")
-			.setDesc(`If this option is enabled, when you open an attachment by holding ${key}, the attachment is shown in the system's file manager.`)
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.revealAttachment)
-				.onChange(async (value: boolean) => {
-					this.plugin.settings.revealAttachment = value;
-					await this.plugin.saveSettings();
-			}));
-
-
-		containerEl.createEl('h3', { text: 'Attachment management' });
-
-		new Setting(containerEl)
-			.setName('Rename the attachment folder automatically and update all links correspondingly:')
-			.setDesc('If this option is enabled, when you rename/move an note, if the renamed note has an attachment folder connected to it, \
-				its attachment folder is renamed/moved to a new name/location corresponding to the new name of the note.')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.autoRenameAttachmentFolder)
-				.onChange(async (value: boolean) => {
-					this.plugin.settings.autoRenameAttachmentFolder = value;
-					await this.plugin.saveSettings();
-			}));
-
-		new Setting(containerEl)
-			.setName('Delete the attachment folder automatically when the corresponding note is deleted:')
-			.setDesc('If this option is enabled, when you delete a note, if the deleted note has an attachment folder connected to it, \
-				its attachment folder will be deleted as well. \
-				Note: automatic deletion only works when the name of the attachment folder contains ${notename}.')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.autoDeleteAttachmentFolder)
-				.onChange(async (value: boolean) => {
-					this.plugin.settings.autoDeleteAttachmentFolder = value;
-					await this.plugin.saveSettings();
-			}));
-
-		new Setting(containerEl)
-			.setName('Ask confirmation before deleting the attachment folder:')
-			.setDesc('If enabled, the user is asked each time whether to delete the attachment folder.')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.confirmDeleteAttachmentFolder)
-				.onChange(async (value: boolean) => {
-					this.plugin.settings.confirmDeleteAttachmentFolder = value;
-					await this.plugin.saveSettings();
-			}));
-
-		containerEl.createEl('h3', { text: 'Display of attachment folders' });
 		
 		new Setting(containerEl)
 			.setName('Hide attachment folders:')
