@@ -828,7 +828,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 		
 		new Setting(containerEl)
 			.setName('Whether to move or copy files that are drag-and-dropped?')
-			.setDesc('Choose whether files that are dragged and dropped into the editor should be moved or copied. Alternatively, the user is asked each time. By holding the SHIFT key pressed, you will be shown the import panel, however you configured this option.')
+			.setDesc('Choose whether files that are dragged and dropped into the editor should be moved or copied. Alternatively, the user is asked each time. By holding the shift key ⇧ pressed, you will be shown the import panel, however you configured this option.')
 			.addDropdown(dropdown => {
 				dropdown.addOption(ImportActionType.ASK_USER, 'Ask each time');
 				dropdown.addOption(ImportActionType.MOVE, 'Move');
@@ -848,7 +848,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('Whether to move or copy files that are copy-and-pasted?')
-			.setDesc('Choose whether files that are copy and pasted into the editor should be moved or copied. Alternatively, the user is asked each time.  By holding the SHIFT key pressed, you will be shown the import panel, however you configured this option.')
+			.setDesc('Choose whether files that are copy and pasted into the editor should be moved or copied. Alternatively, the user is asked each time.  By holding the shift key ⇧ pressed, you will be shown the import panel, however you configured this option.')
 			.addDropdown(dropdown => {
 				dropdown.addOption(ImportActionType.ASK_USER, 'Ask each time');
 				dropdown.addOption(ImportActionType.MOVE, 'Move');
@@ -868,7 +868,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('Embed imported documents:')
-			.setDesc('If this option is enabled, the files are imported as an embedded document; if it is deactivated, they are imported as a linked document.  By holding the SHIFT key pressed, you will be shown the import panel, however you configured this option.')
+			.setDesc('If this option is enabled, the files are imported as an embedded document; if it is deactivated, they are imported as a linked document.  By holding the shift key ⇧ pressed, you will be shown the import panel, however you configured this option.')
 			.addDropdown(dropdown => {
 				dropdown.addOption(YesNoTypes.ASK_USER, 'Ask each time');
 				dropdown.addOption(YesNoTypes.YES, 'Yes');
