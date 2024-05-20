@@ -852,132 +852,130 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		if (Platform.isDesktopApp) {
-			new Setting(containerEl).setName('Importing').setHeading();
-			
-			new Setting(containerEl)
-				.setName('Whether to move or copy files that are drag-and-dropped?')
-				.setDesc('Choose whether files that are dragged and dropped into the editor should be moved or copied. Alternatively, the user is asked each time. By holding the SHIFT key pressed, you will be shown the import panel, however you configured this option.')
-				.addDropdown(dropdown => {
-					dropdown.addOption(ImportActionType.ASK_USER, 'Ask each time');
-					dropdown.addOption(ImportActionType.MOVE, 'Move');
-					dropdown.addOption(ImportActionType.COPY, 'Copy');
-					dropdown.setValue(this.plugin.settings.actionDroppedFilesOnImport)
-					.onChange(async (value: string) => {
-						if (value in ImportActionType) {
-							this.plugin.settings.actionDroppedFilesOnImport = value as ImportActionType;
-							if(value != ImportActionType.ASK_USER) {
-								this.plugin.settings.lastActionDroppedFilesOnImport = value as ImportActionType;
-							}
-							await this.plugin.saveSettings();
-						} else {
-							console.error('Invalid import action type:', value);
+		new Setting(containerEl).setName('Importing').setHeading();
+		
+		new Setting(containerEl)
+			.setName('Whether to move or copy files that are drag-and-dropped?')
+			.setDesc('Choose whether files that are dragged and dropped into the editor should be moved or copied. Alternatively, the user is asked each time. By holding the shift key ⇧ pressed, you will be shown the import panel, however you configured this option.')
+			.addDropdown(dropdown => {
+				dropdown.addOption(ImportActionType.ASK_USER, 'Ask each time');
+				dropdown.addOption(ImportActionType.MOVE, 'Move');
+				dropdown.addOption(ImportActionType.COPY, 'Copy');
+				dropdown.setValue(this.plugin.settings.actionDroppedFilesOnImport)
+				.onChange(async (value: string) => {
+					if (value in ImportActionType) {
+						this.plugin.settings.actionDroppedFilesOnImport = value as ImportActionType;
+						if(value != ImportActionType.ASK_USER) {
+							this.plugin.settings.lastActionDroppedFilesOnImport = value as ImportActionType;
 						}
-				})});
-
-			new Setting(containerEl)
-				.setName('Whether to move or copy files that are copy-and-pasted?')
-				.setDesc('Choose whether files that are copy and pasted into the editor should be moved or copied. Alternatively, the user is asked each time.  By holding the SHIFT key pressed, you will be shown the import panel, however you configured this option.')
-				.addDropdown(dropdown => {
-					dropdown.addOption(ImportActionType.ASK_USER, 'Ask each time');
-					dropdown.addOption(ImportActionType.MOVE, 'Move');
-					dropdown.addOption(ImportActionType.COPY, 'Copy');
-					dropdown.setValue(this.plugin.settings.actionPastedFilesOnImport)
-					.onChange(async (value: string) => {
-						if (value in ImportActionType) {
-							this.plugin.settings.actionPastedFilesOnImport = value as ImportActionType;
-							if(value != ImportActionType.ASK_USER) {
-								this.plugin.settings.lastActionPastedFilesOnImport = value as ImportActionType;
-							}
-							await this.plugin.saveSettings();
-						} else {
-							console.error('Invalid import action type:', value);
-						}
-				})});
-
-			new Setting(containerEl)
-				.setName('Embed imported documents:')
-				.setDesc('If this option is enabled, the files are imported as an embedded document; if it is deactivated, they are imported as a linked document.  By holding the SHIFT key pressed, you will be shown the import panel, however you configured this option.')
-				.addDropdown(dropdown => {
-					dropdown.addOption(YesNoTypes.ASK_USER, 'Ask each time');
-					dropdown.addOption(YesNoTypes.YES, 'Yes');
-					dropdown.addOption(YesNoTypes.NO, 'No');
-					dropdown.setValue(this.plugin.settings.embedFilesOnImport)
-					.onChange(async (value: string) => {
-						if (Object.values(YesNoTypes).includes(value as YesNoTypes)) {
-							this.plugin.settings.embedFilesOnImport = value as YesNoTypes;
-							if(value != YesNoTypes.ASK_USER) {
-								this.plugin.settings.lastEmbedFilesOnImport = value as YesNoTypes;
-							}
-							await this.plugin.saveSettings();
-						} else {
-							console.error('Invalid option selection:', value);
-						}
-				})});
-
-			new Setting(containerEl)
-				.setName('Import multiple files as:')
-				.setDesc('Choose how to import multiple files: as a bulleted list, as a numbered list, or inline without using lists.')
-				.addDropdown(dropdown => {
-					dropdown.addOption(MultipleFilesImportTypes.BULLETED, 'Bulleted list');
-					dropdown.addOption(MultipleFilesImportTypes.NUMBERED, 'Numbered list');
-					dropdown.addOption(MultipleFilesImportTypes.INLINE, 'Inline');
-					dropdown.setValue(this.plugin.settings.multipleFilesImportType)
-					.onChange(async (value: string) => {
-						if (Object.values(MultipleFilesImportTypes).includes(value as MultipleFilesImportTypes)) {
-							this.plugin.settings.multipleFilesImportType = value as MultipleFilesImportTypes;
-							await this.plugin.saveSettings();
-						} else {
-							console.error('Invalid option selection:', value);
-						}
-				})});
-
-			new Setting(containerEl)
-				.setName('Insert display text for links based on filename:')
-				.setDesc('If this option is enabled, the basename of the imported document is used as in place of the custom display text.')
-				.addToggle(toggle => toggle
-					.setValue(this.plugin.settings.customDisplayText)
-					.onChange(async (value: boolean) => {
-						this.plugin.settings.customDisplayText = value;
 						await this.plugin.saveSettings();
-				}));
+					} else {
+						console.error('Invalid import action type:', value);
+					}
+			})});
 
-			new Setting(containerEl).setName('Opening').setHeading();
-			
-			let key;
-			if (Platform.isMacOS) {
-				key = '⌘';
-			} else { // Default to Windows/Linux bindings
-				key = 'Ctrl';
-			}
-			
-
-			new Setting(containerEl)
-				.setName('Open attachment with default external application:')
-				.setDesc(`If this option is enabled, when you open an attachment by holding ${key}, the attachment opens in default external application.`)
-				.addToggle(toggle => toggle
-					.setValue(this.plugin.settings.openAttachmentExternal)
-					.onChange(async (value: boolean) => {
-						this.plugin.settings.openAttachmentExternal = value;
+		new Setting(containerEl)
+			.setName('Whether to move or copy files that are copy-and-pasted?')
+			.setDesc('Choose whether files that are copy and pasted into the editor should be moved or copied. Alternatively, the user is asked each time.  By holding the shift key ⇧ pressed, you will be shown the import panel, however you configured this option.')
+			.addDropdown(dropdown => {
+				dropdown.addOption(ImportActionType.ASK_USER, 'Ask each time');
+				dropdown.addOption(ImportActionType.MOVE, 'Move');
+				dropdown.addOption(ImportActionType.COPY, 'Copy');
+				dropdown.setValue(this.plugin.settings.actionPastedFilesOnImport)
+				.onChange(async (value: string) => {
+					if (value in ImportActionType) {
+						this.plugin.settings.actionPastedFilesOnImport = value as ImportActionType;
+						if(value != ImportActionType.ASK_USER) {
+							this.plugin.settings.lastActionPastedFilesOnImport = value as ImportActionType;
+						}
 						await this.plugin.saveSettings();
-				}));
+					} else {
+						console.error('Invalid import action type:', value);
+					}
+			})});
 
-			if (Platform.isMacOS) {
-				key = '⌘+⌥';
-			} else { // Default to Windows/Linux bindings
-				key = 'Ctrl+Alt';
-			}
-
-			new Setting(containerEl)
-				.setName("Reveal attachment in system's file manager:")
-				.setDesc(`If this option is enabled, when you open an attachment by holding ${key}, the attachment is shown in the system's file manager.`)
-				.addToggle(toggle => toggle
-					.setValue(this.plugin.settings.revealAttachment)
-					.onChange(async (value: boolean) => {
-						this.plugin.settings.revealAttachment = value;
+		new Setting(containerEl)
+			.setName('Embed imported documents:')
+			.setDesc('If this option is enabled, the files are imported as an embedded document; if it is deactivated, they are imported as a linked document.  By holding the shift key ⇧ pressed, you will be shown the import panel, however you configured this option.')
+			.addDropdown(dropdown => {
+				dropdown.addOption(YesNoTypes.ASK_USER, 'Ask each time');
+				dropdown.addOption(YesNoTypes.YES, 'Yes');
+				dropdown.addOption(YesNoTypes.NO, 'No');
+				dropdown.setValue(this.plugin.settings.embedFilesOnImport)
+				.onChange(async (value: string) => {
+					if (Object.values(YesNoTypes).includes(value as YesNoTypes)) {
+						this.plugin.settings.embedFilesOnImport = value as YesNoTypes;
+						if(value != YesNoTypes.ASK_USER) {
+							this.plugin.settings.lastEmbedFilesOnImport = value as YesNoTypes;
+						}
 						await this.plugin.saveSettings();
-				}));
+					} else {
+						console.error('Invalid option selection:', value);
+					}
+			})});
+
+		new Setting(containerEl)
+			.setName('Import multiple files as:')
+			.setDesc('Choose how to import multiple files: as a bulleted list, as a numbered list, or inline without using lists.')
+			.addDropdown(dropdown => {
+				dropdown.addOption(MultipleFilesImportTypes.BULLETED, 'Bulleted list');
+				dropdown.addOption(MultipleFilesImportTypes.NUMBERED, 'Numbered list');
+				dropdown.addOption(MultipleFilesImportTypes.INLINE, 'Inline');
+				dropdown.setValue(this.plugin.settings.multipleFilesImportType)
+				.onChange(async (value: string) => {
+					if (Object.values(MultipleFilesImportTypes).includes(value as MultipleFilesImportTypes)) {
+						this.plugin.settings.multipleFilesImportType = value as MultipleFilesImportTypes;
+						await this.plugin.saveSettings();
+					} else {
+						console.error('Invalid option selection:', value);
+					}
+			})});
+
+		new Setting(containerEl)
+			.setName('Insert display text for links based on filename:')
+			.setDesc('If this option is enabled, the basename of the imported document is used as in place of the custom display text.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.customDisplayText)
+				.onChange(async (value: boolean) => {
+					this.plugin.settings.customDisplayText = value;
+					await this.plugin.saveSettings();
+			}));
+
+		new Setting(containerEl).setName('Opening').setHeading();
+		
+		let key;
+		if (Platform.isMacOS) {
+			key = '⌘';
+		} else { // Default to Windows/Linux bindings
+			key = 'Ctrl';
 		}
+
+		new Setting(containerEl)
+			.setName('Open attachment with default external application:')
+			.setDesc(`If this option is enabled, when you open an attachment by holding ${key}, the attachment opens in default external application.`)
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.openAttachmentExternal)
+				.onChange(async (value: boolean) => {
+					this.plugin.settings.openAttachmentExternal = value;
+					await this.plugin.saveSettings();
+			}));
+
+		if (Platform.isMacOS) {
+			key = '⌘+⌥';
+		} else { // Default to Windows/Linux bindings
+			key = 'Ctrl+Alt';
+		}
+
+		new Setting(containerEl)
+			.setName("Reveal attachment in system's file manager:")
+			.setDesc(`If this option is enabled, when you open an attachment by holding ${key}, the attachment is shown in the system's file manager.`)
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.revealAttachment)
+				.onChange(async (value: boolean) => {
+					this.plugin.settings.revealAttachment = value;
+					await this.plugin.saveSettings();
+			}));
+
 
 		new Setting(containerEl).setName('Managing').setHeading();
 		
@@ -1016,90 +1014,88 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl).setName('Attachment folder').setHeading();
 		
-		if (Platform.isDesktopApp) {
-			new Setting(containerEl)
-				.setName('Default location for new attachments:')
-				.setDesc('The reference folder for importing new attachments.')
-				.addDropdown(dropdown => {
-					dropdown.addOption(RelativeLocation.VAULT, 'Vault folder');
-					dropdown.addOption(RelativeLocation.SAME, 'Same folder as current file');
-					dropdown.setValue(this.plugin.settings.relativeLocation)
-					.onChange(async (value: string) => {
-						if (Object.values(RelativeLocation).includes(value as RelativeLocation)) {
-							this.plugin.settings.relativeLocation = value as RelativeLocation;
-							await this.plugin.saveSettings();
-						} else {
-							console.error('Invalid option selection:', value);
-						}
-				})});
-
-			new Setting(containerEl)
-				.setName('Attachment folder where to import new attachments, relative to the default location:')
-				.setDesc('Where newly created notes are placed. Use ${notename} as a placeholder for the name of the note.')
-				.addText(text => {
-					text.setPlaceholder('Enter folder path');
-					text.setValue(this.plugin.settings.folderPath);
-					text.onChange(async (value: string) => {
-						this.plugin.settings.folderPath = value;
+		new Setting(containerEl)
+			.setName('Default location for new attachments:')
+			.setDesc('The reference folder for importing new attachments.')
+			.addDropdown(dropdown => {
+				dropdown.addOption(RelativeLocation.VAULT, 'Vault folder');
+				dropdown.addOption(RelativeLocation.SAME, 'Same folder as current file');
+				dropdown.setValue(this.plugin.settings.relativeLocation)
+				.onChange(async (value: string) => {
+					if (Object.values(RelativeLocation).includes(value as RelativeLocation)) {
+						this.plugin.settings.relativeLocation = value as RelativeLocation;
 						await this.plugin.saveSettings();
-						this.plugin.configureHideFolderNames();
-						await this.plugin.hideAttachmentFolders(true);
-				})});
+					} else {
+						console.error('Invalid option selection:', value);
+					}
+			})});
 
-			new Setting(containerEl)
-				.setName('Attachment link format:')
-				.setDesc('What types of links to use for the imported attachments.')
-				.addDropdown(dropdown => {
-					dropdown.addOption(LinkFormat.RELATIVE, 'With respect to the note\'s path (relative path)');
-					dropdown.addOption(LinkFormat.ABSOLUTE, 'With respect to the vault\'s path (absolute path)');
-					dropdown.setValue(this.plugin.settings.linkFormat)
-					.onChange(async (value: string) => {
-						if (Object.values(LinkFormat).includes(value as LinkFormat)) {
-							this.plugin.settings.linkFormat = value as LinkFormat;
-							await this.plugin.saveSettings();
-						} else {
-							console.error('Invalid option selection:', value);
-						}
-				})});
+		new Setting(containerEl)
+			.setName('Attachment folder where to import new attachments, relative to the default location:')
+			.setDesc('Where newly created notes are placed. Use ${notename} as a placeholder for the name of the note.')
+			.addText(text => {
+				text.setPlaceholder('Enter folder path');
+				text.setValue(this.plugin.settings.folderPath);
+				text.onChange(async (value: string) => {
+					this.plugin.settings.folderPath = value;
+					await this.plugin.saveSettings();
+					this.plugin.configureHideFolderNames();
+					await this.plugin.hideAttachmentFolders(true);
+			})});
 
-			new Setting(containerEl)
-				.setName('Name of the imported attachments:')
-				.setDesc(createFragment((frag) => {
-					frag.appendText('Choose how to name the imported attachments, using the following variables as a placeholder:');
-					frag.createEl('ul')
-					.createEl('li',{text: '${original} for the name of the original file'})
-					.createEl('li',{text: '${date} for the current date'})
-					.createEl('li',{text: '${uuid} for a 128-bit Universally Unique Identifier'})
-					.createEl('li',{text: '${md5} for a MD5 hash of the imported file'});
-				}))
-				.addText(text => {
-					text.setPlaceholder('Enter attachment name');
-					text.setValue(this.plugin.settings.attachmentName);
-					text.onChange(async (value: string) => {
-						if(value.trim()=='') {
-							value = '${original}'; // TODO: improve checking the input by the user that it is not empty
-						}
-						this.plugin.settings.attachmentName = value;
+		new Setting(containerEl)
+			.setName('Attachment link format:')
+			.setDesc('What types of links to use for the imported attachments.')
+			.addDropdown(dropdown => {
+				dropdown.addOption(LinkFormat.RELATIVE, 'With respect to the note\'s path (relative path)');
+				dropdown.addOption(LinkFormat.ABSOLUTE, 'With respect to the vault\'s path (absolute path)');
+				dropdown.setValue(this.plugin.settings.linkFormat)
+				.onChange(async (value: string) => {
+					if (Object.values(LinkFormat).includes(value as LinkFormat)) {
+						this.plugin.settings.linkFormat = value as LinkFormat;
 						await this.plugin.saveSettings();
-				})});
+					} else {
+						console.error('Invalid option selection:', value);
+					}
+			})});
 
-			new Setting(containerEl)
-				.setName('Date format:')
-				.setDesc(createFragment((frag) => {
-						frag.appendText('Choose the date format, based on ');
-						frag.createEl('a', {
-							href: 'https://momentjscom.readthedocs.io/en/latest/moment/04-displaying/01-format',
-							text: 'momentjs',
-						});
-						frag.appendText(' syntax.')}))
-				.addText(text => {
-					text.setPlaceholder('Enter date format');
-					text.setValue(this.plugin.settings.dateFormat);
-					text.onChange(async (value: string) => {
-						this.plugin.settings.dateFormat = value;
-						await this.plugin.saveSettings();
-				})});
-		}
+		new Setting(containerEl)
+			.setName('Name of the imported attachments:')
+			.setDesc(createFragment((frag) => {
+				frag.appendText('Choose how to name the imported attachments, using the following variables as a placeholder:');
+				frag.createEl('ul')
+				.createEl('li',{text: '${original} for the name of the original file'})
+				.createEl('li',{text: '${date} for the current date'})
+				.createEl('li',{text: '${uuid} for a 128-bit Universally Unique Identifier'})
+				.createEl('li',{text: '${md5} for a MD5 hash of the imported file'});
+			}))
+			.addText(text => {
+				text.setPlaceholder('Enter attachment name');
+				text.setValue(this.plugin.settings.attachmentName);
+				text.onChange(async (value: string) => {
+					if(value.trim()=='') {
+						value = '${original}'; // TODO: improve checking the input by the user that it is not empty
+					}
+					this.plugin.settings.attachmentName = value;
+					await this.plugin.saveSettings();
+			})});
+
+		new Setting(containerEl)
+			.setName('Date format:')
+			.setDesc(createFragment((frag) => {
+					frag.appendText('Choose the date format, based on ');
+					frag.createEl('a', {
+						href: 'https://momentjscom.readthedocs.io/en/latest/moment/04-displaying/01-format',
+						text: 'momentjs',
+					});
+					frag.appendText(' syntax.')}))
+			.addText(text => {
+				text.setPlaceholder('Enter date format');
+				text.setValue(this.plugin.settings.dateFormat);
+				text.onChange(async (value: string) => {
+					this.plugin.settings.dateFormat = value;
+					await this.plugin.saveSettings();
+			})});
 		
 		new Setting(containerEl)
 			.setName('Hide attachment folders:')
