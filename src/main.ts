@@ -38,7 +38,7 @@ import { promises as fs } from 'fs';  // This imports the promises API from fs
 import * as path from 'path';         // Standard import for the path module
 
 import {patchOpenFile, unpatchOpenFile, addKeyListeners, removeKeyListeners} from 'patchOpenFile';
-import {patchFilemanager, unpatchFilemanager} from 'patchFileManagerr';
+import {patchFilemanager, unpatchFilemanager} from 'patchFileManager';
 
 const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 	actionDroppedFilesOnImport: ImportActionType.ASK_USER, // Default to asking the user
