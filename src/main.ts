@@ -382,7 +382,7 @@ export default class ImportAttachments extends Plugin {
 						for (const item of menu.items) {
 							if (item.dom.innerText === "Rename...") { // Adjust the condition as needed
 								const originalCallback = item.callback;
-								console.log(originalCallback);
+								// console.log(originalCallback);
 								item.onClick(async () => {
 									//this.userInitiatedDelete = true;
 									console.log("Flagged");
@@ -399,25 +399,10 @@ export default class ImportAttachments extends Plugin {
 				})
 			);
 			
-			// Patch "Delete current file" command
-			// this.patchDeleteCurrentFileCommand();
-
 		}
 
 		console.log('Loaded plugin Import Attachments+');
 	}
-
-	// patchDeleteCurrentFileCommand() {
-	// 	console.log(this.app.commands);
-	// 	const deleteCommand = this.app.commands.findCommand('delete-file');
-	// 	console.log("FOUND",deleteCommand);
-	// 	if (deleteCommand) {
-	// 		// const originalHandler = deleteCommand.callback;
-	// 		// deleteCommand.callback = () => {				
-	// 			// originalHandler();
-	// 		// };
-	// 	}
-	// }
 
 	onunload() {
 		if (Platform.isDesktopApp) {

@@ -2,105 +2,123 @@
 
 /* eslint-disable @typescript-eslint/no-inferrable-types */
 
-import {FileManager, TAbstractFile, Notice} from 'obsidian';
+import { FileManager, TAbstractFile, Notice } from 'obsidian';
 import ImportAttachments from 'main';
-import * as Utils from "utils";
-import {DeleteAttachmentFolderModal} from './ImportAttachmentsModal';
-import * as path from 'path';         // Standard import for the path module
+import * as Utils from 'utils';
+import { DeleteAttachmentFolderModal } from './ImportAttachmentsModal';
+import * as path from 'path'; // Standard import for the path module
 
 // Save a reference to the original method for the monkey patch
 let originalPromptForDeletion: ((file: TAbstractFile) => Promise<void>) | null = null;
 
-let userInitiatedDelete: boolean = false;
-// let userInitiatedRename: boolean = false;
-
 let modalCreationObserver: MutationObserver | null = null;
 
 function unpatchFilemanager() {
-	if(originalPromptForDeletion) {
+	if (originalPromptForDeletion) {
 		FileManager.prototype.promptForDeletion = originalPromptForDeletion;
 		originalPromptForDeletion = null;
 	}
 }
 
 function patchFilemanager(plugin: ImportAttachments) {
+	let userInitiatedDelete : boolean;
 	originalPromptForDeletion = FileManager.prototype.promptForDeletion;
 
 	// Monkey patch the promptForDeletion method
 	FileManager.prototype.promptForDeletion = async function patchedPromptForDeletion(file: TAbstractFile): Promise<void> {
-		const config = {
-			childList: true,
-			subtree: false,
-		};
+		// Access the 'promptDelete' configuration setting
+		const promptDelete = plugin.app.vault.getConfig("promptDelete");
 
-		// Set up a MutationObserver to watch for the modal
-		modalCreationObserver = new MutationObserver((mutations, observer) => {
-			for (const mutation of mutations) {
-				if (mutation.addedNodes.length > 0) {
-					// Check if the added node is the modal
-					const modal = Array.from(mutation.addedNodes).find(node =>
-						node instanceof HTMLElement && node.classList.contains('modal-container')
-					) as HTMLElement;
-					if (modal) {
-						// Watch for the modal being removed from the DOM (clicked outside or closed)
-						const modalRemovedObserver = new MutationObserver((modalMutations) => {
-							for (const modalMutation of modalMutations) {
-								if (Array.from(modalMutation.removedNodes).includes(modal)) {
-									modalRemovedObserver.disconnect();
-									// console.log("UNFLAGGED");
-									userInitiatedDelete = false;
-									break;
-								}
+		if(promptDelete)
+		{
+			userInitiatedDelete = false;
+			
+			const config = {
+				childList: true,
+				subtree: false,
+			};
+
+			// Set up a MutationObserver to watch for the modal
+			modalCreationObserver = new MutationObserver((mutations, observer) => {
+				for (const mutation of mutations) {
+					if (mutation.addedNodes.length > 0) {
+						// Check if the added node is the modal
+						const modal = Array.from(mutation.addedNodes).find(node =>
+							node instanceof HTMLElement && node.classList.contains('modal-container')
+						) as HTMLElement;
+						if (modal) {
+							// Add event listeners to buttons within the modal
+							const deleteButton = modal.querySelector('.mod-warning');
+							const cancelButton = modal.querySelector('.mod-cancel');
+
+							if (!deleteButton) {
+								throw new Error('Failed to correctly identify the "Delete" button.');
 							}
-						});
+							if (!cancelButton) {
+								throw new Error('Failed to correctly identify the "Cancel" button.');
+							}
 
-						if(modal.parentNode){
-							modalRemovedObserver.observe(modal.parentNode, config);	
-						}						
+							deleteButton.addEventListener('click', () => {
+								userInitiatedDelete = true;
+								// console.log("Delete button clicked");
+							});
+						
+							cancelButton.addEventListener('click', () => {
+								userInitiatedDelete = false;
+								// console.log("Cancel button clicked");
+							});
+						
+							// Watch for the modal being removed from the DOM (clicked outside or closed)
+							const modalRemovedObserver = new MutationObserver((modalMutations) => {
+								for (const modalMutation of modalMutations) {
+									if (Array.from(modalMutation.removedNodes).includes(modal)) {
+										modalRemovedObserver.disconnect();
+										// console.log("Modal closed without action");
+										break;
+									}
+								}
+							});
 
-						// break;
+							if (modal.parentNode) {
+								modalRemovedObserver.observe(modal.parentNode, config);
+							}
+
+							// Disconnect the creation observer once the modal is found
+							observer.disconnect();
+							break;
+						}
 					}
 				}
-			}
-		});
+			});
 
-		modalCreationObserver.observe(document.body, config);
+			modalCreationObserver.observe(document.body, config);
+		} else {
+			userInitiatedDelete = true;
+			console.log("Delete without prompt");
+		}
 
 		// Call the original function
 		if (originalPromptForDeletion) {
-			userInitiatedDelete = true;
-			try {
-				await originalPromptForDeletion.call(this, file);
+			await originalPromptForDeletion.call(this, file);
+			if(userInitiatedDelete) {
 				await deleteAttachmentFolder(plugin, file);
-			} finally {
-				userInitiatedDelete = false;
-			}
+			}			
 		}
 	};
 }
 
 async function deleteAttachmentFolder(plugin: ImportAttachments, file: TAbstractFile) {
-	if (!plugin.settings.autoDeleteAttachmentFolder) { return }
+	if (!plugin.settings.autoDeleteAttachmentFolder) { return; }
 
-	// automatic deletion only works when the attachment name contains ${notename}
-	// in order to avoid deleting common attachment folder, shared between multiple notes
-	if (!plugin.settings.folderPath.includes('${notename}')) { return }
-
-	/*
-	try {
-		// Code throwing an exception
-		throw new Error();
-	} catch(e) {
-		console.log(e.stack);
-		console.log(plugin);
-	}
-	*/
+	// Automatic deletion only works when the attachment name contains ${notename}
+	// In order to avoid deleting common attachment folders, shared between multiple notes
+	if (!plugin.settings.folderPath.includes('${notename}')) { return; }
 
 	const file_parsed = path.parse(file.path);
-	if (file_parsed.ext != ".md") { return }
+	if (file_parsed.ext !== ".md") { return; }
 
 	const attachmentFolderPath = plugin.getAttachmentFolder(file_parsed);
-	if (!attachmentFolderPath) { return }
+	if (!attachmentFolderPath) { return; }
 
 	if (await Utils.checkDirectoryExists(attachmentFolderPath.attachmentsFolderPath)) {
 		const modal = new DeleteAttachmentFolderModal(plugin.app, plugin, attachmentFolderPath.attachmentsFolderPath);
@@ -121,4 +139,4 @@ async function deleteAttachmentFolder(plugin: ImportAttachments, file: TAbstract
 	}
 }
 
-export {patchFilemanager, unpatchFilemanager, userInitiatedDelete};
+export { patchFilemanager, unpatchFilemanager };
