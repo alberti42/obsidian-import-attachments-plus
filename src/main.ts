@@ -12,6 +12,9 @@ import {
 	TAbstractFile,
 	Platform,
 	PluginManifest,
+	Menu,
+	// MenuItem,
+	TFile,
 } from "obsidian";
 
 import {ImportActionTypeModal, OverwriteChoiceModal, ImportFromVaultChoiceModal, DeleteAttachmentFolderModal} from './ImportAttachmentsModal';
@@ -35,6 +38,7 @@ import { promises as fs } from 'fs';  // This imports the promises API from fs
 import * as path from 'path';         // Standard import for the path module
 
 import {patchOpenFile, unpatchOpenFile, addKeyListeners, removeKeyListeners} from 'patchOpenFile';
+import {patchFilemanager, unpatchFilemanager} from 'patchFileManagerr';
 
 const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 	actionDroppedFilesOnImport: ImportActionType.ASK_USER, // Default to asking the user
@@ -368,6 +372,38 @@ export default class ImportAttachments extends Plugin {
 		}
 
 		if (Platform.isDesktopApp) {
+			
+			patchFilemanager(this);
+
+			this.registerEvent(
+				this.app.workspace.on("file-menu", (menu: Menu, file: TAbstractFile) => {
+					if (file instanceof TFile) {
+						if (!file.path.endsWith(".md")) return;
+
+						// Find and modify the existing "Delete" menu item
+						for (const item of menu.items) {
+							if (item.dom.innerText === "Rename...") { // Adjust the condition as needed
+								const originalCallback = item.callback;
+								console.log(originalCallback);
+								item.onClick(async () => {
+									//this.userInitiatedDelete = true;
+									console.log("Flagged");
+
+									await originalCallback();
+
+									//this.userInitiatedDelete = true;
+									console.log("Unflagged");
+								});
+								break; // Exit loop after finding and modifying the "Delete" item
+							}
+						}
+					}
+				})
+			);
+			
+			// Patch "Delete current file" command
+			this.patchDeleteCurrentFileCommand();
+
 			this.registerEvent(
 				this.app.vault.on("delete", async (file: TAbstractFile) => {
 					if(!this.settings.autoDeleteAttachmentFolder) { return }
@@ -377,6 +413,17 @@ export default class ImportAttachments extends Plugin {
 					if(!this.settings.folderPath.includes('${notename}')) { return }
 
 					if(this.deleteCallbackEnabled) {
+
+						/*
+						try {
+							// Code throwing an exception
+							throw new Error();
+						} catch(e) {
+							console.log(e.stack);
+							console.log(this);
+						}
+						*/
+						
 						const file_parsed = path.parse(file.path);
 						if(file_parsed.ext != ".md") { return }
 
@@ -411,10 +458,24 @@ export default class ImportAttachments extends Plugin {
 		console.log('Loaded plugin Import Attachments+');
 	}
 
+	patchDeleteCurrentFileCommand() {
+		const deleteCommand = this.app.commands.findCommandById('app:delete');
+		if (deleteCommand) {
+			const originalHandler = deleteCommand.callback;
+			deleteCommand.callback = () => {				
+				originalHandler();
+			};
+		}
+	}
+
 	onunload() {
 		if (Platform.isDesktopApp) {
+			// unpatch openFile
 			unpatchOpenFile();
 			removeKeyListeners();
+
+			// unpatch fileManager
+			unpatchFilemanager();
 		}
 		if(this.observer){
 			this.observer.disconnect();	
@@ -978,40 +1039,42 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 				}));
 		}
 
-		new Setting(containerEl).setName('Managing').setHeading();
-		
-		new Setting(containerEl)
-			.setName('Rename the attachment folder automatically and update all links correspondingly:')
-			.setDesc('If this option is enabled, when you rename/move an note, if the renamed note has an attachment folder connected to it, \
-				its attachment folder is renamed/moved to a new name/location corresponding to the new name of the note.')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.autoRenameAttachmentFolder)
-				.onChange(async (value: boolean) => {
-					this.plugin.settings.autoRenameAttachmentFolder = value;
-					await this.plugin.saveSettings();
-			}));
+		if (Platform.isDesktopApp) {
+			new Setting(containerEl).setName('Managing').setHeading();
+			
+			new Setting(containerEl)
+				.setName('Rename the attachment folder automatically and update all links correspondingly:')
+				.setDesc('If this option is enabled, when you rename/move an note, if the renamed note has an attachment folder connected to it, \
+					its attachment folder is renamed/moved to a new name/location corresponding to the new name of the note.')
+				.addToggle(toggle => toggle
+					.setValue(this.plugin.settings.autoRenameAttachmentFolder)
+					.onChange(async (value: boolean) => {
+						this.plugin.settings.autoRenameAttachmentFolder = value;
+						await this.plugin.saveSettings();
+				}));
 
-		new Setting(containerEl)
-			.setName('Delete the attachment folder automatically when the corresponding note is deleted:')
-			.setDesc('If this option is enabled, when you delete a note, if the deleted note has an attachment folder connected to it, \
-				its attachment folder will be deleted as well. \
-				Note: automatic deletion only works when the name of the attachment folder contains ${notename}.')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.autoDeleteAttachmentFolder)
-				.onChange(async (value: boolean) => {
-					this.plugin.settings.autoDeleteAttachmentFolder = value;
-					await this.plugin.saveSettings();
-			}));
+			new Setting(containerEl)
+				.setName('Delete the attachment folder automatically when the corresponding note is deleted:')
+				.setDesc('If this option is enabled, when you delete a note, if the deleted note has an attachment folder connected to it, \
+					its attachment folder will be deleted as well. \
+					Note: automatic deletion only works when the name of the attachment folder contains ${notename}.')
+				.addToggle(toggle => toggle
+					.setValue(this.plugin.settings.autoDeleteAttachmentFolder)
+					.onChange(async (value: boolean) => {
+						this.plugin.settings.autoDeleteAttachmentFolder = value;
+						await this.plugin.saveSettings();
+				}));
 
-		new Setting(containerEl)
-			.setName('Ask confirmation before deleting the attachment folder:')
-			.setDesc('If enabled, the user is asked each time whether to delete the attachment folder.')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.confirmDeleteAttachmentFolder)
-				.onChange(async (value: boolean) => {
-					this.plugin.settings.confirmDeleteAttachmentFolder = value;
-					await this.plugin.saveSettings();
-			}));
+			new Setting(containerEl)
+				.setName('Ask confirmation before deleting the attachment folder:')
+				.setDesc('If enabled, the user is asked each time whether to delete the attachment folder.')
+				.addToggle(toggle => toggle
+					.setValue(this.plugin.settings.confirmDeleteAttachmentFolder)
+					.onChange(async (value: boolean) => {
+						this.plugin.settings.confirmDeleteAttachmentFolder = value;
+						await this.plugin.saveSettings();
+				}));
+		}
 
 		new Setting(containerEl).setName('Attachment folder').setHeading();
 		
