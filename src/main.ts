@@ -96,8 +96,6 @@ export default class ImportAttachments extends Plugin {
 			}});
 		};
 
-		const targetNode = document.body; // Or any specific element you're interested in
-
 		this.observer = new MutationObserver(callback);
 
 		const config = {
@@ -105,7 +103,7 @@ export default class ImportAttachments extends Plugin {
 			subtree: true,
 		};
 
-		this.observer.observe(targetNode, config);
+		this.observer.observe(document.body, config);
 	}
 
 	async hideAttachmentFolders(forceRecheckingAllFolders?: boolean) {
