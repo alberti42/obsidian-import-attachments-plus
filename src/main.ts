@@ -17,7 +17,7 @@ import {
 	TFile,
 } from "obsidian";
 
-import {ImportActionTypeModal, OverwriteChoiceModal, ImportFromVaultChoiceModal, DeleteAttachmentFolderModal} from './ImportAttachmentsModal';
+import {ImportActionTypeModal, OverwriteChoiceModal, ImportFromVaultChoiceModal} from './ImportAttachmentsModal';
 import {
 		ImportActionType,
 		MultipleFilesImportTypes,
@@ -400,73 +400,24 @@ export default class ImportAttachments extends Plugin {
 			);
 			
 			// Patch "Delete current file" command
-			this.patchDeleteCurrentFileCommand();
+			// this.patchDeleteCurrentFileCommand();
 
-			this.registerEvent(
-				this.app.vault.on("delete", async (file: TAbstractFile) => {
-					if(!this.settings.autoDeleteAttachmentFolder) { return }
-			
-					// automatic deletion only works when the attachment name contains ${notename}
-					// in order to avoid deleting common attachment folder, shared between multiple notes
-					if(!this.settings.folderPath.includes('${notename}')) { return }
-
-					if(this.deleteCallbackEnabled) {
-
-						/*
-						try {
-							// Code throwing an exception
-							throw new Error();
-						} catch(e) {
-							console.log(e.stack);
-							console.log(this);
-						}
-						*/
-						
-						const file_parsed = path.parse(file.path);
-						if(file_parsed.ext != ".md") { return }
-
-						const attachmentFolderPath = this.getAttachmentFolder(file_parsed);
-						if(!attachmentFolderPath) { return }
-
-						if(await Utils.checkDirectoryExists(attachmentFolderPath.attachmentsFolderPath)) {
-							const modal = new DeleteAttachmentFolderModal(this.app, this, attachmentFolderPath.attachmentsFolderPath);
-							modal.open();
-							const choice = await modal.promise;
-							if (!choice) return;
-
-							const filePath = path.relative(this.vaultPath,attachmentFolderPath.attachmentsFolderPath);
-						
-							try {
-								this.deleteCallbackEnabled = false;
-								await this.trashFile(filePath);
-							} catch (error: unknown) {
-								const msg = 'Failed to remove the attachment folder';
-								console.error(msg + ":", filePath);
-								console.error("Error msg:", error);
-								new Notice(msg+'.');
-							} finally {
-								this.deleteCallbackEnabled = true;
-							}
-						}
-					}
-				})
-			);
 		}
 
 		console.log('Loaded plugin Import Attachments+');
 	}
 
-	patchDeleteCurrentFileCommand() {
-		console.log(this.app.commands);
-		const deleteCommand = this.app.commands.findCommand('delete-file');
-		console.log("FOUND",deleteCommand);
-		if (deleteCommand) {
-			// const originalHandler = deleteCommand.callback;
-			// deleteCommand.callback = () => {				
-				// originalHandler();
-			// };
-		}
-	}
+	// patchDeleteCurrentFileCommand() {
+	// 	console.log(this.app.commands);
+	// 	const deleteCommand = this.app.commands.findCommand('delete-file');
+	// 	console.log("FOUND",deleteCommand);
+	// 	if (deleteCommand) {
+	// 		// const originalHandler = deleteCommand.callback;
+	// 		// deleteCommand.callback = () => {				
+	// 			// originalHandler();
+	// 		// };
+	// 	}
+	// }
 
 	onunload() {
 		if (Platform.isDesktopApp) {
