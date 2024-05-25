@@ -94,7 +94,7 @@ function patchFilemanager(plugin: ImportAttachments) {
 			modalCreationObserver.observe(document.body, config);
 		} else {
 			userInitiatedDelete = true;
-			console.log("Delete without prompt");
+			// console.log("Delete without prompt");
 		}
 
 		// Call the original function
