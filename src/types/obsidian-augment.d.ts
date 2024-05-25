@@ -5,6 +5,7 @@ import 'obsidian';
 declare module 'obsidian' {
     interface App {
         openWithDefaultApp(filepath: string): Promise<void>;
+        commands: Commands;
     }
 
     interface MenuItem {
@@ -18,5 +19,17 @@ declare module 'obsidian' {
 
     interface FileManager {
         promptForDeletion(file: TAbstractFile): Promise<void>;
+    }
+
+    // interface Command {
+    //     id: string;
+    //     name: string;
+    //     //icon: string;
+    //     //checkCallback: (checking: boolean) => boolean | void;
+    //     //callback?: () => void;
+    // }
+
+    interface Commands {
+        findCommandById(id: string): Command | undefined;
     }
 }

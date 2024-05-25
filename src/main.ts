@@ -457,12 +457,14 @@ export default class ImportAttachments extends Plugin {
 	}
 
 	patchDeleteCurrentFileCommand() {
-		const deleteCommand = this.app.commands.findCommandById('app:delete');
+		console.log(this.app.commands);
+		const deleteCommand = this.app.commands.findCommand('delete-file');
+		console.log("FOUND",deleteCommand);
 		if (deleteCommand) {
-			const originalHandler = deleteCommand.callback;
-			deleteCommand.callback = () => {				
-				originalHandler();
-			};
+			// const originalHandler = deleteCommand.callback;
+			// deleteCommand.callback = () => {				
+				// originalHandler();
+			// };
 		}
 	}
 
