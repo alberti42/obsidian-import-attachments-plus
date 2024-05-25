@@ -10,7 +10,7 @@ declare module 'obsidian' {
 	interface Vault {
         getConfig(configName: string): unknown;
     }
-    
+
     interface MenuItem {
         dom: HTMLElement;
         callback: () => void;

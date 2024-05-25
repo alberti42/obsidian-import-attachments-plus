@@ -65,7 +65,6 @@ const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 export default class ImportAttachments extends Plugin {
 	settings: ImportAttachmentsSettings = {...DEFAULT_SETTINGS};
 	vaultPath: string;
-	private renameCallbackEnabled: boolean = true;
 	private deleteCallbackEnabled: boolean = true;
 	private observer: MutationObserver | null = null;
 	private hideFolderNames : Array<string> = [];
@@ -332,11 +331,12 @@ export default class ImportAttachments extends Plugin {
 		}
 
 		if (Platform.isDesktopApp) {
+			let renameCallbackEnabled: boolean = true;
 			this.registerEvent(
 				this.app.vault.on('rename', async (newFile: TAbstractFile, oldPath: string) => {
 					if(!this.settings.autoRenameAttachmentFolder) { return }
 
-					if(this.renameCallbackEnabled) {
+					if(renameCallbackEnabled) {
 						const oldPath_parsed = path.parse(oldPath);
 						if(oldPath_parsed.ext != ".md") { return }
 
@@ -351,7 +351,7 @@ export default class ImportAttachments extends Plugin {
 							const oldPath = path.relative(this.vaultPath,oldAttachmentFolderPath.attachmentsFolderPath);
 							const newPath = path.relative(this.vaultPath,newAttachmentFolderPath.attachmentsFolderPath);
 							try {
-								this.renameCallbackEnabled = false;
+								renameCallbackEnabled = false;
 								await this.renameFile(oldPath,newPath);
 							} catch (error: unknown) {
 								const msg = 'Failed to rename the attachment folder';
@@ -361,7 +361,7 @@ export default class ImportAttachments extends Plugin {
 								console.error("Error msg:", error);
 								new Notice(msg+'.');
 							} finally {
-								this.renameCallbackEnabled = true;
+								renameCallbackEnabled = true;
 							}
 						}
 					}
@@ -371,8 +371,11 @@ export default class ImportAttachments extends Plugin {
 
 		if (Platform.isDesktopApp) {
 			
+			// Monkey-patch file manager to handle the deletion of the attachment folder
+			// when the function promptForDeletion is triggered by the user
 			patchFilemanager(this);
 
+			/*
 			this.registerEvent(
 				this.app.workspace.on("file-menu", (menu: Menu, file: TAbstractFile) => {
 					if (file instanceof TFile) {
@@ -380,17 +383,11 @@ export default class ImportAttachments extends Plugin {
 
 						// Find and modify the existing "Delete" menu item
 						for (const item of menu.items) {
-							if (item.dom.innerText === "Rename...") { // Adjust the condition as needed
+							if (item.dom.innerText === "Delete") { // Adjust the condition as needed
 								const originalCallback = item.callback;
-								// console.log(originalCallback);
+								console.log(originalCallback);
 								item.onClick(async () => {
-									//this.userInitiatedDelete = true;
-									console.log("Flagged");
-
 									await originalCallback();
-
-									//this.userInitiatedDelete = true;
-									console.log("Unflagged");
 								});
 								break; // Exit loop after finding and modifying the "Delete" item
 							}
@@ -398,6 +395,7 @@ export default class ImportAttachments extends Plugin {
 					}
 				})
 			);
+			*/
 			
 		}
 
