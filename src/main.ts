@@ -12,9 +12,9 @@ import {
 	TAbstractFile,
 	Platform,
 	PluginManifest,
-	Menu,
+	// Menu,
 	// MenuItem,
-	TFile,
+	// TFile,
 } from "obsidian";
 
 import {ImportActionTypeModal, OverwriteChoiceModal, ImportFromVaultChoiceModal} from './ImportAttachmentsModal';
@@ -39,6 +39,8 @@ import * as path from 'path';         // Standard import for the path module
 
 import {patchOpenFile, unpatchOpenFile, addKeyListeners, removeKeyListeners} from 'patchOpenFile';
 import {patchFilemanager, unpatchFilemanager} from 'patchFileManager';
+
+import { EditorSelection } from '@codemirror/state';
 
 const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 	actionDroppedFilesOnImport: ImportActionType.ASK_USER, // Default to asking the user
@@ -268,6 +270,16 @@ export default class ImportAttachments extends Plugin {
 			this.registerEvent(
 				// check obsidian.d.ts for other types of events
 				this.app.workspace.on('editor-drop', async (evt: DragEvent, editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
+
+/*					try {
+						// Code throwing an exception
+						throw new Error();
+					} catch (e) {
+						console.log(e.stack);
+						console.log(this);
+					}
+*/
+
 					// Check if the event has already been handled
 					if (evt.defaultPrevented) return;
 
@@ -290,7 +302,20 @@ export default class ImportAttachments extends Plugin {
 					// Handle the dropped files
 					const files = evt?.dataTransfer?.files;
 					if (files && files.length > 0) {
-						await this.handleFiles(files, editor, view, doForceAsking, ImportOperationType.DRAG_AND_DROP);
+						const cm = editor.cm; // Access the CodeMirror instance
+						const dropPos = cm.posAtCoords({ x: evt.clientX, y: evt.clientY });
+
+						if (dropPos) {
+							// Use dispatch to set the cursor position
+							cm.dispatch({
+								selection: EditorSelection.single(dropPos)
+							});
+							
+							// Handle the files as per your existing logic
+							await this.handleFiles(files, editor, view, doForceAsking, ImportOperationType.DRAG_AND_DROP);
+						} else {
+							console.error('Unable to determine drop position');
+						}
 					} else {
 						console.error('No files dropped');
 					}

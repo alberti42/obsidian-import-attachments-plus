@@ -1,13 +1,14 @@
 // obsidian-augment.d.ts
 
 import 'obsidian';
+import { EditorView } from '@codemirror/view';
 
 declare module 'obsidian' {
     interface App {
         openWithDefaultApp(filepath: string): Promise<void>;
     }
 
-	interface Vault {
+    interface Vault {
         getConfig(configName: string): unknown;
     }
 
@@ -22,5 +23,9 @@ declare module 'obsidian' {
 
     interface FileManager {
         promptForDeletion(file: TAbstractFile): Promise<void>;
+    }
+
+    interface Editor {
+        cm: EditorView;
     }
 }
