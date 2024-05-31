@@ -10,8 +10,6 @@ let keyListenersInstalled = false
 
 // Save a reference to the original method for the monkey patch
 let originalOpenFile: ((this: WorkspaceLeaf, file: TFile, openState?: OpenViewState)=> Promise<void>) | null = null;
-// let originalOpenLinkText: ((e:any, t:any, n:any) => any) | null = null;
-// let originalOnSelfClick: ((e:any)=>void)|null = null;
 
 // Function references for event listeners
 function keyDownHandler(event: KeyboardEvent) {
@@ -88,17 +86,17 @@ function unpatchOpenFile() {
 
 function patchOpenFile(plugin: ImportAttachments) {
 	originalOpenFile = WorkspaceLeaf.prototype.openFile;
-	// originalOpenLinkText = WorkspaceLeaf.prototype.openLinkText;
-	// originalOnSelfClick = WorkspaceLeaf.prototype.onSelfClick;
 
 	// Monkey patch the openFile method
 	WorkspaceLeaf.prototype.openFile = async function patchedOpenFile(this: WorkspaceLeaf, file: TFile, openState?: OpenViewState): Promise<void> {
 		// console.log(`Meta key is pressed: ${metaKeyPressed}`);
 		// console.log(`Alt key is pressed: ${altKeyPressed}`);
 
+		/*
 		if(file.extension==='md' && originalOpenFile) {
 			return originalOpenFile.call(this, file, openState);
 		}
+		*/
 
 		const newEmptyLeave = this.getViewState()?.type == 'empty';
 
@@ -120,16 +118,6 @@ function patchOpenFile(plugin: ImportAttachments) {
 		}
 		return;
 	}
-	
-	/*
-	WorkspaceLeaf.prototype.openLinkText = async function patchedOpenLinkText(this:WorkspaceLeaf, t:any, n:any): any {
-		if(originalOpenLinkText){
-			console.log('Open link text');
-			return originalOpenLinkText.call(this,t,n);	
-		}
-		return;		
-	}
-	*/
 }
 
 export {patchOpenFile, addKeyListeners, removeKeyListeners, unpatchOpenFile};
