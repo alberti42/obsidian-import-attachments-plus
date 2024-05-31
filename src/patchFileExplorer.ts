@@ -22,6 +22,7 @@ async function setupFileExplorer(): Promise<void> {
 	if (leafs.length > 0) {
 		fileExplorer = leafs[0].view as FileExplorer;
 		// Perform your custom setup with the fileExplorer here
+		console.log('FileExplorer now available');
 		customSetup();
 	} else {
 		console.error('FileExplorer not found');
