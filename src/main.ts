@@ -12,9 +12,9 @@ import {
 	TAbstractFile,
 	Platform,
 	PluginManifest,
-	Menu,
+	// Menu,
 	// MenuItem,
-	TFile,
+	// TFile,
 } from "obsidian";
 
 import {ImportActionTypeModal, OverwriteChoiceModal, ImportFromVaultChoiceModal} from './ImportAttachmentsModal';
@@ -39,6 +39,8 @@ import * as path from 'path';         // Standard import for the path module
 
 import {patchOpenFile, unpatchOpenFile, addKeyListeners, removeKeyListeners} from 'patchOpenFile';
 import {patchFilemanager, unpatchFilemanager} from 'patchFileManager';
+
+import {initializeFileExplorer} from 'patchFileExplorer';
 
 const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 	actionDroppedFilesOnImport: ImportActionType.ASK_USER, // Default to asking the user
@@ -195,6 +197,17 @@ export default class ImportAttachments extends Plugin {
 					embed: false,
 					action: ImportActionType.MOVE,
 				}),
+			});
+
+			this.addCommand({
+				id: "test-test",
+				name: "Test",
+				callback: () => {
+					console.log("TEST");
+					
+					// console.log(FileExplorer);
+					return;
+				},
 			});
 		}
 
@@ -398,6 +411,10 @@ export default class ImportAttachments extends Plugin {
 			*/
 			
 		}
+
+		this.app.workspace.onLayoutReady(()=>{
+			initializeFileExplorer(this);
+		});
 
 		console.log('Loaded plugin Import Attachments+');
 	}

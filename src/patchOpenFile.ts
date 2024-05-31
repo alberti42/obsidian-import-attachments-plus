@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-inferrable-types */
+
 import {WorkspaceLeaf, TFile, OpenViewState} from 'obsidian';
 
 import ImportAttachments from 'main';
@@ -11,7 +13,7 @@ let keyListenersInstalled = false
 // Save a reference to the original method for the monkey patch
 let originalOpenFile: ((this: WorkspaceLeaf, file: TFile, openState?: OpenViewState)=> Promise<void>) | null = null;
 // let originalOpenLinkText: ((e:any, t:any, n:any) => any) | null = null;
-// let originalOnSelfClick: ((e:any)=>void)|null = null;
+// let originalOnSelfClick: ((e:PointerEvent)=>void)|null = null;
 
 // Function references for event listeners
 function keyDownHandler(event: KeyboardEvent) {
@@ -84,6 +86,10 @@ function unpatchOpenFile() {
 		WorkspaceLeaf.prototype.openFile = originalOpenFile;
 		originalOpenFile = null;
 	}
+	// if(originalOnSelfClick) {
+	// 	WorkspaceLeaf.prototype.onSelfClick = originalOnSelfClick;
+	// 	originalOnSelfClick = null;
+	// }
 }
 
 function patchOpenFile(plugin: ImportAttachments) {
@@ -96,7 +102,7 @@ function patchOpenFile(plugin: ImportAttachments) {
 		// console.log(`Meta key is pressed: ${metaKeyPressed}`);
 		// console.log(`Alt key is pressed: ${altKeyPressed}`);
 
-		/*
+/*		
 		try {
 			// Code throwing an exception
 			throw new Error();
@@ -104,8 +110,8 @@ function patchOpenFile(plugin: ImportAttachments) {
 			console.log(e.stack);
 			console.log(this);
 		}
-		*/
-
+		
+*/
 		if(file.extension==='md' && originalOpenFile) {
 			return originalOpenFile.call(this, file, openState);
 		}
