@@ -36,7 +36,7 @@ import { ParsedPath } from "path";
 
 import { promises as fs } from 'fs';  // This imports the promises API from fs
 
-// import { import_NodeJS_modules, path } from "import_nodejs";
+import { import_NodeJS_modules } from "import_nodejs";
 import * as path from "path"; // Node.js path module to handle path operations
 
 import {patchOpenFile, unpatchOpenFile, addKeyListeners, removeKeyListeners} from 'patchOpenFile';
@@ -76,7 +76,7 @@ export default class ImportAttachments extends Plugin {
 	constructor(app: App, manifest: PluginManifest) {
 		super(app, manifest);
 
-		// import_NodeJS_modules();
+		import_NodeJS_modules();
 
 		// Store the path to the vault
 		if (Platform.isDesktopApp) {
