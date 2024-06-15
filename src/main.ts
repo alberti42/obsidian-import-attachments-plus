@@ -35,7 +35,9 @@ import * as Utils from "utils";
 import { ParsedPath } from "path";
 
 import { promises as fs } from 'fs';  // This imports the promises API from fs
-import * as path from 'path';         // Standard import for the path module
+
+// import { import_NodeJS_modules, path } from "import_nodejs";
+import * as path from "path"; // Node.js path module to handle path operations
 
 import {patchOpenFile, unpatchOpenFile, addKeyListeners, removeKeyListeners} from 'patchOpenFile';
 import {patchFilemanager, unpatchFilemanager} from 'patchFileManager';
@@ -73,6 +75,8 @@ export default class ImportAttachments extends Plugin {
 
 	constructor(app: App, manifest: PluginManifest) {
 		super(app, manifest);
+
+		// import_NodeJS_modules();
 
 		// Store the path to the vault
 		if (Platform.isDesktopApp) {
@@ -360,6 +364,7 @@ export default class ImportAttachments extends Plugin {
 			this.registerEvent(
 				this.app.vault.on('rename', async (newFile: TAbstractFile, oldPath: string) => {
 					if(!this.settings.autoRenameAttachmentFolder) { return }
+					if(!path) { return }
 
 					if(renameCallbackEnabled) {
 						const oldPath_parsed = path.parse(oldPath);
@@ -543,6 +548,8 @@ export default class ImportAttachments extends Plugin {
 	}
 
 	getAttachmentFolder(noteFilePath: ParsedPath | null = null): AttachmentFolderPath | null {
+		if(!path) { return null; }
+
 		try {
 			// Get the current active note if noteFilePath is not provided
 			if(!noteFilePath) {
@@ -652,6 +659,8 @@ export default class ImportAttachments extends Plugin {
 		const multipleFiles = filesToImport.length>1;
 
 		const tasks = Array.from(filesToImport).map(async (fileToImport):Promise<string|null> => {
+			if(!path) { return null; }
+
 			const originalFilePath = fileToImport.path;
 			let destFilePath = path.join(attachmentsFolderPath,
 							await Utils.createAttachmentName(this.settings.attachmentName,this.settings.dateFormat,originalFilePath));
@@ -773,6 +782,9 @@ export default class ImportAttachments extends Plugin {
 	}
 
 	insertLinkToEditor(currentNoteFolderPath: string, importedFilePath: string, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface, counter: number) {
+		if (!path) { return; }
+		console.log(path);
+
 		// Extract just the file name from the path
 
 		const filename=Utils.getFilename(importedFilePath);
