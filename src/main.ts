@@ -32,7 +32,6 @@ import {
 		LinkFormat,
 	} from './types';
 import * as Utils from "utils";
-import { ParsedPath } from "path";
 
 import { promises as fs } from 'fs';  // This imports the promises API from fs
 import * as path from 'path';         // Standard import for the path module
@@ -542,11 +541,11 @@ export default class ImportAttachments extends Plugin {
 		this.moveFileToAttachmentsFolder(files, attachmentsFolderPath, currentNoteFolderPath, editor, view, importSettings);
 	}
 
-	getAttachmentFolder(noteFilePath: ParsedPath | null = null): AttachmentFolderPath | null {
+	getAttachmentFolder(noteFilePath: path.ParsedPath | null = null): AttachmentFolderPath | null {
 		try {
 			// Get the current active note if noteFilePath is not provided
 			if(!noteFilePath) {
-				noteFilePath = ( ():ParsedPath => {
+				noteFilePath = ( ():path.ParsedPath => {
 					const activeFile = this.app.workspace.getActiveFile();
 					if(activeFile==null) {
 						throw new Error("The active note could not be determined.");
