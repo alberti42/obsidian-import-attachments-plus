@@ -61,34 +61,64 @@ const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 	hideAttachmentFolders: true, // Default to true
 	revealAttachment: true, // Default to true
 	openAttachmentExternal: true, // Default to true
-	logs: [], // Initialize logs as an empty array
+	logs: {}, // Initialize logs as an empty array
 };
 
 function monkeyPatchConsole(plugin: ImportAttachments) {
     if (!Platform.isMobile) {
-        return;
+		return;
     }
 
-    const logs: string[] = plugin.settings.logs || [];
+    const logs: Record<string, string[]> = plugin.settings.logs || {};
     const saveLogs = async () => {
         plugin.settings.logs = logs;
         await plugin.saveData(plugin.settings);
     };
 
-    const logMessages = (prefix: string) => (...messages: string[]) => {
-        logs.push(`\n[${prefix}]`);
-        for (const message of messages) {
-            logs.push(message);
+    const formatMessage = (message: unknown): string => {
+        if (typeof message === 'object' && message !== null) {
+            try {
+                return JSON.stringify(message, null, 2); // Pretty print with 2-space indentation
+            } catch {
+                return "[Object]";
+            }
         }
+        return String(message);
+    };
+
+    const getTimestamp = (): string => {
+        return new Date().toISOString();
+    };
+
+    // Store the original console methods
+    const originalConsole = {
+        debug: console.debug,
+        error: console.error,
+        info: console.info,
+        log: console.log,
+        warn: console.warn,
+    };
+
+    const logMessages = (origLog: (...data: unknown[]) => void, prefix: string) => (...messages: unknown[]) => {
+        // Call the original log function
+        origLog(...messages);
+
+        const formattedMessages = messages.map(formatMessage);
+        const timestampedMessage = `${getTimestamp()} ${formattedMessages.join(' ')}`;
+        if (!logs[prefix]) {
+            logs[prefix] = [];
+        }
+        logs[prefix].push(timestampedMessage);
         saveLogs();
     };
 
-    console.debug = logMessages("debug");
-    console.error = logMessages("error");
-    console.info = logMessages("info");
-    console.log = logMessages("log");
-    console.warn = logMessages("warn");
+    console.debug = logMessages(originalConsole.debug, "debug");
+    console.error = logMessages(originalConsole.error, "error");
+    console.info = logMessages(originalConsole.info, "info");
+    console.log = logMessages(originalConsole.log, "log");
+    console.warn = logMessages(originalConsole.warn, "warn");
 }
+
 
 export default class ImportAttachments extends Plugin {
 	settings: ImportAttachmentsSettings = {...DEFAULT_SETTINGS};
@@ -100,13 +130,9 @@ export default class ImportAttachments extends Plugin {
 	constructor(app: App, manifest: PluginManifest) {
 		super(app, manifest);
 
-		if(true) {
-			console.log("test");
-		}
-
 		if (process.env.NODE_ENV === "development") {
 			monkeyPatchConsole(this);
-			console.log("Import Attachments+: development mode including extra logging and debug features");
+			console.debug("Import Attachments+: development mode including extra logging and debug features");
 		}
 
 		// Store the path to the vault
@@ -478,7 +504,7 @@ export default class ImportAttachments extends Plugin {
 
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-		this.settings.logs = [];
+		this.settings.logs = {};
 	}
 
 	async saveSettings() {
