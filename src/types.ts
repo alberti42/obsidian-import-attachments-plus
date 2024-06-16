@@ -54,6 +54,7 @@ export interface ImportAttachmentsSettings {
 	hideAttachmentFolders: boolean;
 	revealAttachment: boolean;
 	openAttachmentExternal: boolean;
+	logs?: string[]; // To include logs on mobile apps
 }
 
 // Define an interface for the return type

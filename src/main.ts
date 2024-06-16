@@ -61,7 +61,34 @@ const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 	hideAttachmentFolders: true, // Default to true
 	revealAttachment: true, // Default to true
 	openAttachmentExternal: true, // Default to true
+	logs: [], // Initialize logs as an empty array
 };
+
+function monkeyPatchConsole(plugin: ImportAttachments) {
+    if (!Platform.isMobile) {
+        return;
+    }
+
+    const logs: string[] = plugin.settings.logs || [];
+    const saveLogs = async () => {
+        plugin.settings.logs = logs;
+        await plugin.saveData(plugin.settings);
+    };
+
+    const logMessages = (prefix: string) => (...messages: string[]) => {
+        logs.push(`\n[${prefix}]`);
+        for (const message of messages) {
+            logs.push(message);
+        }
+        saveLogs();
+    };
+
+    console.debug = logMessages("debug");
+    console.error = logMessages("error");
+    console.info = logMessages("info");
+    console.log = logMessages("log");
+    console.warn = logMessages("warn");
+}
 
 export default class ImportAttachments extends Plugin {
 	settings: ImportAttachmentsSettings = {...DEFAULT_SETTINGS};
@@ -72,6 +99,15 @@ export default class ImportAttachments extends Plugin {
 
 	constructor(app: App, manifest: PluginManifest) {
 		super(app, manifest);
+
+		if(true) {
+			console.log("test");
+		}
+
+		if (process.env.NODE_ENV === "development") {
+			monkeyPatchConsole(this);
+			console.log("Import Attachments+: development mode including extra logging and debug features");
+		}
 
 		// Store the path to the vault
 		if (Platform.isDesktopApp) {
@@ -442,6 +478,7 @@ export default class ImportAttachments extends Plugin {
 
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		this.settings.logs = [];
 	}
 
 	async saveSettings() {
