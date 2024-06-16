@@ -760,10 +760,12 @@ export default class ImportAttachments extends Plugin {
 		
 		if(! await Utils.checkDirectoryExists(attachmentsFolderPath))
 		{
-			const msg="This note does not have an attachment folder.";
+			const msg="This note does not have an attachment folder";
 			console.error(msg+":", attachmentsFolderPath);
 			new Notice(msg+".");
 		}
+
+		// TODO: Ask whether to create an Attachment folder
 
 		// Open the folder in the system's default file explorer
 		// eslint-disable-next-line @typescript-eslint/no-var-requires
