@@ -89,22 +89,24 @@ function patchOpenFile(plugin: ImportAttachments) {
 
 	// Monkey patch the openFile method
 	WorkspaceLeaf.prototype.openFile = async function patchedOpenFile(this: WorkspaceLeaf, file: TFile, openState?: OpenViewState): Promise<void> {
-		// console.log(`Meta key is pressed: ${metaKeyPressed}`);
-		// console.log(`Alt key is pressed: ${altKeyPressed}`);
+		const extension = "."+file.extension;
 
-		/*
-		if(file.extension==='md' && originalOpenFile) {
+		if(originalOpenFile && metaKeyPressed && altKeyPressed && plugin.settings.revealAttachmentExtExcluded.split(',').some((ext:string) => ext === extension))
+		{
 			return originalOpenFile.call(this, file, openState);
 		}
-		*/
 
+		if(originalOpenFile && metaKeyPressed && !altKeyPressed && plugin.settings.openAttachmentExternalExtExcluded.split(',').some((ext:string) => ext === extension))
+		{
+			return originalOpenFile.call(this, file, openState);
+		}
 		const newEmptyLeave = this.getViewState()?.type == 'empty';
 
 		if(plugin.settings.revealAttachment && metaKeyPressed && altKeyPressed){
-				window.require('electron').remote.shell.showItemInFolder(path.join(plugin.vaultPath,file.path));
+			window.require('electron').remote.shell.showItemInFolder(path.join(plugin.vaultPath,file.path));
 		}
 		else if(plugin.settings.openAttachmentExternal && metaKeyPressed && !altKeyPressed) {
-				plugin.app.openWithDefaultApp(file.path);
+			plugin.app.openWithDefaultApp(file.path);
 		}
 		else
 		{

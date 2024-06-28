@@ -12,6 +12,8 @@ import {
 	TAbstractFile,
 	Platform,
 	PluginManifest,
+	TextFileView,
+	TextComponent,
 	// Menu,
 	// MenuItem,
 	// TFile,
@@ -40,6 +42,7 @@ import {patchOpenFile, unpatchOpenFile, addKeyListeners, removeKeyListeners} fro
 import {patchFilemanager, unpatchFilemanager} from 'patchFileManager';
 
 import { EditorSelection } from '@codemirror/state';
+import { text } from "stream/consumers";
 
 const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 	actionDroppedFilesOnImport: ImportActionType.ASK_USER, // Default to asking the user
@@ -60,63 +63,65 @@ const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 	confirmDeleteAttachmentFolder: true, // Default to true
 	hideAttachmentFolders: true, // Default to true
 	revealAttachment: true, // Default to true
+	revealAttachmentExtExcluded: '.md', // Default to Markdown files
 	openAttachmentExternal: true, // Default to true
+	openAttachmentExternalExtExcluded: '.md', // Default to Markdown files
 	logs: {}, // Initialize logs as an empty array
 };
 
 function monkeyPatchConsole(plugin: ImportAttachments) {
-    if (!Platform.isMobile) {
+	if (!Platform.isMobile) {
 		return;
-    }
+	}
 
-    const logs: Record<string, string[]> = plugin.settings.logs || {};
-    const saveLogs = async () => {
-        plugin.settings.logs = logs;
-        await plugin.saveData(plugin.settings);
-    };
+	const logs: Record<string, string[]> = plugin.settings.logs || {};
+	const saveLogs = async () => {
+		plugin.settings.logs = logs;
+		await plugin.saveData(plugin.settings);
+	};
 
-    const formatMessage = (message: unknown): string => {
-        if (typeof message === 'object' && message !== null) {
-            try {
-                return JSON.stringify(message, null, 2); // Pretty print with 2-space indentation
-            } catch {
-                return "[Object]";
-            }
-        }
-        return String(message);
-    };
+	const formatMessage = (message: unknown): string => {
+		if (typeof message === 'object' && message !== null) {
+			try {
+				return JSON.stringify(message, null, 2); // Pretty print with 2-space indentation
+			} catch {
+				return "[Object]";
+			}
+		}
+		return String(message);
+	};
 
-    const getTimestamp = (): string => {
-        return new Date().toISOString();
-    };
+	const getTimestamp = (): string => {
+		return new Date().toISOString();
+	};
 
-    // Store the original console methods
-    const originalConsole = {
-        debug: console.debug,
-        error: console.error,
-        info: console.info,
-        log: console.log,
-        warn: console.warn,
-    };
+	// Store the original console methods
+	const originalConsole = {
+		debug: console.debug,
+		error: console.error,
+		info: console.info,
+		log: console.log,
+		warn: console.warn,
+	};
 
-    const logMessages = (origLog: (...data: unknown[]) => void, prefix: string) => (...messages: unknown[]) => {
-        // Call the original log function
-        origLog(...messages);
+	const logMessages = (origLog: (...data: unknown[]) => void, prefix: string) => (...messages: unknown[]) => {
+		// Call the original log function
+		origLog(...messages);
 
-        const formattedMessages = messages.map(formatMessage);
-        const timestampedMessage = `${getTimestamp()} ${formattedMessages.join(' ')}`;
-        if (!logs[prefix]) {
-            logs[prefix] = [];
-        }
-        logs[prefix].push(timestampedMessage);
-        saveLogs();
-    };
+		const formattedMessages = messages.map(formatMessage);
+		const timestampedMessage = `${getTimestamp()} ${formattedMessages.join(' ')}`;
+		if (!logs[prefix]) {
+			logs[prefix] = [];
+		}
+		logs[prefix].push(timestampedMessage);
+		saveLogs();
+	};
 
-    console.debug = logMessages(originalConsole.debug, "debug");
-    console.error = logMessages(originalConsole.error, "error");
-    console.info = logMessages(originalConsole.info, "info");
-    console.log = logMessages(originalConsole.log, "log");
-    console.warn = logMessages(originalConsole.warn, "warn");
+	console.debug = logMessages(originalConsole.debug, "debug");
+	console.error = logMessages(originalConsole.error, "error");
+	console.info = logMessages(originalConsole.info, "info");
+	console.log = logMessages(originalConsole.log, "log");
+	console.warn = logMessages(originalConsole.warn, "warn");
 }
 
 
@@ -1035,14 +1040,55 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 				key = 'Ctrl';
 			}
 
-			new Setting(containerEl)
-				.setName('Open attachment with default external application:')
-				.setDesc(`If this option is enabled, when you open an attachment by holding ${key}, the attachment opens in default external application.`)
-				.addToggle(toggle => toggle
-					.setValue(this.plugin.settings.openAttachmentExternal)
-					.onChange(async (value: boolean) => {
-						this.plugin.settings.openAttachmentExternal = value;
+			const validate_exts = (textfield:TextComponent, value:string) => {
+				// Process the input string to ensure proper formatting
+				const extensions = value.split(',')
+					.map(ext => ext.trim()) // Trim spaces from each extension
+					.filter(ext => ext !== '') // Remove empty entries
+					.map(ext => {
+						// Ensure each extension starts with a dot
+						if (!ext.startsWith('.')) {
+							ext = '.' + ext;
+						}
+						return ext;
+					})
+					.filter((ext, index, self) => self.indexOf(ext) === index); // Remove duplicates
+
+				// Join the array into a string with proper separator
+				return extensions.join(', ');
+			}
+
+			const external_toggle = new Setting(containerEl)
+				.setName('Open attachments with default external application:')
+				.setDesc(`If this option is enabled, when you open an attachment by holding ${key}, the attachment opens in default external application.`);
+
+			const external_exclude_ext = new Setting(containerEl)
+				.setName('Exclude the following extensions:')
+				.setDesc('Enter a list of extensions separated by comma (e.g.: .md, .pdf) for which the default Obsidian behavior applies instead of opening the file in the default external application.')
+				.addText(text => {
+					text.setPlaceholder('Enter a list of extensions');
+					text.setValue(this.plugin.settings.openAttachmentExternalExtExcluded);
+					text.onChange(async (value: string) => {
+						this.plugin.settings.openAttachmentExternalExtExcluded = validate_exts(text,value);
 						await this.plugin.saveSettings();
+					});
+					// Event when the text field loses focus
+					text.inputEl.onblur = async () => {
+						// Validate and process the extensions
+						text.setValue(this.plugin.settings.openAttachmentExternalExtExcluded); // Set the processed value back to the text field
+					};
+				});
+
+			// Initially set the visibility based on the current setting
+			external_exclude_ext.settingEl.style.display = this.plugin.settings.openAttachmentExternal ? "" : "none";
+
+			external_toggle.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.openAttachmentExternal)
+				.onChange(async (value: boolean) => {
+					// Hide external_exclude_ext if the toggle is off
+					this.plugin.settings.openAttachmentExternal = value;
+					await this.plugin.saveSettings();
+					external_exclude_ext.settingEl.style.display = value ? "" : "none"; // Update visibility based on the toggle
 				}));
 
 			if (Platform.isMacOS) {
@@ -1051,14 +1097,37 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 				key = 'Ctrl+Alt';
 			}
 
-			new Setting(containerEl)
-				.setName("Reveal attachment in system's file manager:")
-				.setDesc(`If this option is enabled, when you open an attachment by holding ${key}, the attachment is shown in the system's file manager.`)
-				.addToggle(toggle => toggle
-					.setValue(this.plugin.settings.revealAttachment)
-					.onChange(async (value: boolean) => {
-						this.plugin.settings.revealAttachment = value;
+			const reveal_toggle = new Setting(containerEl)
+				.setName("Reveal attachments in system's file manager:")
+				.setDesc(`If this option is enabled, when you open an attachment by holding ${key}, the attachment is shown in the system's file manager.`);
+
+			const reveal_exclude_ext = new Setting(containerEl)
+				.setName('Exclude the following extensions:')
+				.setDesc('Enter a list of extensions separated by comma (e.g.: .md, .pdf) for which the default Obsidian behavior applies instead of revealing the file in the system\'s file manager')
+				.addText(text => {
+					text.setPlaceholder('Enter a list of extensions');
+					text.setValue(this.plugin.settings.revealAttachmentExtExcluded);
+					text.onChange(async (value: string) => {
+						this.plugin.settings.revealAttachmentExtExcluded = validate_exts(text,value);
 						await this.plugin.saveSettings();
+					});
+					// Event when the text field loses focus
+					text.inputEl.onblur = async () => {
+						// Validate and process the extensions
+						text.setValue(this.plugin.settings.revealAttachmentExtExcluded); // Set the processed value back to the text field
+					};
+				});
+
+			// Initially set the visibility based on the current setting
+			reveal_exclude_ext.settingEl.style.display = this.plugin.settings.revealAttachment ? "" : "none";
+
+			reveal_toggle.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.revealAttachment)
+				.onChange(async (value: boolean) => {
+					// Hide reveal_exclude_ext if the toggle is off
+					this.plugin.settings.revealAttachment = value;
+					await this.plugin.saveSettings();
+					reveal_exclude_ext.settingEl.style.display = value ? "" : "none"; // Update visibility based on the toggle
 				}));
 		}
 

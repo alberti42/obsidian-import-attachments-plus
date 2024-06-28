@@ -53,7 +53,9 @@ export interface ImportAttachmentsSettings {
 	confirmDeleteAttachmentFolder: boolean;
 	hideAttachmentFolders: boolean;
 	revealAttachment: boolean;
+	revealAttachmentExtExcluded: string;
 	openAttachmentExternal: boolean;
+	openAttachmentExternalExtExcluded: string;
 	logs?: Record<string, string[]>; // To include logs on mobile apps
 }
 
