@@ -12,8 +12,8 @@ import {
 	TAbstractFile,
 	Platform,
 	PluginManifest,
-	TextFileView,
 	TextComponent,
+	normalizePath
 	// Menu,
 	// MenuItem,
 	// TFile,
@@ -42,7 +42,6 @@ import {patchOpenFile, unpatchOpenFile, addKeyListeners, removeKeyListeners} fro
 import {patchFilemanager, unpatchFilemanager} from 'patchFileManager';
 
 import { EditorSelection } from '@codemirror/state';
-import { text } from "stream/consumers";
 
 const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 	actionDroppedFilesOnImport: ImportActionType.ASK_USER, // Default to asking the user
@@ -855,8 +854,11 @@ export default class ImportAttachments extends Plugin {
 		default:
 			relativePath=path.relative(this.vaultPath,importedFilePath);	
 			break;
-		}	
-		
+		}
+
+		// Normalize the path using Obsidian's normalizePath function
+		relativePath = normalizePath(relativePath);
+
 		let prefix = '';
 		let postfix = '';
 		let customDisplay = '';
