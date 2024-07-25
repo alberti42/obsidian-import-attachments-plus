@@ -70,6 +70,11 @@ const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 	logs: {}, // Initialize logs as an empty array
 };
 
+// Joins multiple path segments into a single normalized path.
+function joinPaths(...paths: string[]): string {
+    return normalizePath(paths.join('/'));
+}
+
 // Helper function to patch console logs on mobile
 function monkeyPatchConsole(plugin: ImportAttachments) {
 	if (!Platform.isMobile) {
@@ -598,6 +603,11 @@ export default class ImportAttachments extends Plugin {
 		this.moveFileToAttachmentsFolder(files, attachmentsFolderPath, currentNoteFolderPath, editor, view, importSettings);
 	}
 
+	getAbsolutePath(inVaultPath: string): string | null {
+		if (!this.vaultPath) return null;
+		return joinPaths(this.vaultPath,inVaultPath);
+	}
+
 	// Get attachment folder path based on current note
 	getAttachmentFolder(active_md_file: TFile | null = null): AttachmentFolderPath | null {
 		try {
@@ -607,39 +617,36 @@ export default class ImportAttachments extends Plugin {
 				if (active_md_file == null) {
 					throw new Error("The active note could not be determined.");
 				}
-				console.log("SIDC",active_md_file);
 			}
 
 			if (!active_md_file || active_md_file.extension !== "md") {
 				throw new Error("No Markdown file was found.");
 			}
 
-			if (!this.vaultPath) return null;
-
 			if(!active_md_file.parent) {
 				throw new Error("No parent for the Markdown note was found.");
 			}
 
-			const noteFolderPath = path.join(this.vaultPath, active_md_file.parent.path);
-			const notename = active_md_file.name;
+			const currentNoteFolderPath = active_md_file.parent.path;
+			const notename = active_md_file.basename;
 
 			let referencePath = '';
 			switch (this.settings.relativeLocation) {
 				case RelativeLocation.VAULT:
-					referencePath = this.vaultPath;
+					referencePath = '/';
 					break;
 				case RelativeLocation.SAME:
-					referencePath = noteFolderPath;
+					referencePath = currentNoteFolderPath;
 					break;
 			}
 
 			const relativePath = this.settings.folderPath.replace(/\$\{notename\}/g, notename);
 
-			const attachmentsFolderPath = path.join(referencePath, relativePath);
+			const attachmentsFolderPath = joinPaths(referencePath, relativePath);
 
 			return {
 				attachmentsFolderPath,
-				currentNoteFolderPath: noteFolderPath,
+				currentNoteFolderPath,
 			};
 		} catch (error: unknown) {
 			if (error instanceof Error) {
@@ -808,13 +815,18 @@ export default class ImportAttachments extends Plugin {
 
 	async openAttachmentsFolder() {
 		const attachmentsFolder = this.getAttachmentFolder();
+		
 		if (!attachmentsFolder) { return }
 
 		const { attachmentsFolderPath } = attachmentsFolder;
 
-		if (!await Utils.checkDirectoryExists(attachmentsFolderPath)) {
+		const absAttachmentsFolderPath = this.getAbsolutePath(attachmentsFolderPath);
+
+		if(!absAttachmentsFolderPath) return;
+
+		if (!await Utils.checkDirectoryExists(absAttachmentsFolderPath)) {
 			const msg = "This note does not have an attachment folder";
-			console.error(msg + ":", attachmentsFolderPath);
+			console.error(msg + ":", absAttachmentsFolderPath);
 			new Notice(msg + ".");
 		}
 
@@ -824,7 +836,7 @@ export default class ImportAttachments extends Plugin {
 		// eslint-disable-next-line @typescript-eslint/no-var-requires
 		const { shell } = require('electron');
 		// window.require('electron').remote.shell.showItemInFolder(attachmentsFolder.attachmentsFolderPath);
-		shell.openPath(attachmentsFolder.attachmentsFolderPath);
+		shell.openPath(absAttachmentsFolderPath);
 	}
 
 	// Function to insert links to the imported files in the editor
