@@ -12,6 +12,7 @@ import {
 	PluginSettingTab,
 	Setting,
 	TFile,
+	TFolder,
 	TAbstractFile,
 	Platform,
 	PluginManifest,
@@ -43,6 +44,7 @@ import { patchOpenFile, unpatchOpenFile, addKeyListeners, removeKeyListeners } f
 import { patchFilemanager, unpatchFilemanager } from 'patchFileManager';
 
 import { EditorSelection } from '@codemirror/state';
+import { isInt8Array } from "util/types";
 
 // Default plugin settings
 const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
@@ -72,7 +74,11 @@ const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 
 // Joins multiple path segments into a single normalized path.
 function joinPaths(...paths: string[]): string {
-    return normalizePath(paths.join('/'));
+	return normalizePath(paths.join('/'));
+}
+
+function isInstanceOfFolder(file: TAbstractFile): file is TFolder {
+	return file instanceof TFolder;
 }
 
 // Helper function to patch console logs on mobile
@@ -134,7 +140,7 @@ function monkeyPatchConsole(plugin: ImportAttachments) {
 // Main plugin class
 export default class ImportAttachments extends Plugin {
 	settings: ImportAttachmentsSettings = { ...DEFAULT_SETTINGS };
-	vaultPath: string;
+	vaultPath: string | null;
 	private deleteCallbackEnabled: boolean = true;
 	private observer: MutationObserver | null = null;
 	private hideFolderNames: Array<string> = [];
@@ -156,7 +162,22 @@ export default class ImportAttachments extends Plugin {
 			}
 			this.vaultPath = adapter.getBasePath();
 		} else {
-			this.vaultPath = "";
+			this.vaultPath = null;
+		}
+	}
+
+	doesFolderExist(relativePath: string): boolean {
+		const file: TAbstractFile | null = this.app.vault.getAbstractFileByPath(relativePath);
+		return !!file && isInstanceOfFolder(file);
+	}
+
+	async createFolderIfNotExists(folderPath: string) {
+		if(this.doesFolderExist(folderPath)) return;
+
+		try {
+			await this.app.vault.createFolder(folderPath);
+		} catch (error) {
+			throw new Error(`Failed to create folder at ${folderPath}: ${error}`);
 		}
 	}
 
@@ -700,7 +721,7 @@ export default class ImportAttachments extends Plugin {
 	// Function to move files to the attachments folder using fs.rename
 	async moveFileToAttachmentsFolder(filesToImport: FileList, attachmentsFolderPath: string, currentNoteFolderPath: string, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface) {
 		// Ensure the directory exists before moving the file
-		await Utils.ensureDirectoryExists(attachmentsFolderPath);
+		this.createFolderIfNotExists(attachmentsFolderPath);
 
 		const cursor = editor.getCursor(); // Get the current cursor position before insertion
 
