@@ -11,6 +11,7 @@ import {
 	Plugin,
 	PluginSettingTab,
 	Setting,
+	TFile,
 	TAbstractFile,
 	Platform,
 	PluginManifest,
@@ -531,8 +532,8 @@ export default class ImportAttachments extends Plugin {
 			}
 		} catch (error: unknown) {
 			const msg = 'Failed to rename file';
-			console.error(msg+':', error);
-			new Notice(msg+'.');
+			console.error(msg + ':', error);
+			new Notice(msg + '.');
 		}
 	}
 
@@ -598,27 +599,29 @@ export default class ImportAttachments extends Plugin {
 	}
 
 	// Get attachment folder path based on current note
-	getAttachmentFolder(noteFilePath: path.ParsedPath | null = null): AttachmentFolderPath | null {
+	getAttachmentFolder(active_md_file: TFile | null = null): AttachmentFolderPath | null {
 		try {
 			// Get the current active note if noteFilePath is not provided
-			if (!noteFilePath) {
-				noteFilePath = (():path.ParsedPath  => {
-					const activeFile = this.app.workspace.getActiveFile();
-					if (activeFile == null) {
-						throw new Error("The active note could not be determined.");
-					}
-					return path.parse(activeFile.path);
-				})()
+			if (!active_md_file) {
+				active_md_file = this.app.workspace.getActiveFile();
+				if (active_md_file == null) {
+					throw new Error("The active note could not be determined.");
+				}
+				console.log("SIDC",active_md_file);
 			}
 
-			if (!noteFilePath || noteFilePath.ext !== ".md") {
+			if (!active_md_file || active_md_file.extension !== "md") {
 				throw new Error("No Markdown file was found.");
 			}
 
 			if (!this.vaultPath) return null;
 
-			const noteFolderPath = path.join(this.vaultPath, noteFilePath.dir);
-			const notename = noteFilePath.name;
+			if(!active_md_file.parent) {
+				throw new Error("No parent for the Markdown note was found.");
+			}
+
+			const noteFolderPath = path.join(this.vaultPath, active_md_file.parent.path);
+			const notename = active_md_file.name;
 
 			let referencePath = '';
 			switch (this.settings.relativeLocation) {
@@ -789,16 +792,15 @@ export default class ImportAttachments extends Plugin {
 			}
 		});
 
-		if(counter>0) {
+		if (counter > 0) {
 			let operation = '';
-			switch(importSettings.action)
-			{
-			case ImportActionType.MOVE:
-				operation = 'Moved';
-				break;
-			case ImportActionType.COPY:
-				operation = 'Copied';
-				break;
+			switch (importSettings.action) {
+				case ImportActionType.MOVE:
+					operation = 'Moved';
+					break;
+				case ImportActionType.COPY:
+					operation = 'Copied';
+					break;
 			}
 			new Notice(`${operation} successfully ${counter} files to the attachments folder.`);
 		}
