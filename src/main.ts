@@ -11,8 +11,6 @@ import {
 	Plugin,
 	PluginSettingTab,
 	Setting,
-	TFile,
-	TFolder,
 	TAbstractFile,
 	Platform,
 	PluginManifest,
@@ -33,7 +31,8 @@ import {
 	ImportFromVaultOptions,
 	YesNoTypes,
 	RelativeLocation,
-	LinkFormat
+	LinkFormat,
+	ParsedPath
 } from './types';
 import * as Utils from "utils";
 
@@ -44,7 +43,6 @@ import { patchOpenFile, unpatchOpenFile, addKeyListeners, removeKeyListeners } f
 import { patchFilemanager, unpatchFilemanager } from 'patchFileManager';
 
 import { EditorSelection } from '@codemirror/state';
-import { isInt8Array } from "util/types";
 
 // Default plugin settings
 const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
@@ -71,15 +69,6 @@ const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 	openAttachmentExternalExtExcluded: '.md', // Default to Markdown files
 	logs: {}, // Initialize logs as an empty array
 };
-
-// Joins multiple path segments into a single normalized path.
-function joinPaths(...paths: string[]): string {
-	return normalizePath(paths.join('/'));
-}
-
-function isInstanceOfFolder(file: TAbstractFile): file is TFolder {
-	return file instanceof TFolder;
-}
 
 // Helper function to patch console logs on mobile
 function monkeyPatchConsole(plugin: ImportAttachments) {
@@ -140,7 +129,7 @@ function monkeyPatchConsole(plugin: ImportAttachments) {
 // Main plugin class
 export default class ImportAttachments extends Plugin {
 	settings: ImportAttachmentsSettings = { ...DEFAULT_SETTINGS };
-	vaultPath: string | null;
+	vaultPath: string;
 	private deleteCallbackEnabled: boolean = true;
 	private observer: MutationObserver | null = null;
 	private hideFolderNames: Array<string> = [];
@@ -162,22 +151,7 @@ export default class ImportAttachments extends Plugin {
 			}
 			this.vaultPath = adapter.getBasePath();
 		} else {
-			this.vaultPath = null;
-		}
-	}
-
-	doesFolderExist(relativePath: string): boolean {
-		const file: TAbstractFile | null = this.app.vault.getAbstractFileByPath(relativePath);
-		return !!file && isInstanceOfFolder(file);
-	}
-
-	async createFolderIfNotExists(folderPath: string) {
-		if(this.doesFolderExist(folderPath)) return;
-
-		try {
-			await this.app.vault.createFolder(folderPath);
-		} catch (error) {
-			throw new Error(`Failed to create folder at ${folderPath}: ${error}`);
+			this.vaultPath = "";
 		}
 	}
 
@@ -443,15 +417,15 @@ export default class ImportAttachments extends Plugin {
 					if (!this.settings.autoRenameAttachmentFolder) { return }
 
 					if (renameCallbackEnabled) {
-						const oldPath_parsed = path.parse(oldPath);
-						if (oldPath_parsed.ext != ".md") { return }
+						const oldPath_parsed = Utils.parseFilePath(oldPath);
+						if (oldPath_parsed.ext !== ".md") { return }
 
 						const oldAttachmentFolderPath = this.getAttachmentFolder(oldPath_parsed);
 						if (!oldAttachmentFolderPath) { return }
 
-						if (await Utils.checkDirectoryExists(oldAttachmentFolderPath.attachmentsFolderPath)) {
+						if (Utils.doesFolderExist(this.app,oldAttachmentFolderPath.attachmentsFolderPath)) {
 
-							const newAttachmentFolderPath = this.getAttachmentFolder(path.parse(newFile.path));
+							const newAttachmentFolderPath = this.getAttachmentFolder(Utils.parseFilePath(newFile.path));
 							if (!newAttachmentFolderPath) { return }
 
 							const oldPath = path.relative(this.vaultPath, oldAttachmentFolderPath.attachmentsFolderPath);
@@ -624,32 +598,28 @@ export default class ImportAttachments extends Plugin {
 		this.moveFileToAttachmentsFolder(files, attachmentsFolderPath, currentNoteFolderPath, editor, view, importSettings);
 	}
 
-	getAbsolutePath(inVaultPath: string): string | null {
-		if (!this.vaultPath) return null;
-		return joinPaths(this.vaultPath,inVaultPath);
+	getAbsolutePath(inVaultPath: string): string {
+		return Utils.joinPaths(this.vaultPath,inVaultPath);
 	}
 
 	// Get attachment folder path based on current note
-	getAttachmentFolder(active_md_file: TFile | null = null): AttachmentFolderPath | null {
+	getAttachmentFolder(md_file: ParsedPath | null = null): AttachmentFolderPath | null {
 		try {
 			// Get the current active note if noteFilePath is not provided
-			if (!active_md_file) {
-				active_md_file = this.app.workspace.getActiveFile();
-				if (active_md_file == null) {
+			if (!md_file) {
+				const md_active_file = this.app.workspace.getActiveFile();
+				if (md_active_file == null) {
 					throw new Error("The active note could not be determined.");
 				}
+				md_file = Utils.parseFilePath(md_active_file.path);
 			}
 
-			if (!active_md_file || active_md_file.extension !== "md") {
+			if (md_file.ext !== ".md") {
 				throw new Error("No Markdown file was found.");
 			}
 
-			if(!active_md_file.parent) {
-				throw new Error("No parent for the Markdown note was found.");
-			}
-
-			const currentNoteFolderPath = active_md_file.parent.path;
-			const notename = active_md_file.basename;
+			const currentNoteFolderPath = md_file.dir;
+			const notename = md_file.filename;
 
 			let referencePath = '';
 			switch (this.settings.relativeLocation) {
@@ -663,7 +633,7 @@ export default class ImportAttachments extends Plugin {
 
 			const relativePath = this.settings.folderPath.replace(/\$\{notename\}/g, notename);
 
-			const attachmentsFolderPath = joinPaths(referencePath, relativePath);
+			const attachmentsFolderPath = Utils.joinPaths(referencePath, relativePath);
 
 			return {
 				attachmentsFolderPath,
@@ -721,7 +691,7 @@ export default class ImportAttachments extends Plugin {
 	// Function to move files to the attachments folder using fs.rename
 	async moveFileToAttachmentsFolder(filesToImport: FileList, attachmentsFolderPath: string, currentNoteFolderPath: string, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface) {
 		// Ensure the directory exists before moving the file
-		this.createFolderIfNotExists(attachmentsFolderPath);
+		Utils.createFolderIfNotExists(this.app,attachmentsFolderPath);
 
 		const cursor = editor.getCursor(); // Get the current cursor position before insertion
 
@@ -745,15 +715,15 @@ export default class ImportAttachments extends Plugin {
 			// Check if file already exists in the vault
 			const existingFile = await Utils.checkFileExists(destFilePath);
 			// If they are the same file, then skip copying/moving, we are alrady done
-			if (existingFile && await Utils.arePathsSameFile(originalFilePath, destFilePath)) {
+			if (existingFile && await Utils.arePathsSameFile(this.app.vault, originalFilePath, destFilePath)) {
 				return destFilePath;
 			}
 
 			// If the original file is already in the vault
 			if (!this.vaultPath) return null;
-			const inVault = await Utils.isFileInVault(this.vaultPath, originalFilePath)
-			if (inVault) {
-				const modal = new ImportFromVaultChoiceModal(this.app, this, this.vaultPath, inVault, importSettings.action);
+			const relativePath = await Utils.getFileInVault(this.vaultPath, originalFilePath)
+			if (relativePath) {
+				const modal = new ImportFromVaultChoiceModal(this.app, this, originalFilePath, relativePath, importSettings.action);
 				modal.open();
 				const choice = await modal.promise;
 				if (choice == null) { return null; }
@@ -791,14 +761,14 @@ export default class ImportAttachments extends Plugin {
 			try {
 				switch (importSettings.action) {
 					case ImportActionType.MOVE:
-						await fs.rename(originalFilePath, destFilePath);
+						await fs.rename(originalFilePath, this.getAbsolutePath(destFilePath));
 						return destFilePath;
 					case ImportActionType.COPY:
-						await fs.copyFile(originalFilePath, destFilePath);
+						await fs.copyFile(originalFilePath, this.getAbsolutePath(destFilePath));
 						return destFilePath;
 					case ImportActionType.LINK:
 					default:
-						return originalFilePath;
+						return relativePath;
 				}
 			} catch (error) {
 				const msg = "Failed to process the file";
@@ -841,15 +811,15 @@ export default class ImportAttachments extends Plugin {
 
 		const { attachmentsFolderPath } = attachmentsFolder;
 
+		if (!Utils.doesFolderExist(this.app,attachmentsFolderPath)) {
+			const msg = "This note does not have an attachment folder";
+			console.error(msg + ":", attachmentsFolderPath);
+			new Notice(msg + ".");
+		}
+
 		const absAttachmentsFolderPath = this.getAbsolutePath(attachmentsFolderPath);
 
 		if(!absAttachmentsFolderPath) return;
-
-		if (!await Utils.checkDirectoryExists(absAttachmentsFolderPath)) {
-			const msg = "This note does not have an attachment folder";
-			console.error(msg + ":", absAttachmentsFolderPath);
-			new Notice(msg + ".");
-		}
 
 		// TODO: Ask whether to create an Attachment folder
 
@@ -863,8 +833,8 @@ export default class ImportAttachments extends Plugin {
 	// Function to insert links to the imported files in the editor
 	insertLinkToEditor(currentNoteFolderPath: string, importedFilePath: string, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface, counter: number) {
 		// Extract just the file name from the path
-		const filename = Utils.getFilename(importedFilePath);
-
+		const { filename } = Utils.parseFilePath(importedFilePath);
+		
 		let relativePath;
 		switch (this.settings.linkFormat) {
 			case LinkFormat.RELATIVE:

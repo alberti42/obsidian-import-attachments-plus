@@ -192,7 +192,8 @@ export class OverwriteChoiceModal extends Modal {
 		this.promise = new Promise<OverwriteChoiceResult>((resolve) => {
 			this.resolveChoice = resolve;
 		});
-		this.filename = Utils.getFilename(destFilePath);
+		const { filename } = Utils.parseFilePath(destFilePath);
+		this.filename = filename;
 	}
 
 	onOpen() {
@@ -350,7 +351,7 @@ export class ImportFromVaultChoiceModal extends Modal {
 	promise: Promise<ImportFromVaultChoiceResult>;
 	private resolveChoice: (result: ImportFromVaultChoiceResult) => void = () => {};  // To resolve the promise. Initialize with a no-op function
 	
-	constructor(app: App, private plugin: ImportAttachments, private vaultPath: string, private originalFilePath: string, private importAction: ImportActionType) {
+	constructor(app: App, private plugin: ImportAttachments, private originalFilePath: string, private relativePath: string, private importAction: ImportActionType) {
 		// use TypeScript `parameter properties` to initialize `plugin`.
 		super(app);
 		this.promise = new Promise<ImportFromVaultChoiceResult>((resolve) => {
@@ -369,7 +370,7 @@ export class ImportFromVaultChoiceModal extends Modal {
 		
 		// Create a hyperlink for the filename
 		const fileLink = paragraph.createEl('a', {
-			text: path.relative(this.vaultPath,this.originalFilePath),
+			text: this.relativePath,
 			href: '#',
 		});
 		fileLink.addEventListener('click', (e) => {

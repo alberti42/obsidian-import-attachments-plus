@@ -59,6 +59,13 @@ export interface ImportAttachmentsSettings {
 	logs?: Record<string, string[]>; // To include logs on mobile apps
 }
 
+export interface ParsedPath {
+	dir: string,
+	base: string,
+	filename: string,
+	ext: string
+}
+
 // Define an interface for the return type
 export interface AttachmentFolderPath {
 	attachmentsFolderPath: string;

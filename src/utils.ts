@@ -1,23 +1,44 @@
 // utils.ts
 import { promises as fs } from 'fs';  // This imports the promises API from fs
-import * as path from 'path';         // Standard import for the path module
 import * as crypto from 'crypto';
 
 import { v4 as uuidv4 } from 'uuid';
+import { App, normalizePath, TAbstractFile, TFile, TFolder, Vault } from 'obsidian';
 
-export function getFilename(filepath: string) {
-	return path.parse(filepath).name;
+import { ParsedPath } from 'types';
+import * as path from 'path';
+
+// Joins multiple path segments into a single normalized path.
+export function joinPaths(...paths: string[]): string {
+	return normalizePath(paths.join('/'));
 }
 
-export async function arePathsSameFile(file1:string, file2:string) {
-	try {
-		const realpath1 = await fs.realpath(file1);
-		const realpath2 = await fs.realpath(file2);
-		return path.relative(realpath1,realpath2)==''
-	} catch (error: unknown) {
-		console.error('Error resolving paths:', error);
-		return false;
-	}
+export function parseFilePath(filePath: string): ParsedPath {
+    filePath = normalizePath(filePath);
+    const lastSlashIndex = filePath.lastIndexOf('/');
+
+    const dir = lastSlashIndex !== -1 ? filePath.substring(0, lastSlashIndex) : '/';
+    const base = lastSlashIndex !== -1 ? filePath.substring(lastSlashIndex + 1) : filePath;
+    const extIndex = base.lastIndexOf('.');
+    const filename = extIndex !== -1 ? base.substring(0, extIndex) : base;
+    const ext = extIndex !== -1 ? base.substring(extIndex) : '';
+
+    return { dir, base, filename, ext };
+}
+
+export function isInstanceOfFolder(file: TAbstractFile): file is TFolder {
+	return file instanceof TFolder;
+}
+
+export function arePathsSameFile(vault: Vault, filePath1: string, filePath2: string): boolean {
+    const file1: TAbstractFile | null = vault.getAbstractFileByPath(filePath1);
+    const file2: TAbstractFile | null = vault.getAbstractFileByPath(filePath2);
+
+    if (file1 instanceof TFile && file2 instanceof TFile) {
+        return file1.path === file2.path;
+    }
+
+    return false;
 }
 
 async function hashFile(filePath: string): Promise<string> {
@@ -55,9 +76,9 @@ function formatDateTime(dateFormat:string):string {
 
 export async function createAttachmentName(namePattern:string,dateFormat:string,originalFilePath:string): Promise<string> {
 
-	const originalFilePath_parsed = path.parse(originalFilePath);
+	const originalFilePath_parsed = parseFilePath(originalFilePath);
 
-	const fileToImportName = originalFilePath_parsed.name;
+	const fileToImportName = originalFilePath_parsed.filename;
 	
 	let attachmentName = namePattern.replace(/\$\{original\}/g, fileToImportName)
 									.replace(/\$\{uuid\}/g, uuidv4())
@@ -81,13 +102,13 @@ export async function createAttachmentName(namePattern:string,dateFormat:string,
 
 export async function findNewFilename(destFilePath: string,)
 {
-	const destFilePath_parse = path.parse(destFilePath);
+	const destFilePath_parse = parseFilePath(destFilePath);
 
 	let counter = 1;
 	let fileExists;
 	let newFilename = null;
 	do {
-		newFilename=path.join(destFilePath_parse.dir,`${destFilePath_parse.name} (${counter})${destFilePath_parse.ext}`);
+		newFilename=joinPaths(destFilePath_parse.dir,`${destFilePath_parse.filename} (${counter})${destFilePath_parse.ext}`);
 		fileExists = await checkFileExists(newFilename);
 		counter+=1;
 	} while(fileExists);
@@ -95,7 +116,7 @@ export async function findNewFilename(destFilePath: string,)
 	return newFilename;
 }
 
-export async function isFileInVault(vaultPath:string,filePath:string) {
+export async function getFileInVault(vaultPath: string, filePath: string): Promise<string | null> {
 	try {
 		// Resolve the real (absolute) paths to handle symlinks and relative paths
 		const realFilePath = await fs.realpath(filePath);
@@ -105,18 +126,18 @@ export async function isFileInVault(vaultPath:string,filePath:string) {
 		const normalizedFilePath = path.normalize(realFilePath);
 		const normalizedVaultFolderPath = path.normalize(realVaultFolderPath);
 
-		// Check if the file path starts with the folder path
-		// Ensure the folder path ends with a path separator to avoid partial folder name matches
+		// Get the relative path from the vault folder to the file
+		const relativePath = path.relative(normalizedVaultFolderPath, normalizedFilePath);
 
-		if(normalizedFilePath.startsWith(`${normalizedVaultFolderPath}${path.sep}`)) {
-			// return normalizedFilePath.substring(normalizedVaultFolderPath.length).replace(/^\//,'');
-			return normalizedFilePath;
+		// Check if the relative path is outside the vault folder
+		if (!relativePath.startsWith('..') && !path.isAbsolute(relativePath)) {
+			return relativePath;
 		} else {
-			return false;
+			return null;
 		}
 	} catch (error: unknown) {
 		console.error('Error resolving paths:', error);
-		return false;
+		return null;
 	}
 }
 
@@ -144,10 +165,17 @@ export async function checkDirectoryExists(dirPath: string): Promise<boolean> {
 	}
 }
 
-export async function ensureDirectoryExists(path: string): Promise<boolean> {
-	const doExist = await checkDirectoryExists(path);
-	if (!doExist) {
-		await fs.mkdir(path,{recursive: true});
+export function doesFolderExist(app: App, relativePath: string): boolean {
+		const file: TAbstractFile | null = app.vault.getAbstractFileByPath(relativePath);
+		return !!file && isInstanceOfFolder(file);
 	}
-	return true;
-}
+
+export async function createFolderIfNotExists(app: App, folderPath: string) {
+		if(doesFolderExist(app,folderPath)) return;
+
+		try {
+			await app.vault.createFolder(folderPath);
+		} catch (error) {
+			throw new Error(`Failed to create folder at ${folderPath}: ${error}`);
+		}
+	}

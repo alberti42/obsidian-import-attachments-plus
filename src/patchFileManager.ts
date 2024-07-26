@@ -114,7 +114,7 @@ async function deleteAttachmentFolder(plugin: ImportAttachments, file: TAbstract
 	// In order to avoid deleting common attachment folders, shared between multiple notes
 	if (!plugin.settings.folderPath.includes('${notename}')) { return; }
 
-	const file_parsed = path.parse(file.path);
+	const file_parsed = Utils.parseFilePath(file.path);
 	if (file_parsed.ext !== ".md") { return; }
 
 	const attachmentFolderPath = plugin.getAttachmentFolder(file_parsed);

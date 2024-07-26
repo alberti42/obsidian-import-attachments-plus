@@ -91,14 +91,18 @@ function patchOpenFile(plugin: ImportAttachments) {
 	WorkspaceLeaf.prototype.openFile = async function patchedOpenFile(this: WorkspaceLeaf, file: TFile, openState?: OpenViewState): Promise<void> {
 		const extension = "."+file.extension;
 
-		if(originalOpenFile && metaKeyPressed && altKeyPressed && plugin.settings.revealAttachmentExtExcluded.split(',').some((ext:string) => ext === extension))
-		{
-			return originalOpenFile.call(this, file, openState);
-		}
-
-		if(originalOpenFile && metaKeyPressed && !altKeyPressed && plugin.settings.openAttachmentExternalExtExcluded.split(',').some((ext:string) => ext === extension))
-		{
-			return originalOpenFile.call(this, file, openState);
+		if(originalOpenFile && metaKeyPressed) {
+			if(altKeyPressed) {
+				if(plugin.settings.revealAttachmentExtExcluded.split(',').some((ext:string) => ext === extension))
+				{
+					return originalOpenFile.call(this, file, openState);
+				}
+			} else {
+				if(plugin.settings.openAttachmentExternalExtExcluded.split(',').some((ext:string) => ext === extension))
+				{
+					return originalOpenFile.call(this, file, openState);
+				}
+			}
 		}
 		const newEmptyLeave = this.getViewState()?.type == 'empty';
 
@@ -118,7 +122,7 @@ function patchOpenFile(plugin: ImportAttachments) {
 			// close prepared empty tab
 			this.detach();
 		}
-		return;
+		return Promise.resolve();
 	}
 }
 
