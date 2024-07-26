@@ -153,18 +153,6 @@ export async function checkFileExists(filePath: string): Promise<boolean> {
 	}
 }
 
-export async function checkDirectoryExists(dirPath: string): Promise<boolean> {
-	try {
-		const stats = await fs.stat(dirPath);
-		return stats.isDirectory();  // Check if the path is a directory
-	} catch (error: unknown) {
-		if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
-			return false;  // The directory does not exist
-		}
-		throw error; // Re-throw the error if it's not related to the existence check
-	}
-}
-
 export function doesFolderExist(app: App, relativePath: string): boolean {
 		const file: TAbstractFile | null = app.vault.getAbstractFileByPath(relativePath);
 		return !!file && isInstanceOfFolder(file);

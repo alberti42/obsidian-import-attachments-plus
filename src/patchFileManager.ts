@@ -120,7 +120,9 @@ async function deleteAttachmentFolder(plugin: ImportAttachments, file: TAbstract
 	const attachmentFolderPath = plugin.getAttachmentFolder(file_parsed);
 	if (!attachmentFolderPath) { return; }
 
-	if (await Utils.checkDirectoryExists(attachmentFolderPath.attachmentsFolderPath)) {
+	console.log(attachmentFolderPath.attachmentsFolderPath);
+	if (await Utils.doesFolderExist(plugin.app,attachmentFolderPath.attachmentsFolderPath)) {
+		console.log("DDFdffdf");
 		const modal = new DeleteAttachmentFolderModal(plugin.app, plugin, attachmentFolderPath.attachmentsFolderPath);
 		modal.open();
 		const choice = await modal.promise;
