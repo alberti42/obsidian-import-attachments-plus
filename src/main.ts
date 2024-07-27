@@ -718,14 +718,16 @@ export default class ImportAttachments extends Plugin {
 				await Utils.createAttachmentName(this.settings.attachmentName, this.settings.dateFormat, originalFilePath));
 
 			// Check if file already exists in the vault
-			const existingFile = await Utils.checkFileExists(destFilePath);
+			const existingFile = await Utils.doesFileExist(this.app.vault,destFilePath);
+
 			// If they are the same file, then skip copying/moving, we are alrady done
-			if (existingFile && await Utils.arePathsSameFile(this.app.vault, originalFilePath, destFilePath)) {
+			console.log(Utils.arePathsSameFile(this.app.vault, originalFilePath, Utils.joinPaths(this.vaultPath,destFilePath)));
+			
+			if (existingFile && Utils.arePathsSameFile(this.app.vault, originalFilePath, Utils.joinPaths(this.vaultPath,destFilePath))) {
 				return destFilePath;
 			}
 
 			// If the original file is already in the vault
-			if (!this.vaultPath) return null;
 			const relativePath = await Utils.getFileInVault(this.vaultPath, originalFilePath)
 			if (relativePath) {
 				const modal = new ImportFromVaultChoiceModal(this, originalFilePath, relativePath, importSettings.action);
@@ -755,8 +757,7 @@ export default class ImportAttachments extends Plugin {
 						// continue
 						break;
 					case OverwriteChoiceOptions.KEEPBOTH:
-						destFilePath = await Utils.findNewFilename(destFilePath);
-						if (destFilePath == null) { return null; }
+						destFilePath = Utils.findNewFilename(this.app.vault,destFilePath);
 						break;
 					case OverwriteChoiceOptions.SKIP:
 						return null;
@@ -785,7 +786,6 @@ export default class ImportAttachments extends Plugin {
 
 		// Wait for all tasks to complete
 		const results = await Promise.all(tasks);
-
 
 		// Now process the results
 		let counter = 0;

@@ -3,14 +3,14 @@ import { promises as fs } from 'fs';  // This imports the promises API from fs
 import * as crypto from 'crypto';
 
 import { v4 as uuidv4 } from 'uuid';
-import { Vault, App, normalizePath, TAbstractFile, TFile, TFolder } from 'obsidian';
+import { Vault, normalizePath, TAbstractFile, TFile, TFolder } from 'obsidian';
 
 import { ParsedPath } from 'types';
 import * as path from 'path';
 
 // Joins multiple path segments into a single normalized path.
 export function joinPaths(...paths: string[]): string {
-	return normalizePath(paths.join('/'));
+	return paths.join('/');
 }
 
 export function parseFilePath(filePath: string): ParsedPath {
@@ -28,6 +28,10 @@ export function parseFilePath(filePath: string): ParsedPath {
 
 export function isInstanceOfFolder(file: TAbstractFile): file is TFolder {
 	return file instanceof TFolder;
+}
+
+export function isInstanceOfFile(file: TAbstractFile): file is TFile {
+	return file instanceof TFile;
 }
 
 export function arePathsSameFile(vault: Vault, filePath1: string, filePath2: string): boolean {
@@ -100,7 +104,7 @@ export async function createAttachmentName(namePattern:string,dateFormat:string,
 	return attachmentName;
 }
 
-export async function findNewFilename(destFilePath: string,)
+export function findNewFilename(vault: Vault, destFilePath: string): string
 {
 	const destFilePath_parse = parseFilePath(destFilePath);
 
@@ -109,7 +113,7 @@ export async function findNewFilename(destFilePath: string,)
 	let newFilename = null;
 	do {
 		newFilename=joinPaths(destFilePath_parse.dir,`${destFilePath_parse.filename} (${counter})${destFilePath_parse.ext}`);
-		fileExists = await checkFileExists(newFilename);
+		fileExists = doesFileExist(vault,newFilename);
 		counter+=1;
 	} while(fileExists);
 
@@ -166,9 +170,14 @@ export async function doesDirectoryOutsideVaultExist(dirPath: string): Promise<b
 }
 
 export function doesFolderExist(vault: Vault, relativePath: string): boolean {
-		const file: TAbstractFile | null = vault.getAbstractFileByPath(relativePath);
-		return !!file && isInstanceOfFolder(file);
-	}
+	const file: TAbstractFile | null = vault.getAbstractFileByPath(relativePath);
+	return !!file && isInstanceOfFolder(file);
+}
+
+export function doesFileExist(vault: Vault, relativePath: string): boolean {
+	const file: TAbstractFile | null = vault.getAbstractFileByPath(relativePath);
+	return !!file && isInstanceOfFile(file);
+}
 
 export async function filterOutFolders(filesArray: File[]) {
 	const nonFolderFilesArray: File[] = [];

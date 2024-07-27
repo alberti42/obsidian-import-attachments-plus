@@ -201,11 +201,13 @@ export class OverwriteChoiceModal extends Modal {
 
 		container.createEl('h2', { text: 'Import files' });
 		const paragraph = container.createEl('p');
-		paragraph.append('You are trying to copy the file "');
+		paragraph.append('You are trying to copy the file ');
 		
+		const {base} = Utils.parseFilePath(this.originalFilePath);
+
 		// Create a hyperlink for the filename
 		const origFileLink = paragraph.createEl('a', {
-			text: this.originalFilePath,
+			text: base,
 			href: '#',
 		});
 		origFileLink.addEventListener('click', (e) => {
@@ -214,8 +216,8 @@ export class OverwriteChoiceModal extends Modal {
 			window.require('electron').remote.shell.showItemInFolder(this.originalFilePath);
 		});
 
-		paragraph.append('" into the vault, where a "');
-
+		paragraph.append(' into the vault, where a ');
+		console.log(this.destFilePath);
 		// Create a hyperlink for the filename
 		const vaultFileLink = paragraph.createEl('a', {
 			text: 'file',
@@ -224,10 +226,10 @@ export class OverwriteChoiceModal extends Modal {
 		vaultFileLink.addEventListener('click', (e) => {
 			e.preventDefault(); // Prevent the default anchor behavior
 			// Open the folder in the system's default file explorer
-			window.require('electron').remote.shell.showItemInFolder(this.destFilePath);
+			window.require('electron').remote.shell.showItemInFolder(Utils.joinPaths(this.plugin.vaultPath,this.destFilePath));
 		});
 
-		paragraph.append('" with the same name is already present.');
+		paragraph.append(' with the same name is already present.');
 
 		container.createEl('p',{text: 'How do you want to proceed?'});
 
@@ -295,7 +297,7 @@ export class DeleteAttachmentFolderModal extends Modal {
 
 		container.createEl('h2', { text: 'Import files' });
 		const paragraph = container.createEl('p');
-		paragraph.append('Do you want to move the attachment folder "');
+		paragraph.append('Do you want to move the attachment folder ');
 		
 		// Create a hyperlink for the filename
 		const fileLink = paragraph.createEl('a', {
@@ -309,7 +311,7 @@ export class DeleteAttachmentFolderModal extends Modal {
 			window.require('electron').remote.shell.openPath(Utils.joinPaths(this.plugin.vaultPath,this.attachmentFolderPath));
 		});
 
-		paragraph.append('" to the system trash?');
+		paragraph.append(' to the system trash?');
 
 		const buttonContainer = container.createDiv({cls:'import-buttons'});
 		const deleteButton = buttonContainer.createEl('button', {
@@ -364,7 +366,7 @@ export class ImportFromVaultChoiceModal extends Modal {
 
 		container.createEl('h2', { text: 'Import files' });
 		const paragraph = container.createEl('p');
-		paragraph.append('The file you are trying to import "');
+		paragraph.append('The file you are trying to import ');
 		
 		// Create a hyperlink for the filename
 		const fileLink = paragraph.createEl('a', {
@@ -377,7 +379,7 @@ export class ImportFromVaultChoiceModal extends Modal {
 			window.require('electron').remote.shell.showItemInFolder(Utils.joinPaths(this.plugin.vaultPath,this.relativeFilePath));
 		});
 
-		paragraph.append('" is already stored in the vault.');
+		paragraph.append(' is already stored in the vault.');
 
 		if(this.importAction==ImportActionType.MOVE) {
 			container.createEl('p',{text: 'You intended to move the file. \
@@ -456,7 +458,7 @@ export class FolderImportErrorModal extends Modal {
 
         container.createEl('h2', { text: 'Import files' });
         const paragraph = container.createEl('p');
-        paragraph.append('Importing folders is not supported. The following folders will not be imported:');
+        paragraph.append('Importing folders is not supported in Obsidian. The following folders will not be imported:');
         
         // Create a list to display folders
         const ul = container.createEl('ul');
