@@ -153,16 +153,29 @@ export async function checkFileExists(filePath: string): Promise<boolean> {
 	}
 }
 
-export function doesFolderExist(app: App, relativePath: string): boolean {
-		const file: TAbstractFile | null = app.vault.getAbstractFileByPath(relativePath);
+export function doesFolderExist(vault: Vault, relativePath: string): boolean {
+		const file: TAbstractFile | null = vault.getAbstractFileByPath(relativePath);
 		return !!file && isInstanceOfFolder(file);
 	}
 
-export async function createFolderIfNotExists(app: App, folderPath: string) {
-		if(doesFolderExist(app,folderPath)) return;
+export function filterOutFolders(filesArray: File[]) {
+	const nonFolderFilesArray: File[]  = [];
+	const foldersArray: File[] = [];
+
+	filesArray.forEach((file) => {
+        // const relativePath = file.webkitRelativePath || file.path;
+        nonFolderFilesArray.push(file);
+        return true;
+    });
+
+    return {nonFolderFilesArray, foldersArray};
+}
+
+export async function createFolderIfNotExists(vault: Vault, folderPath: string) {
+		if(doesFolderExist(vault,folderPath)) return;
 
 		try {
-			await app.vault.createFolder(folderPath);
+			await vault.createFolder(folderPath);
 		} catch (error) {
 			throw new Error(`Failed to create folder at ${folderPath}: ${error}`);
 		}

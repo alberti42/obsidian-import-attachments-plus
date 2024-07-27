@@ -337,7 +337,6 @@ export default class ImportAttachments extends Plugin {
 		if (Platform.isDesktopApp) {
 			this.registerEvent( // check obsidian.d.ts for other types of events
 				this.app.workspace.on('editor-drop', async (evt: DragEvent, editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
-
 					// Check if the event has already been handled
 					if (evt.defaultPrevented) return;
 
@@ -359,7 +358,13 @@ export default class ImportAttachments extends Plugin {
 
 					// Handle the dropped files
 					const files = evt?.dataTransfer?.files;
-					if (files && files.length > 0) {
+					if(!files) return;
+
+					const {nonFolderFilesArray, foldersArray} = Utils.filterOutFolders(Array.from(files));
+
+					console.log(nonFolderFilesArray);
+
+					if (nonFolderFilesArray.length > 0) {
 						const cm = editor.cm; // Access the CodeMirror instance
 						const dropPos = cm.posAtCoords({ x: evt.clientX, y: evt.clientY });
 
@@ -370,7 +375,7 @@ export default class ImportAttachments extends Plugin {
 							});
 
 							// Handle the files as per your existing logic
-							await this.handleFiles(files, editor, view, doForceAsking, ImportOperationType.DRAG_AND_DROP);
+							await this.handleFiles(nonFolderFilesArray, editor, view, doForceAsking, ImportOperationType.DRAG_AND_DROP);
 						} else {
 							console.error('Unable to determine drop position');
 						}
@@ -423,7 +428,7 @@ export default class ImportAttachments extends Plugin {
 						const oldAttachmentFolderPath = this.getAttachmentFolder(oldPath_parsed);
 						if (!oldAttachmentFolderPath) { return }
 
-						if (Utils.doesFolderExist(this.app,oldAttachmentFolderPath.attachmentsFolderPath)) {
+						if (Utils.doesFolderExist(this.app.vault,oldAttachmentFolderPath.attachmentsFolderPath)) {
 
 							const newAttachmentFolderPath = this.getAttachmentFolder(Utils.parseFilePath(newFile.path));
 							if (!newAttachmentFolderPath) { return }
@@ -538,7 +543,7 @@ export default class ImportAttachments extends Plugin {
 	}
 
 	
-	async handleFiles(files: FileList, editor: Editor, view: MarkdownView, doForceAsking: boolean, importType: ImportOperationType) {
+	async handleFiles(files: File[], editor: Editor, view: MarkdownView, doForceAsking: boolean, importType: ImportOperationType) {
 		const attachmentsFolder = this.getAttachmentFolder();
 		if (!attachmentsFolder) { return }
 
@@ -674,7 +679,7 @@ export default class ImportAttachments extends Plugin {
 
 			if (files && files.length > 0) {
 				// Directly pass the FileList to the processing function
-				await this.moveFileToAttachmentsFolder(files, attachmentsFolderPath, referencePath, editor, markdownView, importSettings);
+				await this.moveFileToAttachmentsFolder(Array.from(files), attachmentsFolderPath, referencePath, editor, markdownView, importSettings);
 			} else {
 				const msg = "No files selected or file access error.";
 				console.error(msg);
@@ -685,9 +690,9 @@ export default class ImportAttachments extends Plugin {
 	}
 
 	// Function to move files to the attachments folder using fs.rename
-	async moveFileToAttachmentsFolder(filesToImport: FileList, attachmentsFolderPath: string, currentNoteFolderPath: string, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface) {
+	async moveFileToAttachmentsFolder(filesToImport: File[], attachmentsFolderPath: string, currentNoteFolderPath: string, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface) {
 		// Ensure the directory exists before moving the file
-		Utils.createFolderIfNotExists(this.app,attachmentsFolderPath);
+		Utils.createFolderIfNotExists(this.app.vault,attachmentsFolderPath);
 
 		const cursor = editor.getCursor(); // Get the current cursor position before insertion
 
@@ -703,7 +708,7 @@ export default class ImportAttachments extends Plugin {
 
 		const multipleFiles = filesToImport.length > 1;
 
-		const tasks = Array.from(filesToImport).map(async (fileToImport): Promise<string | null> => {
+		const tasks = filesToImport.map(async (fileToImport): Promise<string | null> => {
 			const originalFilePath = fileToImport.path;
 			let destFilePath = path.join(attachmentsFolderPath,
 				await Utils.createAttachmentName(this.settings.attachmentName, this.settings.dateFormat, originalFilePath));
@@ -807,7 +812,7 @@ export default class ImportAttachments extends Plugin {
 
 		const { attachmentsFolderPath } = attachmentsFolder;
 
-		if (!Utils.doesFolderExist(this.app,attachmentsFolderPath)) {
+		if (!Utils.doesFolderExist(this.app.vault,attachmentsFolderPath)) {
 			const msg = "This note does not have an attachment folder";
 			console.error(msg + ":", attachmentsFolderPath);
 			new Notice(msg + ".");
