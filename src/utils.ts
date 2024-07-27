@@ -3,7 +3,7 @@ import { promises as fs } from 'fs';  // This imports the promises API from fs
 import * as crypto from 'crypto';
 
 import { v4 as uuidv4 } from 'uuid';
-import { App, normalizePath, TAbstractFile, TFile, TFolder, Vault } from 'obsidian';
+import { Vault, App, normalizePath, TAbstractFile, TFile, TFolder } from 'obsidian';
 
 import { ParsedPath } from 'types';
 import * as path from 'path';

@@ -561,7 +561,7 @@ export default class ImportAttachments extends Plugin {
 		const lastEmbedOption = this.settings.lastEmbedFilesOnImport;
 
 		if (doForceAsking || actionFilesOnImport == ImportActionType.ASK_USER || embedOption == YesNoTypes.ASK_USER) {
-			const modal = new ImportActionTypeModal(this.app, this, lastActionFilesOnImport, lastEmbedOption);
+			const modal = new ImportActionTypeModal(this, lastActionFilesOnImport, lastEmbedOption);
 			modal.open();
 			const choice = await modal.promise;
 			if (choice == null) return;
@@ -596,10 +596,6 @@ export default class ImportAttachments extends Plugin {
 		};
 
 		this.moveFileToAttachmentsFolder(files, attachmentsFolderPath, currentNoteFolderPath, editor, view, importSettings);
-	}
-
-	getAbsolutePath(inVaultPath: string): string {
-		return Utils.joinPaths(this.vaultPath,inVaultPath);
 	}
 
 	// Get attachment folder path based on current note
@@ -723,7 +719,7 @@ export default class ImportAttachments extends Plugin {
 			if (!this.vaultPath) return null;
 			const relativePath = await Utils.getFileInVault(this.vaultPath, originalFilePath)
 			if (relativePath) {
-				const modal = new ImportFromVaultChoiceModal(this.app, this, originalFilePath, relativePath, importSettings.action);
+				const modal = new ImportFromVaultChoiceModal(this, originalFilePath, relativePath, importSettings.action);
 				modal.open();
 				const choice = await modal.promise;
 				if (choice == null) { return null; }
@@ -741,7 +737,7 @@ export default class ImportAttachments extends Plugin {
 			
 			// Decide what to do if a file with the same name already exists at the destination
 			if (existingFile && importSettings.action != ImportActionType.LINK) {
-				const modal = new OverwriteChoiceModal(this.app, this, originalFilePath, destFilePath);
+				const modal = new OverwriteChoiceModal(this, originalFilePath, destFilePath);
 				modal.open();
 				const choice = await modal.promise;
 				if (choice == null) { return null; }
@@ -761,10 +757,10 @@ export default class ImportAttachments extends Plugin {
 			try {
 				switch (importSettings.action) {
 					case ImportActionType.MOVE:
-						await fs.rename(originalFilePath, this.getAbsolutePath(destFilePath));
+						await fs.rename(originalFilePath, Utils.joinPaths(this.vaultPath,destFilePath));
 						return destFilePath;
 					case ImportActionType.COPY:
-						await fs.copyFile(originalFilePath, this.getAbsolutePath(destFilePath));
+						await fs.copyFile(originalFilePath, Utils.joinPaths(this.vaultPath,destFilePath));
 						return destFilePath;
 					case ImportActionType.LINK:
 					default:
@@ -817,7 +813,7 @@ export default class ImportAttachments extends Plugin {
 			new Notice(msg + ".");
 		}
 
-		const absAttachmentsFolderPath = this.getAbsolutePath(attachmentsFolderPath);
+		const absAttachmentsFolderPath = Utils.joinPaths(this.vaultPath,attachmentsFolderPath);
 
 		if(!absAttachmentsFolderPath) return;
 

@@ -24,9 +24,9 @@ export class ImportActionTypeModal extends Modal {
 	private selectedEmbedOption: YesNoTypes;
 	private rememberChoice: boolean = false;  // Private variable to store the checkbox state
 	
-	constructor(app: App, private plugin: ImportAttachments, private lastActionFilesOnImport: ImportActionType, private lastEmbedOnImport: YesNoTypes) {
+	constructor(private plugin: ImportAttachments, private lastActionFilesOnImport: ImportActionType, private lastEmbedOnImport: YesNoTypes) {
 		// use TypeScript `parameter properties` to initialize `plugin`.
-		super(app);
+		super(plugin.app);
 		this.promise = new Promise<ImportActionChoiceResult>((resolve) => {
 			this.resolveChoice = resolve;
 		});
@@ -186,14 +186,14 @@ export class OverwriteChoiceModal extends Modal {
 	private resolveChoice: (result: OverwriteChoiceResult) => void = () => {};  // To resolve the promise. Initialize with a no-op function
 	private filename: string;
 	
-	constructor(app: App, private plugin: ImportAttachments, private originalFilePath: string, private destFilePath: string) {
+	constructor(private plugin: ImportAttachments, private originalFilePath: string, private destFilePath: string) {
 		// use TypeScript `parameter properties` to initialize `plugin`.
-		super(app);
+		super(plugin.app);
 		this.promise = new Promise<OverwriteChoiceResult>((resolve) => {
 			this.resolveChoice = resolve;
 		});
-		const { filename } = Utils.parseFilePath(destFilePath);
-		this.filename = filename;
+		const parsed_filepath = Utils.parseFilePath(destFilePath);
+		this.filename = parsed_filepath.filename;
 	}
 
 	onOpen() {
@@ -279,9 +279,9 @@ export class DeleteAttachmentFolderModal extends Modal {
 	promise: Promise<boolean>;
 	private resolveChoice: (result: boolean) => void = () => {};  // To resolve the promise. Initialize with a no-op function
 	
-	constructor(app: App, private plugin: ImportAttachments, private attachmentFolderPath: string) {
+	constructor(private plugin: ImportAttachments, private attachmentFolderPath: string) {
 		// use TypeScript `parameter properties` to initialize `plugin`.
-		super(app);
+		super(plugin.app);
 		this.promise = new Promise<boolean>((resolve) => {
 			this.resolveChoice = resolve;
 		});
@@ -289,7 +289,7 @@ export class DeleteAttachmentFolderModal extends Modal {
 
 	onOpen() {
 
-		const attachmentFolderPath_parsed = path.parse(this.attachmentFolderPath);
+		const attachmentFolderPath_parsed = Utils.parseFilePath(this.attachmentFolderPath);
 
 		const { contentEl } = this;
 
@@ -301,14 +301,14 @@ export class DeleteAttachmentFolderModal extends Modal {
 		
 		// Create a hyperlink for the filename
 		const fileLink = paragraph.createEl('a', {
-			text: attachmentFolderPath_parsed.name,
+			text: attachmentFolderPath_parsed.filename,
 			href: '#',
 		});
 		fileLink.addEventListener('click', (e) => {
 			e.preventDefault(); // Prevent the default anchor behavior
 			// Open the folder in the system's default file explorer
 			// window.require('electron').remote.shell.showItemInFolder(this.attachmentFolderPath);
-			window.require('electron').remote.shell.openPath(this.attachmentFolderPath);
+			window.require('electron').remote.shell.openPath(Utils.joinPaths(this.plugin.vaultPath,this.attachmentFolderPath));
 		});
 
 		paragraph.append('" to the system trash?');
@@ -351,9 +351,9 @@ export class ImportFromVaultChoiceModal extends Modal {
 	promise: Promise<ImportFromVaultChoiceResult>;
 	private resolveChoice: (result: ImportFromVaultChoiceResult) => void = () => {};  // To resolve the promise. Initialize with a no-op function
 	
-	constructor(app: App, private plugin: ImportAttachments, private originalFilePath: string, private relativePath: string, private importAction: ImportActionType) {
+	constructor(private plugin: ImportAttachments, private vaultPath: string, private relativeFilePath: string, private importAction: ImportActionType) {
 		// use TypeScript `parameter properties` to initialize `plugin`.
-		super(app);
+		super(plugin.app);
 		this.promise = new Promise<ImportFromVaultChoiceResult>((resolve) => {
 			this.resolveChoice = resolve;
 		});
@@ -370,13 +370,13 @@ export class ImportFromVaultChoiceModal extends Modal {
 		
 		// Create a hyperlink for the filename
 		const fileLink = paragraph.createEl('a', {
-			text: this.relativePath,
+			text: this.relativeFilePath,
 			href: '#',
 		});
 		fileLink.addEventListener('click', (e) => {
 			e.preventDefault(); // Prevent the default anchor behavior
 			// Open the folder in the system's default file explorer
-			window.require('electron').remote.shell.showItemInFolder(this.originalFilePath);
+			window.require('electron').remote.shell.showItemInFolder(Utils.joinPaths(this.plugin.vaultPath,this.relativeFilePath));
 		});
 
 		paragraph.append('" is already stored in the vault.');

@@ -6,7 +6,6 @@ import { FileManager, TAbstractFile, Notice } from 'obsidian';
 import ImportAttachments from 'main';
 import * as Utils from 'utils';
 import { DeleteAttachmentFolderModal } from './ImportAttachmentsModal';
-import * as path from 'path'; // Standard import for the path module
 
 // Save a reference to the original method for the monkey patch
 let originalPromptForDeletion: ((file: TAbstractFile) => Promise<void>) | null = null;
@@ -28,7 +27,7 @@ function patchFilemanager(plugin: ImportAttachments) {
 	FileManager.prototype.promptForDeletion = async function patchedPromptForDeletion(file: TAbstractFile): Promise<void> {
 		// Access the 'promptDelete' configuration setting
 		const promptDelete = plugin.app.vault.getConfig("promptDelete");
-
+		
 		if(promptDelete)
 		{
 			userInitiatedDelete = false;
@@ -120,21 +119,21 @@ async function deleteAttachmentFolder(plugin: ImportAttachments, file: TAbstract
 	const attachmentFolderPath = plugin.getAttachmentFolder(file_parsed);
 	if (!attachmentFolderPath) { return; }
 
-	console.log(attachmentFolderPath.attachmentsFolderPath);
 	if (await Utils.doesFolderExist(plugin.app,attachmentFolderPath.attachmentsFolderPath)) {
-		console.log("DDFdffdf");
-		const modal = new DeleteAttachmentFolderModal(plugin.app, plugin, attachmentFolderPath.attachmentsFolderPath);
-		modal.open();
-		const choice = await modal.promise;
-		if (!choice) return;
+		if(plugin.settings.confirmDeleteAttachmentFolder) {
+			const modal = new DeleteAttachmentFolderModal(plugin, attachmentFolderPath.attachmentsFolderPath);
+			modal.open();
+			const choice = await modal.promise;
+			if (!choice) return;
+		}
 
-		const filePath = path.relative(plugin.vaultPath, attachmentFolderPath.attachmentsFolderPath);
+		const filePathForDeletion = attachmentFolderPath.attachmentsFolderPath;
 
 		try {
-			await plugin.trashFile(filePath);
+			await plugin.trashFile(filePathForDeletion);
 		} catch (error: unknown) {
 			const msg = 'Failed to remove the attachment folder';
-			console.error(msg + ":", filePath);
+			console.error(msg + ":", filePathForDeletion);
 			console.error("Error msg:", error);
 			new Notice(msg + '.');
 		}
