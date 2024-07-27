@@ -19,7 +19,7 @@ import {
 } from "obsidian";
 
 // Import utility and modal components
-import { ImportActionTypeModal, OverwriteChoiceModal, ImportFromVaultChoiceModal } from './ImportAttachmentsModal';
+import { ImportActionTypeModal, OverwriteChoiceModal, ImportFromVaultChoiceModal, FolderImportErrorModal } from './ImportAttachmentsModal';
 import {
 	ImportActionType,
 	MultipleFilesImportTypes,
@@ -360,10 +360,14 @@ export default class ImportAttachments extends Plugin {
 					const files = evt?.dataTransfer?.files;
 					if(!files) return;
 
-					const {nonFolderFilesArray, foldersArray} = Utils.filterOutFolders(Array.from(files));
+					const {nonFolderFilesArray, foldersArray} = await Utils.filterOutFolders(Array.from(files));
 
-					console.log(nonFolderFilesArray);
-
+					if(foldersArray.length>0) {
+						const modal = new FolderImportErrorModal(this, foldersArray);
+						modal.open();
+						await modal.promise;
+					}
+					
 					if (nonFolderFilesArray.length > 0) {
 						const cm = editor.cm; // Access the CodeMirror instance
 						const dropPos = cm.posAtCoords({ x: evt.clientX, y: evt.clientY });

@@ -14,16 +14,16 @@ export function joinPaths(...paths: string[]): string {
 }
 
 export function parseFilePath(filePath: string): ParsedPath {
-    filePath = normalizePath(filePath);
-    const lastSlashIndex = filePath.lastIndexOf('/');
+	filePath = normalizePath(filePath);
+	const lastSlashIndex = filePath.lastIndexOf('/');
 
-    const dir = lastSlashIndex !== -1 ? filePath.substring(0, lastSlashIndex) : '/';
-    const base = lastSlashIndex !== -1 ? filePath.substring(lastSlashIndex + 1) : filePath;
-    const extIndex = base.lastIndexOf('.');
-    const filename = extIndex !== -1 ? base.substring(0, extIndex) : base;
-    const ext = extIndex !== -1 ? base.substring(extIndex) : '';
+	const dir = lastSlashIndex !== -1 ? filePath.substring(0, lastSlashIndex) : '/';
+	const base = lastSlashIndex !== -1 ? filePath.substring(lastSlashIndex + 1) : filePath;
+	const extIndex = base.lastIndexOf('.');
+	const filename = extIndex !== -1 ? base.substring(0, extIndex) : base;
+	const ext = extIndex !== -1 ? base.substring(extIndex) : '';
 
-    return { dir, base, filename, ext };
+	return { dir, base, filename, ext };
 }
 
 export function isInstanceOfFolder(file: TAbstractFile): file is TFolder {
@@ -31,14 +31,14 @@ export function isInstanceOfFolder(file: TAbstractFile): file is TFolder {
 }
 
 export function arePathsSameFile(vault: Vault, filePath1: string, filePath2: string): boolean {
-    const file1: TAbstractFile | null = vault.getAbstractFileByPath(filePath1);
-    const file2: TAbstractFile | null = vault.getAbstractFileByPath(filePath2);
+	const file1: TAbstractFile | null = vault.getAbstractFileByPath(filePath1);
+	const file2: TAbstractFile | null = vault.getAbstractFileByPath(filePath2);
 
-    if (file1 instanceof TFile && file2 instanceof TFile) {
-        return file1.path === file2.path;
-    }
+	if (file1 instanceof TFile && file2 instanceof TFile) {
+		return file1.path === file2.path;
+	}
 
-    return false;
+	return false;
 }
 
 async function hashFile(filePath: string): Promise<string> {
@@ -153,22 +153,37 @@ export async function checkFileExists(filePath: string): Promise<boolean> {
 	}
 }
 
+export async function doesDirectoryOutsideVaultExist(dirPath: string): Promise<boolean> {
+	try {
+		const stats = await fs.stat(dirPath);
+		return stats.isDirectory();  // Check if the path is a directory
+	} catch (error: unknown) {
+		if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+			return false;  // The directory does not exist
+		}
+		throw error; // Re-throw the error if it's not related to the existence check
+	}
+}
+
 export function doesFolderExist(vault: Vault, relativePath: string): boolean {
 		const file: TAbstractFile | null = vault.getAbstractFileByPath(relativePath);
 		return !!file && isInstanceOfFolder(file);
 	}
 
-export function filterOutFolders(filesArray: File[]) {
-	const nonFolderFilesArray: File[]  = [];
+export async function filterOutFolders(filesArray: File[]) {
+	const nonFolderFilesArray: File[] = [];
 	const foldersArray: File[] = [];
 
-	filesArray.forEach((file) => {
-        // const relativePath = file.webkitRelativePath || file.path;
-        nonFolderFilesArray.push(file);
-        return true;
-    });
+	// Use Promise.all with map to handle asynchronous operations
+	await Promise.all(filesArray.map(async (file) => {
+		if (await doesDirectoryOutsideVaultExist(file.path)) {
+			foldersArray.push(file); // If it's a folder, add to foldersArray
+		} else {
+			nonFolderFilesArray.push(file); // If it's not a folder, add to nonFolderFilesArray
+		}
+	}));
 
-    return {nonFolderFilesArray, foldersArray};
+	return {nonFolderFilesArray, foldersArray};
 }
 
 export async function createFolderIfNotExists(vault: Vault, folderPath: string) {

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-inferrable-types */
 // ImportAttachmentsModal.ts
-import { Modal, App } from 'obsidian';
+import { Modal } from 'obsidian';
 import {
 		ImportActionType,
 		ImportActionChoiceResult,
@@ -14,8 +14,6 @@ import {
 	} from './types';
 import * as Utils from "utils";
 import type ImportAttachments from 'main'; // Import the type of your plugin class if needed for type hinting
-
-import * as path from "path"; // Node.js path module to handle path operations
 
 export class ImportActionTypeModal extends Modal {
 	promise: Promise<ImportActionChoiceResult>;
@@ -437,4 +435,67 @@ export class ImportFromVaultChoiceModal extends Modal {
 		this.contentEl.empty();
 		this.resolveChoice(null);  // Resolve with null if the modal is closed without a choice
 	}
+}
+
+export class FolderImportErrorModal extends Modal {
+    promise: Promise<boolean>;
+    private resolveChoice: (result: boolean) => void = () => {};  // To resolve the promise. Initialize with a no-op function
+    
+    constructor(private plugin: ImportAttachments, private nonFolderFilesArray: File[]) {
+        // use TypeScript `parameter properties` to initialize `plugin`.
+        super(plugin.app);
+        this.promise = new Promise<boolean>((resolve) => {
+            this.resolveChoice = resolve;
+        });
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+
+        const container = contentEl.createDiv({ cls: 'import-plugin' });
+
+        container.createEl('h2', { text: 'Import files' });
+        const paragraph = container.createEl('p');
+        paragraph.append('Importing folders is not supported. The following folders will not be imported:');
+        
+        // Create a list to display folders
+        const ul = container.createEl('ul');
+        
+        this.nonFolderFilesArray.forEach((folder) => {
+            const li = ul.createEl('li');
+            
+            // Create a hyperlink for the filename
+            const fileLink = li.createEl('a', {
+                text: folder.name,
+                href: '#',
+            });
+            fileLink.addEventListener('click', (e) => {
+                e.preventDefault(); // Prevent the default anchor behavior
+                // Open the folder in the system's default file explorer
+                window.require('electron').remote.shell.openPath(folder.path);
+            });
+        });
+
+        const buttonContainer = container.createDiv({ cls: 'import-buttons' });
+        const okButton = buttonContainer.createEl('button', {
+            text: 'Ok',
+            cls: 'mod-warning'
+        });
+        okButton.addEventListener('click', () => {
+            this.resolveChoice(true);
+            this.close(); 
+        });
+        
+        setTimeout(() => {
+            // Set focus with a slight delay:
+            // this method leverages JavaScript's event loop, ensuring that focusing the button
+            // is enqueued after all the elements are properly rendered and the DOM is fully updated.
+            okButton.focus();
+        }, 0); // A timeout of 0 ms is often enough
+    }
+
+    onClose() {
+        this.contentEl.empty();
+        this.resolveChoice(false);  // Resolve with false if the modal is closed without a choice
+    }
 }
