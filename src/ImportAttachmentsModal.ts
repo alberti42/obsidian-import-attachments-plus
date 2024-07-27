@@ -501,3 +501,60 @@ export class FolderImportErrorModal extends Modal {
         this.resolveChoice(false);  // Resolve with false if the modal is closed without a choice
     }
 }
+
+
+export class CreateAttachmentFolderModal extends Modal {
+    promise: Promise<boolean>;
+    private resolveChoice: (result: boolean) => void = () => {};  // To resolve the promise. Initialize with a no-op function
+    
+    constructor(private plugin: ImportAttachments, private attachmentFolderPath: string) {
+        // use TypeScript `parameter properties` to initialize `plugin`.
+        super(plugin.app);
+        this.promise = new Promise<boolean>((resolve) => {
+            this.resolveChoice = resolve;
+        });
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+
+        const container = contentEl.createDiv({ cls: 'import-plugin' });
+
+        const attachmentFolderPath_parsed = Utils.parseFilePath(this.attachmentFolderPath);
+
+        container.createEl('h2', { text: 'Create an empty attachment folder?' });
+        const paragraph = container.createEl('p');
+        paragraph.append(`The attachment folder ${attachmentFolderPath_parsed.base} does not exist yet. Do you want to create one?`);
+        
+        const buttonContainer = container.createDiv({ cls: 'import-buttons' });
+        const yesButton = buttonContainer.createEl('button', {
+            text: 'Yes',
+            cls: 'mod-cta'
+        });
+        yesButton.addEventListener('click', () => {
+            this.resolveChoice(true);
+            this.close(); 
+        });
+        const noButton = buttonContainer.createEl('button', {
+            text: 'No',
+            cls: 'mod-cancel'
+        });
+        noButton.addEventListener('click', () => {
+            this.resolveChoice(false);
+            this.close(); 
+        });
+        
+        setTimeout(() => {
+            // Set focus with a slight delay:
+            // this method leverages JavaScript's event loop, ensuring that focusing the button
+            // is enqueued after all the elements are properly rendered and the DOM is fully updated.
+            yesButton.focus();
+        }, 0); // A timeout of 0 ms is often enough
+    }
+
+    onClose() {
+        this.contentEl.empty();
+        this.resolveChoice(false);  // Resolve with false if the modal is closed without a choice
+    }
+}
+

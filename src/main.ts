@@ -19,7 +19,7 @@ import {
 } from "obsidian";
 
 // Import utility and modal components
-import { ImportActionTypeModal, OverwriteChoiceModal, ImportFromVaultChoiceModal, FolderImportErrorModal } from './ImportAttachmentsModal';
+import { ImportActionTypeModal, OverwriteChoiceModal, ImportFromVaultChoiceModal, FolderImportErrorModal, CreateAttachmentFolderModal } from './ImportAttachmentsModal';
 import {
 	ImportActionType,
 	MultipleFilesImportTypes,
@@ -720,16 +720,13 @@ export default class ImportAttachments extends Plugin {
 			// Check if file already exists in the vault
 			const existingFile = await Utils.doesFileExist(this.app.vault,destFilePath);
 
-			// If they are the same file, then skip copying/moving, we are alrady done
-			console.log(Utils.arePathsSameFile(this.app.vault, originalFilePath, Utils.joinPaths(this.vaultPath,destFilePath)));
-			
-			if (existingFile && Utils.arePathsSameFile(this.app.vault, originalFilePath, Utils.joinPaths(this.vaultPath,destFilePath))) {
-				return destFilePath;
-			}
-
 			// If the original file is already in the vault
 			const relativePath = await Utils.getFileInVault(this.vaultPath, originalFilePath)
 			if (relativePath) {
+
+				// If they are the same file, then skip copying/moving, we are alrady done
+				if (existingFile && Utils.arePathsSameFile(this.app.vault, relativePath, destFilePath)) return destFilePath;
+
 				const modal = new ImportFromVaultChoiceModal(this, originalFilePath, relativePath, importSettings.action);
 				modal.open();
 				const choice = await modal.promise;
@@ -817,9 +814,11 @@ export default class ImportAttachments extends Plugin {
 		const { attachmentsFolderPath } = attachmentsFolder;
 
 		if (!Utils.doesFolderExist(this.app.vault,attachmentsFolderPath)) {
-			const msg = "This note does not have an attachment folder";
-			console.error(msg + ":", attachmentsFolderPath);
-			new Notice(msg + ".");
+			const modal = new CreateAttachmentFolderModal(this, attachmentsFolderPath);
+			modal.open();
+			const choice = await modal.promise;
+			if (choice == null) return;
+			Utils.createFolderIfNotExists(this.app.vault,attachmentsFolderPath);
 		}
 
 		const absAttachmentsFolderPath = Utils.joinPaths(this.vaultPath,attachmentsFolderPath);

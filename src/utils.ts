@@ -45,6 +45,18 @@ export function arePathsSameFile(vault: Vault, filePath1: string, filePath2: str
 	return false;
 }
 
+/*export async function arePathsSameFile(file1:string, file2:string) {
+	try {
+		const realpath1 = await fs.realpath(file1);
+		const realpath2 = await fs.realpath(file2);
+		return path.relative(realpath1,realpath2)==''
+	} catch (error: unknown) {
+		console.error('Error resolving paths:', error);
+		return false;
+	}
+}
+*/
+
 async function hashFile(filePath: string): Promise<string> {
 	const hash = crypto.createHash('md5');
 	let fileHandle = null;
