@@ -817,8 +817,8 @@ export default class ImportAttachments extends Plugin {
 			const modal = new CreateAttachmentFolderModal(this, attachmentsFolderPath);
 			modal.open();
 			const choice = await modal.promise;
-			if (choice == null) return;
-			Utils.createFolderIfNotExists(this.app.vault,attachmentsFolderPath);
+			if (choice == false) return;
+			await Utils.createFolderIfNotExists(this.app.vault,attachmentsFolderPath);
 		}
 
 		const absAttachmentsFolderPath = Utils.joinPaths(this.vaultPath,attachmentsFolderPath);
