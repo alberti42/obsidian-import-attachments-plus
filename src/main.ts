@@ -43,6 +43,9 @@ import { patchOpenFile, unpatchOpenFile, addKeyListeners, removeKeyListeners } f
 import { patchFilemanager, unpatchFilemanager } from 'patchFileManager';
 
 import { EditorSelection } from '@codemirror/state';
+import { patchVault, unpatchVault } from "patchVault";
+
+import { monkeyPatchConsole, unpatchConsole } from "patchConsole";
 
 // Default plugin settings
 const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
@@ -70,61 +73,6 @@ const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 	logs: {}, // Initialize logs as an empty array
 };
 
-// Helper function to patch console logs on mobile
-function monkeyPatchConsole(plugin: ImportAttachments) {
-	if (!Platform.isMobile) {
-		return;
-	}
-
-	const logs: Record<string, string[]> = plugin.settings.logs || {};
-	const saveLogs = async () => {
-		plugin.settings.logs = logs;
-		await plugin.saveData(plugin.settings);
-	};
-
-	const formatMessage = (message: unknown): string => {
-		if (typeof message === 'object' && message !== null) {
-			try {
-				return JSON.stringify(message, null, 2); // Pretty print with 2-space indentation
-			} catch {
-				return "[Object]";
-			}
-		}
-		return String(message);
-	};
-
-	const getTimestamp = (): string => {
-		return new Date().toISOString();
-	};
-
-	// Store the original console methods
-	const originalConsole = {
-		debug: console.debug,
-		error: console.error,
-		info: console.info,
-		log: console.log,
-		warn: console.warn,
-	};
-
-	const logMessages = (origLog: (...data: unknown[]) => void, prefix: string) => (...messages: unknown[]) => {
-		// Call the original log function
-		origLog(...messages);
-
-		const formattedMessages = messages.map(formatMessage);
-		const timestampedMessage = `${getTimestamp()} ${formattedMessages.join(' ')}`;
-		if (!logs[prefix]) {
-			logs[prefix] = [];
-		}
-		logs[prefix].push(timestampedMessage);
-		saveLogs();
-	};
-
-	console.debug = logMessages(originalConsole.debug, "debug");
-	console.error = logMessages(originalConsole.error, "error");
-	console.info = logMessages(originalConsole.info, "info");
-	console.log = logMessages(originalConsole.log, "log");
-	console.warn = logMessages(originalConsole.warn, "warn");
-}
 
 // Main plugin class
 export default class ImportAttachments extends Plugin {
@@ -254,13 +202,23 @@ export default class ImportAttachments extends Plugin {
 		// Set up the mutation observer for hiding folders
 		this.setupObserver();
 
-		// Monkey patch of the openFile function
+		// Monkey patches of the openFile function
 		if (Platform.isDesktopApp) {
 			// patch the openFile function
 			patchOpenFile(this);
+			new Notice("PATCHED!!");
 			// add key listeners for modifying the behavior when opening files
 			addKeyListeners();
 		}
+
+		// Monkey patches of the vault function
+		if (Platform.isDesktopApp) {
+			patchVault(this);
+		}
+
+		// Monkey-patch file manager to handle the deletion of the attachment folder
+		// when the function promptForDeletion is triggered by the user
+		patchFilemanager(this);
 
 		// Commands for moving or copying files to the vault
 		if (Platform.isDesktopApp) {
@@ -337,6 +295,7 @@ export default class ImportAttachments extends Plugin {
 		if (Platform.isDesktopApp) {
 			this.registerEvent( // check obsidian.d.ts for other types of events
 				this.app.workspace.on('editor-drop', async (evt: DragEvent, editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
+
 					// Check if the event has already been handled
 					if (evt.defaultPrevented) return;
 
@@ -360,15 +319,7 @@ export default class ImportAttachments extends Plugin {
 					const files = evt?.dataTransfer?.files;
 					if(!files) return;
 
-					const {nonFolderFilesArray, foldersArray} = await Utils.filterOutFolders(Array.from(files));
-
-					if(foldersArray.length>0) {
-						const modal = new FolderImportErrorModal(this, foldersArray);
-						modal.open();
-						await modal.promise;
-					}
-					
-					if (nonFolderFilesArray.length > 0) {
+					if (files.length > 0) {
 						const cm = editor.cm; // Access the CodeMirror instance
 						const dropPos = cm.posAtCoords({ x: evt.clientX, y: evt.clientY });
 
@@ -379,7 +330,7 @@ export default class ImportAttachments extends Plugin {
 							});
 
 							// Handle the files as per your existing logic
-							await this.handleFiles(nonFolderFilesArray, editor, view, doForceAsking, ImportOperationType.DRAG_AND_DROP);
+							await this.handleFiles(Array.from(files), editor, view, doForceAsking, ImportOperationType.DRAG_AND_DROP);
 						} else {
 							console.error('Unable to determine drop position');
 						}
@@ -408,10 +359,28 @@ export default class ImportAttachments extends Plugin {
 						// const items = clipboardData.items;
 
 						if (files && files.length > 0) {
-							evt.preventDefault();
 
-							const doToggleEmbedPreference = false; // Pretend shift was not pressed
-							await this.handleFiles(files, editor, view, doToggleEmbedPreference, ImportOperationType.PASTE);
+							// Check if all files have a non-empty 'path' property
+							const filesArray = Array.from(files);
+							const allFilesHavePath = filesArray.every(file => file.path && file.path !== "");
+							if(allFilesHavePath) {
+								// evt.preventDefault();
+
+								// const doToggleEmbedPreference = false; // Pretend shift was not pressed
+								// await this.handleFiles(filesArray, editor, view, doToggleEmbedPreference, ImportOperationType.PASTE);
+							} else {
+								//
+								const t = Array.from(files);
+								// console.log(files);
+								// console.log(clipboardData.dropEffect);
+								// console.log(clipboardData.files);
+								// console.log(clipboardData.items);
+								// console.log(clipboardData.types);
+								// console.log(clipboardData);
+								// Example: Save the image file to the vault
+								const arrayBuffer = await t[0].arrayBuffer();
+								fs.appendFile("/Users/andrea/Downloads/tst.png", Buffer.from(arrayBuffer));
+							}
 						}
 						// console.error("No files detected in paste data.");
 					}
@@ -459,11 +428,6 @@ export default class ImportAttachments extends Plugin {
 		}
 
 		if (Platform.isDesktopApp) {
-
-			// Monkey-patch file manager to handle the deletion of the attachment folder
-			// when the function promptForDeletion is triggered by the user
-			patchFilemanager(this);
-
 			/*
 			this.registerEvent(
 				this.app.workspace.on("file-menu", (menu: Menu, file: TAbstractFile) => {
@@ -487,21 +451,26 @@ export default class ImportAttachments extends Plugin {
 			*/
 		}
 
-		console.log('Loaded plugin Import Attachments+');
+		console.log('Loaded plugin Import Attachments+!!!!');
 	}
 
 	onunload() {
-		if (Platform.isDesktopApp) {
-			// unpatch openFile
-			unpatchOpenFile();
-			removeKeyListeners();
+		// unpatch openFile
+		unpatchOpenFile();
+		removeKeyListeners();
 
-			// unpatch fileManager
-			unpatchFilemanager();
-		}
+		// unpatch fileManager
+		unpatchFilemanager();
+
+		// unpatch Vault
+		unpatchVault();
+
 		if (this.observer) {
 			this.observer.disconnect();
 		}
+
+		// unpatch console
+		unpatchConsole();
 	}
 
 	async loadSettings() {
@@ -534,8 +503,13 @@ export default class ImportAttachments extends Plugin {
 		try {
 			const file = this.app.vault.getAbstractFileByPath(filePath);
 			if (file instanceof TAbstractFile) {
-				await await this.app.vault.adapter.trashSystem(filePath);
-				new Notice('Attachment folder moved to system trash successfully.');
+				await this.app.vault.adapter.trashSystem(filePath);
+				if(Platform.isDesktop) {
+					new Notice('Attachment folder moved to the system trash successfully.');
+				} else {
+					new Notice('Attachment folder deleted successfully.');
+				}
+
 			} else {
 				new Notice('Attachment folder could not be found at the given location.');
 			}
@@ -548,10 +522,14 @@ export default class ImportAttachments extends Plugin {
 
 	
 	async handleFiles(files: File[], editor: Editor, view: MarkdownView, doForceAsking: boolean, importType: ImportOperationType) {
-		const attachmentsFolder = this.getAttachmentFolder();
-		if (!attachmentsFolder) { return }
 
-		const { attachmentsFolderPath, currentNoteFolderPath } = attachmentsFolder;
+		const {nonFolderFilesArray, foldersArray} = await Utils.filterOutFolders(Array.from(files));
+
+		if(foldersArray.length>0) {
+			const modal = new FolderImportErrorModal(this, foldersArray);
+			modal.open();
+			await modal.promise;
+		}
 
 		let actionFilesOnImport = ImportActionType.COPY; // for safety, the defualt is COPY
 		let lastActionFilesOnImport = ImportActionType.COPY; // for safety, the defualt is COPY
@@ -604,57 +582,78 @@ export default class ImportAttachments extends Plugin {
 			action: actionFilesOnImport,
 		};
 
-		this.moveFileToAttachmentsFolder(files, attachmentsFolderPath, currentNoteFolderPath, editor, view, importSettings);
+		this.moveFileToAttachmentsFolder(nonFolderFilesArray, editor, view, importSettings);
 	}
 
 	// Get attachment folder path based on current note
-	getAttachmentFolder(md_file: ParsedPath | null = null): AttachmentFolderPath | null {
-		try {
-			// Get the current active note if noteFilePath is not provided
-			if (!md_file) {
-				const md_active_file = this.app.workspace.getActiveFile();
-				if (md_active_file == null) {
-					throw new Error("The active note could not be determined.");
-				}
-				md_file = Utils.parseFilePath(md_active_file.path);
+	getAttachmentFolder(md_file: ParsedPath | null = null): AttachmentFolderPath {
+		// Get the current active note if md_file is not provided
+		if (!md_file) {
+			const md_active_file = this.app.workspace.getActiveFile();
+			if (md_active_file == null) {
+				throw new Error("The active note could not be determined.");
 			}
-
-			if (md_file.ext !== ".md") {
-				throw new Error("No Markdown file was found.");
-			}
-
-			const currentNoteFolderPath = md_file.dir;
-			const notename = md_file.filename;
-
-			let referencePath = '';
-			switch (this.settings.relativeLocation) {
-				case RelativeLocation.VAULT:
-					referencePath = '/';
-					break;
-				case RelativeLocation.SAME:
-					referencePath = currentNoteFolderPath;
-					break;
-			}
-
-			const relativePath = this.settings.folderPath.replace(/\$\{notename\}/g, notename);
-
-			const attachmentsFolderPath = Utils.joinPaths(referencePath, relativePath);
-
-			return {
-				attachmentsFolderPath,
-				currentNoteFolderPath,
-			};
-		} catch (error: unknown) {
-			if (error instanceof Error) {
-				console.error(error.message);
-				new Notice(error.message);
-			} else {
-				// If it's not an Error, log it as a string or use a default message
-				console.error("An unknown error occurred:", error);
-				new Notice("An unknown error occurred");
-			}
-			return null;
+			md_file = Utils.parseFilePath(md_active_file.path);
 		}
+
+		if (md_file.ext !== ".md") {
+			throw new Error("No Markdown file was found.");
+		}
+
+		const currentNoteFolderPath = md_file.dir;
+		const notename = md_file.filename;
+
+		let referencePath = '';
+		switch (this.settings.relativeLocation) {
+			case RelativeLocation.VAULT:
+				referencePath = '/';
+				break;
+			case RelativeLocation.SAME:
+				referencePath = currentNoteFolderPath;
+				break;
+		}
+
+		const relativePath = this.settings.folderPath.replace(/\$\{notename\}/g, notename);
+
+		const attachmentsFolderPath = Utils.joinPaths(referencePath, relativePath);
+
+		return {
+			attachmentsFolderPath,
+			currentNoteFolderPath,
+		};
+	}
+
+	async createAttachmentName(originalFilePath:string, data: File | ArrayBuffer, md_file: ParsedPath | null = null): Promise<string> {
+
+		const originalFilePath_parsed = Utils.parseFilePath(originalFilePath);
+		const namePattern = this.settings.attachmentName;
+		const dateFormat = this.settings.dateFormat;
+		
+		const fileToImportName = originalFilePath_parsed.filename;
+		
+		let attachmentName = namePattern.replace(/\$\{original\}/g, fileToImportName)
+										.replace(/\$\{uuid\}/g, Utils.uuidv4())
+										.replace(/\$\{date\}/g, Utils.formatDateTime(dateFormat));
+
+		if(namePattern.includes('${md5}')) {
+			let hash = ''
+			try {
+				hash = await Utils.hashFile(originalFilePath);
+			} catch (err: unknown) {
+				console.error('Error hashing the file:', err);
+			}
+			attachmentName = attachmentName.replace(/\$\{md5\}/g, hash);
+		}
+
+		// add the extension
+		attachmentName += originalFilePath_parsed.ext;
+
+		const {attachmentsFolderPath} = this.getAttachmentFolder(md_file);
+
+		// Ensure the directory exists before moving the file
+		await Utils.createFolderIfNotExists(this.app.vault,attachmentsFolderPath);
+
+		return Utils.joinPaths(attachmentsFolderPath,attachmentName);
 	}
 
 	async chooseFileToImport(importSettings: ImportSettingsInterface) {
@@ -668,11 +667,6 @@ export default class ImportAttachments extends Plugin {
 			return;
 		}
 
-		const attachmentsFolder = this.getAttachmentFolder();
-		if (!attachmentsFolder) { return }
-
-		const { attachmentsFolderPath, currentNoteFolderPath: referencePath } = attachmentsFolder;
-
 		const input = document.createElement("input");
 		input.type = "file";
 		input.multiple = true; // Allow selection of multiple files
@@ -683,7 +677,7 @@ export default class ImportAttachments extends Plugin {
 
 			if (files && files.length > 0) {
 				// Directly pass the FileList to the processing function
-				await this.moveFileToAttachmentsFolder(Array.from(files), attachmentsFolderPath, referencePath, editor, markdownView, importSettings);
+				await this.moveFileToAttachmentsFolder(Array.from(files), editor, markdownView, importSettings);
 			} else {
 				const msg = "No files selected or file access error.";
 				console.error(msg);
@@ -694,9 +688,9 @@ export default class ImportAttachments extends Plugin {
 	}
 
 	// Function to move files to the attachments folder using fs.rename
-	async moveFileToAttachmentsFolder(filesToImport: File[], attachmentsFolderPath: string, currentNoteFolderPath: string, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface) {
-		// Ensure the directory exists before moving the file
-		Utils.createFolderIfNotExists(this.app.vault,attachmentsFolderPath);
+	async moveFileToAttachmentsFolder(filesToImport: File[], editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface) {
+
+		const { currentNoteFolderPath } = this.getAttachmentFolder();
 
 		const cursor = editor.getCursor(); // Get the current cursor position before insertion
 
@@ -714,8 +708,7 @@ export default class ImportAttachments extends Plugin {
 
 		const tasks = filesToImport.map(async (fileToImport): Promise<string | null> => {
 			const originalFilePath = fileToImport.path;
-			let destFilePath = path.join(attachmentsFolderPath,
-				await Utils.createAttachmentName(this.settings.attachmentName, this.settings.dateFormat, originalFilePath));
+			let destFilePath = await this.createAttachmentName(originalFilePath,fileToImport);
 
 			// Check if file already exists in the vault
 			const existingFile = await Utils.doesFileExist(this.app.vault,destFilePath);
@@ -1131,42 +1124,40 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 				}));
 		}
 
-		if (Platform.isDesktopApp) {
-			new Setting(containerEl).setName('Managing').setHeading();
+		new Setting(containerEl).setName('Managing').setHeading();
 
-			new Setting(containerEl)
-				.setName('Rename the attachment folder automatically and update all links correspondingly:')
-				.setDesc('If this option is enabled, when you rename/move an note, if the renamed note has an attachment folder connected to it, \
-					its attachment folder is renamed/moved to a new name/location corresponding to the new name of the note.')
-				.addToggle(toggle => toggle
-					.setValue(this.plugin.settings.autoRenameAttachmentFolder)
-					.onChange(async (value: boolean) => {
-						this.plugin.settings.autoRenameAttachmentFolder = value;
-						await this.plugin.saveSettings();
-					}));
+		new Setting(containerEl)
+			.setName('Rename the attachment folder automatically and update all links correspondingly:')
+			.setDesc('If this option is enabled, when you rename/move an note, if the renamed note has an attachment folder connected to it, \
+				its attachment folder is renamed/moved to a new name/location corresponding to the new name of the note.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.autoRenameAttachmentFolder)
+				.onChange(async (value: boolean) => {
+					this.plugin.settings.autoRenameAttachmentFolder = value;
+					await this.plugin.saveSettings();
+				}));
 
-			new Setting(containerEl)
-				.setName('Delete the attachment folder automatically when the corresponding note is deleted:')
-				.setDesc('If this option is enabled, when you delete a note, if the deleted note has an attachment folder connected to it, \
-					its attachment folder will be deleted as well. \
-					Note: automatic deletion only works when the name of the attachment folder contains ${notename}.')
-				.addToggle(toggle => toggle
-					.setValue(this.plugin.settings.autoDeleteAttachmentFolder)
-					.onChange(async (value: boolean) => {
-						this.plugin.settings.autoDeleteAttachmentFolder = value;
-						await this.plugin.saveSettings();
-					}));
+		new Setting(containerEl)
+			.setName('Delete the attachment folder automatically when the corresponding note is deleted:')
+			.setDesc('If this option is enabled, when you delete a note, if the deleted note has an attachment folder connected to it, \
+				its attachment folder will be deleted as well. \
+				Note: automatic deletion only works when the name of the attachment folder contains ${notename}.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.autoDeleteAttachmentFolder)
+				.onChange(async (value: boolean) => {
+					this.plugin.settings.autoDeleteAttachmentFolder = value;
+					await this.plugin.saveSettings();
+				}));
 
-			new Setting(containerEl)
-				.setName('Ask confirmation before deleting the attachment folder:')
-				.setDesc('If enabled, the user is asked each time whether to delete the attachment folder.')
-				.addToggle(toggle => toggle
-					.setValue(this.plugin.settings.confirmDeleteAttachmentFolder)
-					.onChange(async (value: boolean) => {
-						this.plugin.settings.confirmDeleteAttachmentFolder = value;
-						await this.plugin.saveSettings();
-					}));
-		}
+		new Setting(containerEl)
+			.setName('Ask confirmation before deleting the attachment folder:')
+			.setDesc('If enabled, the user is asked each time whether to delete the attachment folder.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.confirmDeleteAttachmentFolder)
+				.onChange(async (value: boolean) => {
+					this.plugin.settings.confirmDeleteAttachmentFolder = value;
+					await this.plugin.saveSettings();
+				}));
 
 		new Setting(containerEl).setName('Attachment folder').setHeading();
 

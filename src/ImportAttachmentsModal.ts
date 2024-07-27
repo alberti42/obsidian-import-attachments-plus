@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-inferrable-types */
 // ImportAttachmentsModal.ts
-import { Modal } from 'obsidian';
+import { Modal, Platform } from 'obsidian';
 import {
 		ImportActionType,
 		ImportActionChoiceResult,
@@ -216,8 +216,8 @@ export class OverwriteChoiceModal extends Modal {
 			window.require('electron').remote.shell.showItemInFolder(this.originalFilePath);
 		});
 
-		paragraph.append(' into the vault, where a ');
-		console.log(this.destFilePath);
+		paragraph.append(' into the vault. However, a ');
+		
 		// Create a hyperlink for the filename
 		const vaultFileLink = paragraph.createEl('a', {
 			text: 'file',
@@ -229,7 +229,7 @@ export class OverwriteChoiceModal extends Modal {
 			window.require('electron').remote.shell.showItemInFolder(Utils.joinPaths(this.plugin.vaultPath,this.destFilePath));
 		});
 
-		paragraph.append(' with the same name is already present.');
+		paragraph.append(' with the same name already exists at the destination location.');
 
 		container.createEl('p',{text: 'How do you want to proceed?'});
 
@@ -297,22 +297,30 @@ export class DeleteAttachmentFolderModal extends Modal {
 
 		container.createEl('h2', { text: 'Import files' });
 		const paragraph = container.createEl('p');
-		paragraph.append('Do you want to move the attachment folder ');
+		paragraph.append('Do you want to ' + (Platform.isDesktop ? 'move' : 'delete') + ' the attachment folder ');
 		
-		// Create a hyperlink for the filename
-		const fileLink = paragraph.createEl('a', {
-			text: attachmentFolderPath_parsed.filename,
-			href: '#',
-		});
-		fileLink.addEventListener('click', (e) => {
-			e.preventDefault(); // Prevent the default anchor behavior
-			// Open the folder in the system's default file explorer
-			// window.require('electron').remote.shell.showItemInFolder(this.attachmentFolderPath);
-			window.require('electron').remote.shell.openPath(Utils.joinPaths(this.plugin.vaultPath,this.attachmentFolderPath));
-		});
+		if(Platform.isDesktopApp) {
+			// Create a hyperlink for the filename
+			const fileLink = paragraph.createEl('a', {
+				text: attachmentFolderPath_parsed.filename,
+				href: '#',
+			});
+			fileLink.addEventListener('click', (e) => {
+				e.preventDefault(); // Prevent the default anchor behavior
+				// Open the folder in the system's default file explorer
+				// window.require('electron').remote.shell.showItemInFolder(this.attachmentFolderPath);
+				window.require('electron').remote.shell.openPath(Utils.joinPaths(this.plugin.vaultPath,this.attachmentFolderPath));
+			});
+		} else {
+			paragraph.createEl('strong', {text: attachmentFolderPath_parsed.filename});
+		}		
 
-		paragraph.append(' to the system trash?');
-
+		if(Platform.isDesktopApp) {
+			paragraph.append(' to the system trash?');
+		} else {
+			paragraph.append('?');
+		}
+		
 		const buttonContainer = container.createDiv({cls:'import-buttons'});
 		const deleteButton = buttonContainer.createEl('button', {
 			text: 'Delete',
@@ -524,7 +532,12 @@ export class CreateAttachmentFolderModal extends Modal {
 
         container.createEl('h2', { text: 'Create an empty attachment folder?' });
         const paragraph = container.createEl('p');
-        paragraph.append(`The attachment folder ${attachmentFolderPath_parsed.base} does not exist yet. Do you want to create one?`);
+        paragraph.append('The attachment folder ');
+
+        // Highlight the folder name using a <span> element with a custom class
+        paragraph.createEl('strong', {text: attachmentFolderPath_parsed.base});
+
+        paragraph.append(' does not exist yet. Do you want to create it?');
         
         const buttonContainer = container.createDiv({ cls: 'import-buttons' });
         const yesButton = buttonContainer.createEl('button', {
@@ -557,4 +570,3 @@ export class CreateAttachmentFolderModal extends Modal {
         this.resolveChoice(false);  // Resolve with false if the modal is closed without a choice
     }
 }
-

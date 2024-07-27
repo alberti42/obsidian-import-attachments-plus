@@ -6,10 +6,12 @@ import { EditorView } from '@codemirror/view';
 declare module 'obsidian' {
     interface App {
         openWithDefaultApp(filepath: string): Promise<void>;
+        saveAttachment(fileName: string, fileExtension: string, fileData: ArrayBuffer): Promise<TFile>;
     }
 
     interface Vault {
         getConfig(configName: string): unknown;
+        getAvailablePathForAttachments(fileName: string, extension: string, currentFile: TFile | null): Promise<string>;
     }
 
     interface MenuItem {

@@ -2,11 +2,11 @@ import {WorkspaceLeaf, TFile, OpenViewState} from 'obsidian';
 
 import ImportAttachments from 'main';
 
-import * as path from 'path';
-
 let metaKeyPressed = false;
 let altKeyPressed = false;
 let keyListenersInstalled = false
+
+import { joinPaths } from 'utils';
 
 // Save a reference to the original method for the monkey patch
 let originalOpenFile: ((this: WorkspaceLeaf, file: TFile, openState?: OpenViewState)=> Promise<void>) | null = null;
@@ -104,10 +104,11 @@ function patchOpenFile(plugin: ImportAttachments) {
 				}
 			}
 		}
+
 		const newEmptyLeave = this.getViewState()?.type == 'empty';
 
 		if(plugin.settings.revealAttachment && metaKeyPressed && altKeyPressed){
-			window.require('electron').remote.shell.showItemInFolder(path.join(plugin.vaultPath,file.path));
+			window.require('electron').remote.shell.showItemInFolder(joinPaths(plugin.vaultPath,file.path));
 		}
 		else if(plugin.settings.openAttachmentExternal && metaKeyPressed && !altKeyPressed) {
 			plugin.app.openWithDefaultApp(file.path);

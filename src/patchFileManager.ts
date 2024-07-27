@@ -25,6 +25,7 @@ function patchFilemanager(plugin: ImportAttachments) {
 
 	// Monkey patch the promptForDeletion method
 	FileManager.prototype.promptForDeletion = async function patchedPromptForDeletion(file: TAbstractFile): Promise<void> {
+		
 		// Access the 'promptDelete' configuration setting
 		const promptDelete = plugin.app.vault.getConfig("promptDelete");
 		

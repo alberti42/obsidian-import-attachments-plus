@@ -45,19 +45,7 @@ export function arePathsSameFile(vault: Vault, filePath1: string, filePath2: str
 	return false;
 }
 
-/*export async function arePathsSameFile(file1:string, file2:string) {
-	try {
-		const realpath1 = await fs.realpath(file1);
-		const realpath2 = await fs.realpath(file2);
-		return path.relative(realpath1,realpath2)==''
-	} catch (error: unknown) {
-		console.error('Error resolving paths:', error);
-		return false;
-	}
-}
-*/
-
-async function hashFile(filePath: string): Promise<string> {
+export async function hashFile(filePath: string): Promise<string> {
 	const hash = crypto.createHash('md5');
 	let fileHandle = null;
 	try {
@@ -90,31 +78,48 @@ function formatDateTime(dateFormat:string):string {
 	}
 }
 
-export async function createAttachmentName(namePattern:string,dateFormat:string,originalFilePath:string): Promise<string> {
+/*
+// Function to get the available path for attachments
+function getAvailablePathForAttachments = async function (fileName: string, extension: string, currentFile: TFile | null): Promise<string> {
+    // Get the attachment folder path configuration
+    let attachmentFolderPath = this.getConfig("attachmentFolderPath");
+    const isCurrentFolder = attachmentFolderPath === "." || attachmentFolderPath === "./";
+    let relativePath: string | null = null;
 
-	const originalFilePath_parsed = parseFilePath(originalFilePath);
+    // If the attachment folder path starts with './', remove the './'
+    if (attachmentFolderPath.startsWith("./")) {
+        relativePath = attachmentFolderPath.slice(2);
+    }
 
-	const fileToImportName = originalFilePath_parsed.filename;
-	
-	let attachmentName = namePattern.replace(/\$\{original\}/g, fileToImportName)
-									.replace(/\$\{uuid\}/g, uuidv4())
-									.replace(/\$\{date\}/g, formatDateTime(dateFormat));
+    // If using the current folder, set the attachment folder path accordingly
+    if (isCurrentFolder) {
+        attachmentFolderPath = currentFile ? currentFile.parent?.path : "";
+    } else if (relativePath) {
+        attachmentFolderPath = (currentFile ? currentFile.parent?.getParentPrefix() : "") + relativePath;
+    }
 
-	if(namePattern.includes('${md5}')) {
-		let hash = ''
-		try {
-			hash = await hashFile(originalFilePath);
-		} catch (err: unknown) {
-			console.error('Error hashing the file:', err);
-		}
-		attachmentName = attachmentName.replace(/\$\{md5\}/g, hash);
-	}
+    // Normalize the paths
+    attachmentFolderPath = normalizePath(attachmentFolderPath);
+    fileName = normalizePath(fileName);
 
-	// add the extension
-	attachmentName += originalFilePath_parsed.ext;
-	
-	return attachmentName;
+    // Try to get the abstract file by the insensitive path
+    let folder: TAbstractFile | null = this.getAbstractFileByPathInsensitive(attachmentFolderPath);
+
+    // If the folder does not exist and relativePath is specified, create the folder
+    if (!folder && relativePath) {
+        await this.createFolder(attachmentFolderPath);
+        folder = this.getAbstractFileByPathInsensitive(attachmentFolderPath);
+    }
+
+    // If the folder is an instance of TFolder, get the available path within the folder
+    if (folder instanceof TFolder) {
+        return this.getAvailablePath(folder.getParentPrefix() + fileName, extension);
+    } else {
+        // Otherwise, get the available path in the root
+        return this.getAvailablePath(fileName, extension);
+    }
 }
+*/
 
 export function findNewFilename(vault: Vault, destFilePath: string): string
 {
@@ -216,3 +221,5 @@ export async function createFolderIfNotExists(vault: Vault, folderPath: string) 
 			throw new Error(`Failed to create folder at ${folderPath}: ${error}`);
 		}
 	}
+
+export { uuidv4, formatDateTime };
