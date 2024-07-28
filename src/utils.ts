@@ -3,7 +3,7 @@ import { promises as fs } from 'fs';  // This imports the promises API from fs
 import * as crypto from 'crypto';
 
 import { v4 as uuidv4 } from 'uuid';
-import { Vault, normalizePath, TAbstractFile, TFile, TFolder } from 'obsidian';
+import { Vault, normalizePath, TAbstractFile, TFile, TFolder, TFileAbstract } from 'obsidian';
 
 import { ParsedPath } from 'types';
 import * as path from 'path';
@@ -23,7 +23,7 @@ export function parseFilePath(filePath: string): ParsedPath {
 	const filename = extIndex !== -1 ? base.substring(0, extIndex) : base;
 	const ext = extIndex !== -1 ? base.substring(extIndex) : '';
 
-	return { dir, base, filename, ext };
+	return { dir, base, filename, ext, path: filePath };
 }
 
 export function isInstanceOfFolder(file: TAbstractFile): file is TFolder {
@@ -79,7 +79,7 @@ function formatDateTime(dateFormat:string):string {
 }
 
 /*
-// Function to get the available path for attachments
+// Function to get the available path for attachments from Obsidian
 function getAvailablePathForAttachments = async function (fileName: string, extension: string, currentFile: TFile | null): Promise<string> {
     // Get the attachment folder path configuration
     let attachmentFolderPath = this.getConfig("attachmentFolderPath");
@@ -196,6 +196,23 @@ export function doesFileExist(vault: Vault, relativePath: string): boolean {
 	return !!file && isInstanceOfFile(file);
 }
 
+// Custom function to create a mock TFile object
+function createMockTFile(vault:Vault,filepath:string): TFileAbstract {
+
+	const { filename, path } = parseFilePath(filepath);
+	
+    // Create a new TFile object
+    const tfile = Object.create(TFile.prototype) as TFile;
+
+    // Set necessary properties
+    tfile.path = path;
+    tfile.name = filename;
+    tfile.vault = vault;
+    tfile.parent = null;
+  
+    return tfile;
+}
+
 export async function filterOutFolders(filesArray: File[]) {
 	const nonFolderFilesArray: File[] = [];
 	const foldersArray: File[] = [];
@@ -222,4 +239,4 @@ export async function createFolderIfNotExists(vault: Vault, folderPath: string) 
 		}
 	}
 
-export { uuidv4, formatDateTime };
+export { uuidv4, formatDateTime, createMockTFile };

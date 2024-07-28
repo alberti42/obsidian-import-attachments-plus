@@ -45,7 +45,6 @@ export interface ImportAttachmentsSettings {
 	customDisplayText: boolean;
 	relativeLocation: RelativeLocation;
 	folderPath: string;
-	linkFormat: LinkFormat;
 	dateFormat: string;
 	attachmentName: string;
 	autoRenameAttachmentFolder: boolean;
@@ -63,7 +62,8 @@ export interface ParsedPath {
 	dir: string,
 	base: string,
 	filename: string,
-	ext: string
+	ext: string,
+	path: string
 }
 
 // Define an interface for the return type

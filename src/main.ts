@@ -31,13 +31,12 @@ import {
 	ImportFromVaultOptions,
 	YesNoTypes,
 	RelativeLocation,
-	LinkFormat,
+	// LinkFormat,
 	ParsedPath
 } from './types';
 import * as Utils from "utils";
 
 import { promises as fs } from 'fs';  // This imports the promises API from fs
-import * as path from 'path';         // Standard import for the path module
 
 import { patchOpenFile, unpatchOpenFile, addKeyListeners, removeKeyListeners } from 'patchOpenFile';
 import { patchFilemanager, unpatchFilemanager } from 'patchFileManager';
@@ -59,7 +58,6 @@ const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 	multipleFilesImportType: MultipleFilesImportTypes.BULLETED, // Default to bulleted list when importing multiple files
 	relativeLocation: RelativeLocation.SAME, // Default to vault
 	folderPath: '${notename} (attachments)', // Default to a folder in the vault
-	linkFormat: LinkFormat.RELATIVE,
 	attachmentName: '${original}', // Default to the original name of the attachment
 	dateFormat: 'YYYY_MM_DDTHH_mm_ss',
 	customDisplayText: true,  // Default to true
@@ -456,21 +454,22 @@ export default class ImportAttachments extends Plugin {
 							const filesArray = Array.from(files);
 							const allFilesHavePath = filesArray.every(file => file.path && file.path !== "");
 							if(allFilesHavePath) {
-								// evt.preventDefault();
+								evt.preventDefault();
 
-								// const doToggleEmbedPreference = false; // Pretend shift was not pressed
-								// await this.handleFiles(filesArray, editor, view, doToggleEmbedPreference, ImportOperationType.PASTE);
+								const doToggleEmbedPreference = false; // Pretend shift was not pressed
+								await this.handleFiles(filesArray, editor, view, doToggleEmbedPreference, ImportOperationType.PASTE);
 							} else {
+								// TODO Process images from clipboard
 								//
-								const t = Array.from(files);
+								// const t = Array.from(files);
 								// console.log(files);
 								// console.log(clipboardData);
 								// console.log(clipboardData.dropEffect);
 								// console.log(clipboardData.files);
 								// console.log(clipboardData.items);
 								// console.log(clipboardData.types);
-								const arrayBuffer = await t[0].arrayBuffer();
-								fs.appendFile("/Users/andrea/Downloads/tst.png", Buffer.from(arrayBuffer));
+								// const arrayBuffer = await t[0].arrayBuffer();
+								// fs.appendFile("/Users/andrea/Downloads/tst.png", Buffer.from(arrayBuffer));
 							}
 						}
 						// console.error("No files detected in paste data.");
@@ -928,25 +927,23 @@ export default class ImportAttachments extends Plugin {
 	// Function to insert links to the imported files in the editor
 	insertLinkToEditor(currentNoteFolderPath: string, importedFilePath: string, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface, counter: number) {
 		// Extract just the file name from the path
-		const { filename } = Utils.parseFilePath(importedFilePath);
 		
+		/*
 		let relativePath;
 		switch (this.settings.linkFormat) {
 			case LinkFormat.RELATIVE:
-				relativePath = path.relative(currentNoteFolderPath, importedFilePath);
+				relativePath = relative(currentNoteFolderPath, importedFilePath);
 				break;
 			case LinkFormat.ABSOLUTE:
 			default:
-				relativePath = path.relative(this.vaultPath, importedFilePath);
+				relativePath = relative(this.vaultPath, importedFilePath);
 				break;
 		}
 
-		// Normalize the path using Obsidian's normalizePath function
-		relativePath = normalizePath(relativePath);
+		*/
 
 		let prefix = '';
 		let postfix = '';
-		let customDisplay = '';
 		if (counter > 0) {
 			switch (this.settings.multipleFilesImportType) {
 				case MultipleFilesImportTypes.BULLETED:
@@ -965,14 +962,51 @@ export default class ImportAttachments extends Plugin {
 					break;
 			}
 		}
-		if (this.settings.customDisplayText) {
-			customDisplay = '|' + filename;
+
+		const file = Utils.createMockTFile(this.app.vault,importedFilePath);
+		
+		const filename = file.name;
+		const customDisplayText = (this.settings.customDisplayText) ? filename : "";
+		
+		const generatedLink = this.app.fileManager.generateMarkdownLink(file,currentNoteFolderPath,undefined,(this.settings.customDisplayText) ? customDisplayText : undefined);
+
+		const MDLink_regex = new RegExp('^(!)?(\\[[^\\]]*\\])(.*)$');
+		const WikiLink_regex = new RegExp('^(!)?(.*?)(|[^|]*)?$');
+		
+		const useMarkdownLinks = this.app.vault.getConfig("useMarkdownLinks");
+
+		let offset;
+		let processedLink;
+		let selectDisplayedText = false;
+		if(useMarkdownLinks) { // MD links
+			// Perform the match
+			const match = generatedLink.match(MDLink_regex);
+
+			offset = generatedLink.length;
+			processedLink = generatedLink;
+			if(match) {
+				offset = 1;
+				processedLink = "[" + customDisplayText + "]" + match[3];
+				selectDisplayedText = true;
+			}
+		} else { // Wiki links
+			// Perform the match
+			const match = generatedLink.match(WikiLink_regex);
+
+			offset = generatedLink.length;
+			processedLink = generatedLink;
+			if(match) {
+				offset = match[2].length;
+				processedLink = match[2] + (match[3] ? match[3] : "");
+				selectDisplayedText = true;
+			}
 		}
+
 		if (importSettings.embed) {
 			prefix = prefix + '!';
 		}
 
-		const linkText = prefix + '[[' + relativePath + customDisplay + ']]' + postfix;
+		const linkText = prefix + processedLink + postfix;
 
 		const cursor = editor.getCursor();  // Get the current cursor position before insertion
 
@@ -980,15 +1014,15 @@ export default class ImportAttachments extends Plugin {
 		editor.replaceRange(linkText, cursor);
 
 		if (counter == 0) {
-			if (this.settings.customDisplayText) {
+			if (selectDisplayedText) {
 				// Define the start and end positions for selecting 'baseName' within the inserted link
 				const startCursorPos = {
 					line: cursor.line,
-					ch: cursor.ch + relativePath.length + prefix.length + 3,
+					ch: cursor.ch + offset + prefix.length,
 				};
 				const endCursorPos = {
 					line: cursor.line,
-					ch: startCursorPos.ch + filename.length,
+					ch: startCursorPos.ch + customDisplayText.length,
 				};
 				
 				// Set the selection range to highlight 'baseName'
@@ -1127,8 +1161,8 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 				});
 
 			new Setting(containerEl)
-				.setName('Insert display text for links based on filename:')
-				.setDesc('If this option is enabled, the basename of the imported document is used as in place of the custom display text.')
+				.setName('Use the filename for the displayed text:')
+				.setDesc('If this option is enabled, the filename of the imported document is used as the display text.')
 				.addToggle(toggle => toggle
 					.setValue(this.plugin.settings.customDisplayText)
 					.onChange(async (value: boolean) => {
@@ -1305,6 +1339,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 					})
 				});
 
+			/*
 			new Setting(containerEl)
 				.setName('Attachment link format:')
 				.setDesc('What types of links to use for the imported attachments.')
@@ -1321,6 +1356,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 							}
 						})
 				});
+			*/
 
 			new Setting(containerEl)
 				.setName('Name of the imported attachments:')
