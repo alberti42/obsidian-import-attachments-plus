@@ -45,7 +45,7 @@ import { patchFilemanager, unpatchFilemanager } from 'patchFileManager';
 import { EditorSelection } from '@codemirror/state';
 
 import { patchImportFunctions, unpatchImportFunctions } from "patchImportFunctions";
-import { patchFileExplorer, unpatchFileExplorer } from "patchFileExplorer";
+import { patchFileExplorer, unpatchFileExplorer, updateVisibilityAttachmentFolders } from "patchFileExplorer";
 import { monkeyPatchConsole, unpatchConsole } from "patchConsole";
 
 // Default plugin settings
@@ -105,6 +105,7 @@ export default class ImportAttachments extends Plugin {
 	}
 
 	// Observer to hide attachment folders
+	/*
 	setupObserver() {
 		this.configureHideFolderNames();
 
@@ -161,6 +162,28 @@ export default class ImportAttachments extends Plugin {
 		});
 	}
 
+	// Configure the folder names to hide
+	configureHideFolderNames() {
+		const placeholder = "${notename}";
+		if (this.settings.folderPath.includes(placeholder)) {
+			const [startsWith, endsWith] = this.splitAroundOriginal(this.settings.folderPath, placeholder);
+			if (endsWith != "") {
+				this.hideFolderNames = [
+					`[data-path$="${endsWith}"]`
+				];
+			} else if (startsWith != "") {
+				this.hideFolderNames = [
+					`.nav-folder-title[data-path^="${startsWith}"], .nav-folder-title[data-path*="/${startsWith}"]`
+				];
+			}
+		} else {
+			this.hideFolderNames = [
+				`[data-path$="/${this.settings.folderPath}"], [data-path="${this.settings.folderPath}"]`
+			];
+		}
+	}
+	*/
+
 	// Function to split around the original
 	parseAttachmentFolderPath() {
 		const folderPath = this.settings.folderPath;
@@ -186,7 +209,6 @@ export default class ImportAttachments extends Plugin {
 			const folderPathEndsWith = folderPath.substring(endOfPlaceholderIndex);
 
 			this.matchAttachmentFolder = (filePath: string): boolean => {
-				console.log(filePath);
 				// Check if filePath starts with startsWidth or contains /startsWidth
 				const startsWithMatch = filePath.startsWith(folderPathStartsWith) || filePath.includes(`/${folderPathStartsWith}`);
 				
@@ -226,26 +248,6 @@ export default class ImportAttachments extends Plugin {
 		return [beforeFirst, afterLast];
 	}
 
-	// Configure the folder names to hide
-	configureHideFolderNames() {
-		const placeholder = "${notename}";
-		if (this.settings.folderPath.includes(placeholder)) {
-			const [startsWith, endsWith] = this.splitAroundOriginal(this.settings.folderPath, placeholder);
-			if (endsWith != "") {
-				this.hideFolderNames = [
-					`[data-path$="${endsWith}"]`
-				];
-			} else if (startsWith != "") {
-				this.hideFolderNames = [
-					`.nav-folder-title[data-path^="${startsWith}"], .nav-folder-title[data-path*="/${startsWith}"]`
-				];
-			}
-		} else {
-			this.hideFolderNames = [
-				`[data-path$="/${this.settings.folderPath}"], [data-path="${this.settings.folderPath}"]`
-			];
-		}
-	}
 
 	// Load plugin settings
 	async onload() {
@@ -428,12 +430,11 @@ export default class ImportAttachments extends Plugin {
 								//
 								const t = Array.from(files);
 								// console.log(files);
+								// console.log(clipboardData);
 								// console.log(clipboardData.dropEffect);
 								// console.log(clipboardData.files);
 								// console.log(clipboardData.items);
 								// console.log(clipboardData.types);
-								// console.log(clipboardData);
-								// Example: Save the image file to the vault
 								const arrayBuffer = await t[0].arrayBuffer();
 								fs.appendFile("/Users/andrea/Downloads/tst.png", Buffer.from(arrayBuffer));
 							}
@@ -860,7 +861,6 @@ export default class ImportAttachments extends Plugin {
 		patchFileExplorer(this);
 
 		return;
-
 
 		// Get the file explorer plugin
 		const fileExplorer = this.app.internalPlugins.getPluginById('file-explorer');
@@ -1305,9 +1305,8 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 					text.onChange(async (value: string) => {
 						this.plugin.settings.folderPath = value;
 						await this.plugin.saveSettings();
-						this.plugin.configureHideFolderNames();
 						this.plugin.parseAttachmentFolderPath();
-						await this.plugin.hideAttachmentFolders(true);
+						updateVisibilityAttachmentFolders(this.plugin);
 					})
 				});
 
@@ -1378,7 +1377,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 				.onChange(async (value: boolean) => {
 					this.plugin.settings.hideAttachmentFolders = value;
 					await this.plugin.saveSettings();
-					await this.plugin.hideAttachmentFolders(true);
+					updateVisibilityAttachmentFolders(this.plugin);
 				}));
 	}
 }
