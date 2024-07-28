@@ -3,7 +3,7 @@ import { promises as fs } from 'fs';  // This imports the promises API from fs
 import * as crypto from 'crypto';
 
 import { v4 as uuidv4 } from 'uuid';
-import { Vault, normalizePath, TAbstractFile, TFile, TFolder, TFileAbstract } from 'obsidian';
+import { Vault, normalizePath, TAbstractFile, TFile, TFolder } from 'obsidian';
 
 import { ParsedPath } from 'types';
 import * as path from 'path';
@@ -197,7 +197,7 @@ export function doesFileExist(vault: Vault, relativePath: string): boolean {
 }
 
 // Custom function to create a mock TFile object
-function createMockTFile(vault:Vault,filepath:string): TFileAbstract {
+function createMockTFile(vault:Vault,filepath:string): TFile {
 
 	const { filename, path } = parseFilePath(filepath);
 	
