@@ -27,22 +27,6 @@ function unpatchFileExplorer() {
 	}
 }
 
-function patchFileExplorer(plugin: ImportAttachments) {
-	if (originalCreateFolderDom) { return; }
-
-	const leaves = plugin.app.workspace.getLeavesOfType('file-explorer');
-	for (const leaf of leaves) {
-		const viewInstance = leaf.view as FileExplorerView;
-		originalCreateFolderDom = viewInstance.constructor.prototype.createFolderDom;
-		viewClass = viewInstance.constructor as { new(leaf: WorkspaceLeaf): FileExplorerView };
-		break;
-	}
-
-	if(hidden) el.toggleClass("import-plugin-hidden",true);
-	
-	console.log('Custom behavior after createFolderDom');
-}
-
 function patchCreateFolderDom(plugin: ImportAttachments, viewInstance: FileExplorerView) {
 	if (originalCreateFolderDom) { return; }
 
