@@ -8,7 +8,6 @@ import ImportAttachments from 'main';
 // Save a reference to the original method for the monkey patch
 let originalGetAvailablePathForAttachments: ((fileName: string, extension: string, currentFile: TFile | null) => Promise<string>) | null = null;
 let originalSaveAttachment: ((fileName: string, fileExtension: string, fileData: ArrayBuffer) => Promise<TFile>) | null = null;
-let originalOnChange: ((eventType: string, filePath: string, oldPath?: string, stat?: FileStats) => void) | null = null;
 let data: ArrayBuffer | null = null;
 
 function unpatchImportFunctions() {
@@ -20,11 +19,6 @@ function unpatchImportFunctions() {
 	if(originalSaveAttachment) {
 		App.prototype.saveAttachment = originalSaveAttachment;
 		originalSaveAttachment = null;
-	}
-
-	if(originalOnChange) {
-		Vault.prototype.onChange = originalOnChange;
-		originalOnChange = null;
 	}
 }
 
@@ -79,12 +73,13 @@ function patchImportFunctions(plugin: ImportAttachments) {
 		return newAttachmentFile;
 	}
 
-	return;
-
+	/*
 	if (!originalOnChange) {
 		originalOnChange = Vault.prototype.onChange;
 	}
+	*/
 
+	/*
 	function matchesPatternWithHolder(filePath: string): boolean {
 		// Check if filePath starts with startsWidth or contains /startsWidth
 		const startsWithMatch = filePath.startsWith(plugin.folderPathStartsWith) || filePath.includes(`/${plugin.folderPathStartsWith}`);
@@ -108,37 +103,37 @@ function patchImportFunctions(plugin: ImportAttachments) {
 
 		// const fileExplorerPlugin = plugin.app.internalPlugins.getPluginById('file-explorer');
 		
-		if(filePath.endsWith('.xyz')) {
-			// console.log("XYZ:",eventType);
-			// console.log(originalOnChange);
-			originalOnChange.call(this, eventType, filePath, oldPath, stat);
-			return;
-		}
-
-		if(filePath.endsWith('.md')) {
-			// console.log("MD:",eventType);
-			return;
-		}
-
-		// if (eventType === 'folder-created') {
-		// 	const placeholder = "${notename}";
-
-		// 	if (plugin.settings.folderPath.includes(placeholder) && matchesPatternWithHolder(filePath)) {
-		// 		// console.log("1",filePath)
-		// 		// console.log(TFolder);
-
-		// 		// Handle folder creation event manually
-		// 		const newFolder = new TFolder(this, filePath);
-		// 		this.fileMap[filePath] = newFolder;
-		// 		// debugger
-		// 		this.addChild(newFolder);
-
-		// 		this.trigger("create", this.fileMap[filePath]);
-		// 		return;
-		// 	} else if (matchesPatternWithoutHolder(filePath)) {
-		// 		console.log("2",filePath)
-		// 	}
+		// if(filePath.endsWith('.xyz')) {
+		// 	// console.log("XYZ:",eventType);
+		// 	// console.log(originalOnChange);
+		// 	originalOnChange.call(this, eventType, filePath, oldPath, stat);
+		// 	return;
 		// }
+
+		// if(filePath.endsWith('.md')) {
+		// 	// console.log("MD:",eventType);
+		// 	return;
+		// }
+
+		if (eventType === 'folder-created') {
+			const placeholder = "${notename}";
+
+			if (plugin.settings.folderPath.includes(placeholder) && matchesPatternWithHolder(filePath)) {
+				// console.log("1",filePath)
+				// console.log(TFolder);
+
+				// Handle folder creation event manually
+				const newFolder = new TFolder(this, filePath);
+				this.fileMap[filePath] = newFolder;
+				// debugger
+				this.addChild(newFolder);
+
+				this.trigger("create", this.fileMap[filePath]);
+				return;
+			} else if (matchesPatternWithoutHolder(filePath)) {
+				console.log("2",filePath)
+			}
+		}
 
 		originalOnChange.call(this, eventType, filePath, oldPath, stat);
 	};
@@ -146,6 +141,8 @@ function patchImportFunctions(plugin: ImportAttachments) {
     // const fileExplorer = plugin.app.internalPlugins.getPluginById('file-explorer');
 	// const xyz = fileExplorer.views['file-explorer']
     // console.log(xyz);
+
+    */
 }
 
 export { patchImportFunctions, unpatchImportFunctions };

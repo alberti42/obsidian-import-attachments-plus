@@ -43,8 +43,9 @@ import { patchOpenFile, unpatchOpenFile, addKeyListeners, removeKeyListeners } f
 import { patchFilemanager, unpatchFilemanager } from 'patchFileManager';
 
 import { EditorSelection } from '@codemirror/state';
-import { patchImportFunctions, unpatchImportFunctions } from "patchImportFunctions";
 
+import { patchImportFunctions, unpatchImportFunctions } from "patchImportFunctions";
+import { patchFileExplorer, unpatchFileExplorer } from "patchFileExplorer";
 import { monkeyPatchConsole, unpatchConsole } from "patchConsole";
 
 // Default plugin settings
@@ -150,6 +151,7 @@ export default class ImportAttachments extends Plugin {
 
 			folderElements.forEach((folder: Element) => {
 				if (folder.parentNode && folder.parentNode instanceof HTMLElement) {
+					// console.log(folder);
 					if (this.settings.hideAttachmentFolders) {
 						folder.parentNode.classList.add('import-plugin-hidden');
 					}
@@ -236,7 +238,7 @@ export default class ImportAttachments extends Plugin {
 		this.addSettingTab(new ImportAttachmentsSettingTab(this.app, this));
 
 		// Set up the mutation observer for hiding folders
-		this.setupObserver();
+		// this.setupObserver();
 
 		// Monkey patches of the openFile function
 		if (Platform.isDesktopApp) {
@@ -832,12 +834,31 @@ export default class ImportAttachments extends Plugin {
 	}
 
 	async openAttachmentsFolder() {
-/*
+
+		// Monkey-path file explorer to hide attachment folders
+		patchFileExplorer(this);
+
+		return;
+
+
 		// Get the file explorer plugin
 		const fileExplorer = this.app.internalPlugins.getPluginById('file-explorer');
 
 		// Check if the plugin is loaded and enabled
 		if (fileExplorer) {
+
+			const leaves = this.app.workspace.getLeavesOfType('file-explorer');
+			for (const leaf of leaves) {
+				console.log(leaf);
+				const viewInstance = leaf.view;
+				if (viewInstance) {
+					
+
+					break;
+				}
+			}
+
+			console.log(fileExplorer);
 			const viewFactory = fileExplorer.views['file-explorer'];
 
 			// Create a new instance of the view to identify its class
@@ -847,41 +868,30 @@ export default class ImportAttachments extends Plugin {
 			// Identify the class used in createItemDom
 			const viewClass = viewInstance.constructor;
 
-			// Find the JJ class by exploring the prototype
-			// console.log('viewClass:', viewClass.prototype.createItemDom);
+			// Log the createItemDom method to inspect it
+			console.log('viewClass createFolderDom:', viewClass.prototype.createFolderDom);
 
-			// Use a dummy instance to explore properties (assuming createItemDom creates JJ instances)
-			const dummyItem = viewClass.prototype.createItemDom.call(viewInstance, {}); // Pass an empty object as an argument
-
-			// Log the dummy item to inspect it
-			// console.log('dummyItem:', dummyItem);
-
-			// Get the JJ class from the dummy item
-			const JJClass = dummyItem.constructor;
-
-			// Log the JJ class to ensure it's identified correctly
-			console.log('JJClass:', JJClass.prototype.updateTitle);
-
-			// Patch the JJ class prototype
-			if (JJClass.prototype.updateTitle) {
-				const originalUpdateTitle = JJClass.prototype.updateTitle;
-				JJClass.prototype.updateTitle = function(...args: any) {
-					console.log('Custom behavior before updateTitle');
-					console.log(args);
-					const result = originalUpdateTitle.apply(this, args);
-					console.log('Custom behavior after updateTitle');
+			// Patch the createItemDom method in viewClass prototype
+			if (viewClass.prototype.createFolderDom) {
+				const originalCreateFolderDom = viewClass.prototype.createFolderDom;
+				viewClass.prototype.createFolderDom = function(...args) {
+					console.log('Custom behavior before createFolderDom');
+					const result = originalCreateFolderDom.apply(this, args);
+					console.log(result);
+					console.log('Custom behavior after createFolderDom');
 					return result;
 				};
-				console.log('PATCHED');
+				console.log('createFolderDom PATCHED');
 			} else {
-				console.error('updateTitle method not found on JJ prototype');
+				console.error('createFolderDom method not found on viewClass prototype');
 			}
+
+			
 		} else {
 			console.error('File Explorer plugin not found or not enabled');
 		}
-
 		return;
-*/
+
 
 		const md_active_file = this.app.workspace.getActiveFile();
 
@@ -905,10 +915,6 @@ export default class ImportAttachments extends Plugin {
 		}
 
 		const absAttachmentsFolderPath = Utils.joinPaths(this.vaultPath,attachmentsFolderPath);
-
-		if(!absAttachmentsFolderPath) return;
-
-		// TODO: Ask whether to create an Attachment folder
 
 		// Open the folder in the system's default file explorer
 		// eslint-disable-next-line @typescript-eslint/no-var-requires

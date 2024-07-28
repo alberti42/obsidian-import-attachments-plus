@@ -1,14 +1,6 @@
-.import-plugin-hidden {
-	height: 0;
-    overflow: hidden;
+.nav-files-container:not(.import-plugin-hidden) .import-plugin-hidden {
+	display: none;
 }
-
-/*
-.nav-files-container:not(.show-unsupported) .is-unsupported {
-	text-color: red;
-	display: block !important;
-}
-*/
 
 .import-plugin table {
 	width: 100%;
