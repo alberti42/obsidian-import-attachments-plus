@@ -43,7 +43,7 @@ import { patchOpenFile, unpatchOpenFile, addKeyListeners, removeKeyListeners } f
 import { patchFilemanager, unpatchFilemanager } from 'patchFileManager';
 
 import { EditorSelection } from '@codemirror/state';
-import { patchVault, unpatchVault } from "patchVault";
+import { patchImportFunctions, unpatchImportFunctions } from "patchImportFunctions";
 
 import { monkeyPatchConsole, unpatchConsole } from "patchConsole";
 
@@ -212,7 +212,7 @@ export default class ImportAttachments extends Plugin {
 
 		// Monkey patches of the vault function
 		if (Platform.isDesktopApp) {
-			patchVault(this);
+			patchImportFunctions(this);
 		}
 
 		// Monkey-patch file manager to handle the deletion of the attachment folder
@@ -319,12 +319,12 @@ export default class ImportAttachments extends Plugin {
 					if(!files) return;
 
 					if (files.length > 0) {
-						const cm = editor.cm; // Access the CodeMirror instance
-						const dropPos = cm.posAtCoords({ x: evt.clientX, y: evt.clientY });
-
-						if (dropPos) {
+						const codemirror = editor.cm; // Access the CodeMirror instance
+						const dropPos = codemirror.posAtCoords({ x: evt.clientX, y: evt.clientY });
+						
+						if (dropPos!==null) {
 							// Use dispatch to set the cursor position
-							cm.dispatch({
+							codemirror.dispatch({
 								selection: EditorSelection.single(dropPos)
 							});
 
@@ -387,45 +387,42 @@ export default class ImportAttachments extends Plugin {
 			);
 		}
 
-		if (Platform.isDesktopApp) {
-			let renameCallbackEnabled: boolean = true;
-			this.registerEvent(
-				this.app.vault.on('rename', async (newFile: TAbstractFile, oldPath: string) => {
-					if (!this.settings.autoRenameAttachmentFolder) { return }
+		let renameCallbackEnabled: boolean = true;
+		this.registerEvent(
+			this.app.vault.on('rename', async (newFile: TAbstractFile, oldPath: string) => {
+				if (!this.settings.autoRenameAttachmentFolder) { return }
 
-					if (renameCallbackEnabled) {
-						const oldPath_parsed = Utils.parseFilePath(oldPath);
-						if (oldPath_parsed.ext !== ".md") { return }
+				if (renameCallbackEnabled) {
+					const oldPath_parsed = Utils.parseFilePath(oldPath);
+					if (oldPath_parsed.ext !== ".md") { return }
 
-						const oldAttachmentFolderPath = this.getAttachmentFolder(oldPath_parsed);
-						if (!oldAttachmentFolderPath) { return }
+					const oldAttachmentFolderPath = this.getAttachmentFolder(oldPath_parsed);
+					if (!oldAttachmentFolderPath) { return }
+					if (Utils.doesFolderExist(this.app.vault,oldAttachmentFolderPath.attachmentsFolderPath)) {
+						const newAttachmentFolderPath = this.getAttachmentFolder(Utils.parseFilePath(newFile.path));
 
-						if (Utils.doesFolderExist(this.app.vault,oldAttachmentFolderPath.attachmentsFolderPath)) {
-
-							const newAttachmentFolderPath = this.getAttachmentFolder(Utils.parseFilePath(newFile.path));
-							if (!newAttachmentFolderPath) { return }
-
-							const oldPath = path.relative(this.vaultPath, oldAttachmentFolderPath.attachmentsFolderPath);
-							const newPath = path.relative(this.vaultPath, newAttachmentFolderPath.attachmentsFolderPath);
-							try {
-								renameCallbackEnabled = false;
-								await this.renameFile(oldPath, newPath);
-							} catch (error: unknown) {
-								const msg = 'Failed to rename the attachment folder';
-								console.error(msg);
-								console.error("Original attachment folder:", oldPath);
-								console.error("New attachment folder:", newPath);
-								console.error("Error msg:", error);
-								new Notice(msg + '.');
-							} finally {
-								renameCallbackEnabled = true;
-							}
+						const oldPath = oldAttachmentFolderPath.attachmentsFolderPath;
+						const newPath = newAttachmentFolderPath.attachmentsFolderPath;
+						console.log(oldPath);
+						console.log(newPath);
+						try {
+							renameCallbackEnabled = false;
+							await this.renameFile(oldPath, newPath);
+						} catch (error: unknown) {
+							const msg = 'Failed to rename the attachment folder';
+							console.error(msg);
+							console.error("Original attachment folder:", oldPath);
+							console.error("New attachment folder:", newPath);
+							console.error("Error msg:", error);
+							new Notice(msg + '.');
+						} finally {
+							renameCallbackEnabled = true;
 						}
 					}
-				})
-			);
-		}
-
+				}
+			})
+		);
+	
 		if (Platform.isDesktopApp) {
 			/*
 			this.registerEvent(
@@ -462,7 +459,7 @@ export default class ImportAttachments extends Plugin {
 		unpatchFilemanager();
 
 		// unpatch Vault
-		unpatchVault();
+		unpatchImportFunctions();
 
 		if (this.observer) {
 			this.observer.disconnect();
