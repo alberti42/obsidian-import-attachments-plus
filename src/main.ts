@@ -462,7 +462,7 @@ export default class ImportAttachments extends Plugin {
 								// TODO Process images from clipboard
 								//
 								// const t = Array.from(files);
-								// console.log(files);
+								// console.log(t);
 								// console.log(clipboardData);
 								// console.log(clipboardData.dropEffect);
 								// console.log(clipboardData.files);
