@@ -40,6 +40,28 @@ function matchesPatternWithoutHolder(plugin: ImportAttachments, filePath: string
 function patchFileExplorer(plugin: ImportAttachments) {
 	if (originalCreateFolderDom) { return; }
 
+	// Create a mock leaf using a detached element
+	const detachedDiv = document.createElement('div');
+	const mockLeaf = {
+		containerEl: detachedDiv,
+		view: {
+			file: null,
+			icon: '',
+			navigation: false,
+			getViewType: () => 'file-explorer',
+			getDisplayText: () => '',
+			onResize: () => {},
+			onOpen: () => Promise.resolve(),
+			onClose: () => Promise.resolve(),
+			destroy: () => {},
+		},
+	} as unknown as WorkspaceLeaf;
+
+	const viewInstance = plugin.app.workspace.activeLeaf.view.constructor.call(mockLeaf) as FileExplorerView;
+    originalCreateFolderDom = viewInstance.constructor.prototype.createFolderDom;
+    viewClass = viewInstance.constructor as { new(leaf: WorkspaceLeaf): FileExplorerView };
+
+
 	const leaves = plugin.app.workspace.getLeavesOfType('file-explorer');
 	for (const leaf of leaves) {
 		const viewInstance = leaf.view as FileExplorerView;
