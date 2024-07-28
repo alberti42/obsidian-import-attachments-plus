@@ -81,8 +81,7 @@ export default class ImportAttachments extends Plugin {
 	private deleteCallbackEnabled: boolean = true;
 	private observer: MutationObserver | null = null;
 	private hideFolderNames: Array<string> = [];
-	folderPathStartsWith: string = "";
-	folderPathEndsWith: string = "";
+	matchAttachmentFolder: ((str:string)=>boolean) = (_:string) => true;
 
 	constructor(app: App, manifest: PluginManifest) {
 		super(app, manifest);
@@ -163,6 +162,48 @@ export default class ImportAttachments extends Plugin {
 	}
 
 	// Function to split around the original
+	parseAttachmentFolderPath() {
+		const folderPath = this.settings.folderPath;
+		const placeholder = "${notename}";
+
+		if(folderPath.includes("${notename}")) {
+			// Find the index of the first occurrence of the placeholder
+			const firstIndex = folderPath.indexOf(placeholder);
+
+			// If the placeholder is not found, return the whole string as the first part and an empty string as the second part
+			if (firstIndex === -1) {
+				return [folderPath, ""];
+			}
+
+			// Find the index of the last occurrence of the placeholder
+			const lastIndex = folderPath.lastIndexOf(placeholder);
+
+			// Calculate the starting index of the text after the placeholder
+			const endOfPlaceholderIndex = lastIndex + placeholder.length;
+
+			// Extract the parts before the first occurrence and after the last occurrence of the placeholder
+			const folderPathStartsWith = folderPath.substring(0, firstIndex);
+			const folderPathEndsWith = folderPath.substring(endOfPlaceholderIndex);
+
+			this.matchAttachmentFolder = (filePath: string): boolean => {
+				console.log(filePath);
+				// Check if filePath starts with startsWidth or contains /startsWidth
+				const startsWithMatch = filePath.startsWith(folderPathStartsWith) || filePath.includes(`/${folderPathStartsWith}`);
+				
+				// Check if filePath ends with endsWidth
+				const endsWithMatch = filePath.endsWith(folderPathEndsWith);
+				
+				// Return true only if both conditions are met
+				return startsWithMatch && endsWithMatch;
+			}
+		} else {
+			this.matchAttachmentFolder = (filePath: string): boolean => {
+				return filePath.endsWith(`/${folderPath}`) || filePath === folderPath;	
+			}
+		}		
+	}
+
+	// Function to split around the original
 	splitAroundOriginal(input: string, placeholder: string): [string, string] {
 		// Find the index of the first occurrence of the placeholder
 		const firstIndex = input.indexOf(placeholder);
@@ -183,30 +224,6 @@ export default class ImportAttachments extends Plugin {
 		const afterLast = input.substring(endOfPlaceholderIndex);
 
 		return [beforeFirst, afterLast];
-	}
-
-	// Function to split around the original
-	parseAttachmentFolderPath() {
-		const folderPath = this.settings.folderPath;
-		const placeholder = "${notename}";
-
-		// Find the index of the first occurrence of the placeholder
-		const firstIndex = folderPath.indexOf(placeholder);
-
-		// If the placeholder is not found, return the whole string as the first part and an empty string as the second part
-		if (firstIndex === -1) {
-			return [folderPath, ""];
-		}
-
-		// Find the index of the last occurrence of the placeholder
-		const lastIndex = folderPath.lastIndexOf(placeholder);
-
-		// Calculate the starting index of the text after the placeholder
-		const endOfPlaceholderIndex = lastIndex + placeholder.length;
-
-		// Extract the parts before the first occurrence and after the last occurrence of the placeholder
-		this.folderPathStartsWith = folderPath.substring(0, firstIndex);
-		this.folderPathEndsWith = folderPath.substring(endOfPlaceholderIndex);
 	}
 
 	// Configure the folder names to hide
@@ -235,7 +252,7 @@ export default class ImportAttachments extends Plugin {
 		// Load and add settings tab
 		await this.loadSettings();
 		this.addSettingTab(new ImportAttachmentsSettingTab(this.app, this));
-
+		
 		// Set up the mutation observer for hiding folders
 		// this.setupObserver();
 
@@ -500,9 +517,12 @@ export default class ImportAttachments extends Plugin {
 		// unpatch Vault
 		unpatchImportFunctions();
 
-		if (this.observer) {
-			this.observer.disconnect();
-		}
+		// if (this.observer) {
+		// 	this.observer.disconnect();
+		// }
+
+		// unpatch file-explorer plugin
+		unpatchFileExplorer();
 
 		// unpatch console
 		unpatchConsole();

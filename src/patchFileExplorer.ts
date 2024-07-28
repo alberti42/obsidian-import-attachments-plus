@@ -27,34 +27,15 @@ function unpatchFileExplorer() {
 	}
 }
 
-function matchesPatternWithHolder(plugin: ImportAttachments, filePath: string): boolean {
-	// Check if filePath starts with startsWidth or contains /startsWidth
-	const startsWithMatch = filePath.startsWith(plugin.folderPathStartsWith) || filePath.includes(`/${plugin.folderPathStartsWith}`);
-	
-	// Check if filePath ends with endsWidth
-	const endsWithMatch = filePath.endsWith(plugin.folderPathEndsWith);
-	
-	// Return true only if both conditions are met
-	return startsWithMatch && endsWithMatch;
-}
+function patchFileExplorer(plugin: ImportAttachments) {
+	if (originalCreateFolderDom) { return; }
 
-function matchesPatternWithoutHolder(plugin: ImportAttachments, filePath: string): boolean {
-	const folderName = plugin.settings.folderPath;
-	return filePath.endsWith(`/${folderName}`) || filePath === folderName;
-}
-
-function setVisibility(folderPath:string, el:HTMLDivElement, plugin:ImportAttachments)
-{
-	
-	
-	let hidden = false;
-	if (plugin.settings.folderPath.includes("${notename}") && matchesPatternWithHolder(plugin,folderPath)) {
-		console.log("FOUND1",folderPath);
-		hidden = true;
-
-	} else if (matchesPatternWithoutHolder(plugin,folderPath)) {
-		console.log("FOUND2",folderPath);
-		hidden = true;
+	const leaves = plugin.app.workspace.getLeavesOfType('file-explorer');
+	for (const leaf of leaves) {
+		const viewInstance = leaf.view as FileExplorerView;
+		originalCreateFolderDom = viewInstance.constructor.prototype.createFolderDom;
+		viewClass = viewInstance.constructor as { new(leaf: WorkspaceLeaf): FileExplorerView };
+		break;
 	}
 
 	if(hidden) el.toggleClass("import-plugin-hidden",true);
@@ -79,7 +60,7 @@ function patchCreateFolderDom(plugin: ImportAttachments, viewInstance: FileExplo
 		const result = originalCreateFolderDom.apply(this, [folder]);
 		
 		if(result) {
-			setVisibility(result.file.name,result.el,plugin);
+			if(plugin.matchAttachmentFolder(result.file.name)) result.el.toggleClass("import-plugin-hidden",true);
 		}
 		return result;
 	};
