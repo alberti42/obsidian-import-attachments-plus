@@ -187,6 +187,19 @@ export default class ImportAttachments extends Plugin {
 
 	// Function to split around the original
 	parseAttachmentFolderPath() {
+		function escapeRegex(string:string) {
+			return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+		}
+
+		function createRegexFromString(template:string) {
+			const [leftPart, rightPart] = template.split('${notename}');
+			const escapedLeftPart = escapeRegex(leftPart);
+			const escapedRightPart = escapeRegex(rightPart);
+
+			const regexPattern = `^${escapedLeftPart}(.*?)${escapedRightPart}$`;
+			return new RegExp(regexPattern);
+		}
+
 		const folderPath = this.settings.folderPath;
 		const placeholder = "${notename}";
 
@@ -209,6 +222,8 @@ export default class ImportAttachments extends Plugin {
 			const folderPathStartsWith = folderPath.substring(0, firstIndex);
 			const folderPathEndsWith = folderPath.substring(endOfPlaceholderIndex);
 
+			const regex = createRegexFromString(folderPath);
+
 			this.matchAttachmentFolder = (filePath: string): boolean => {
 				// Check if filePath starts with startsWidth or contains /startsWidth
 				const startsWithMatch = filePath.startsWith(folderPathStartsWith) || filePath.includes(`/${folderPathStartsWith}`);
@@ -216,8 +231,26 @@ export default class ImportAttachments extends Plugin {
 				// Check if filePath ends with endsWidth
 				const endsWithMatch = filePath.endsWith(folderPathEndsWith);
 				
-				// Return true only if both conditions are met
-				return startsWithMatch && endsWithMatch;
+				// Check that both conditions are met
+				const heuristicMatch = startsWithMatch && endsWithMatch;
+
+				if(heuristicMatch && this.settings.relativeLocation===RelativeLocation.SAME)
+				{
+					const {filename, dir} = Utils.parseFilePath(filePath);
+
+					// Use the match method to get the groups
+					const match = filename.match(regex);
+
+					if (match && match[1]) {
+						const noteName = normalizePath(Utils.joinPaths(dir,match[1])+".md");
+						return Utils.doesFileExist(this.app.vault,noteName);
+					} else {
+						// No match found
+						return false;
+					}
+				} else {
+					return heuristicMatch;
+				}
 			}
 		} else {
 			this.matchAttachmentFolder = (filePath: string): boolean => {
@@ -811,9 +844,6 @@ export default class ImportAttachments extends Plugin {
 				}
 			}
 
-			console.log(originalFilePath);
-			console.log(Utils.joinPaths(this.vaultPath,destFilePath));
-	
 			try {
 				switch (importSettings.action) {
 					case ImportActionType.MOVE:

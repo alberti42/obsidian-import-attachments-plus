@@ -47,7 +47,7 @@ function patchAcceptRename(plugin: ImportAttachments, viewClass: { new(leaf: Wor
 		if(fileBeingRenamed instanceof TFolder) {
 			const item = this.fileItems[fileBeingRenamed.path];
 			await originalAcceptRename.apply(this);
-			if(plugin.settings.hideAttachmentFolders && plugin.matchAttachmentFolder(item.file.name)) item.el.toggleClass("import-plugin-hidden",true);
+			if(plugin.settings.hideAttachmentFolders && plugin.matchAttachmentFolder(item.file.path)) item.el.toggleClass("import-plugin-hidden",true);
 		} else {
 			await originalAcceptRename.apply(this);
 		}
@@ -64,7 +64,7 @@ function patchCreateFolderDom(plugin: ImportAttachments, viewClass: { new(leaf: 
 		
 		const item = originalCreateFolderDom.apply(this, [folder]);
 			
-		if(plugin.settings.hideAttachmentFolders && plugin.matchAttachmentFolder(item.file.name)) item.el.toggleClass("import-plugin-hidden",true);
+		if(plugin.settings.hideAttachmentFolders && plugin.matchAttachmentFolder(item.file.path)) item.el.toggleClass("import-plugin-hidden",true);
 
 		return item;
 	};
