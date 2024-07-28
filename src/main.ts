@@ -206,7 +206,6 @@ export default class ImportAttachments extends Plugin {
 		if (Platform.isDesktopApp) {
 			// patch the openFile function
 			patchOpenFile(this);
-			new Notice("PATCHED!!");
 			// add key listeners for modifying the behavior when opening files
 			addKeyListeners();
 		}
@@ -451,7 +450,7 @@ export default class ImportAttachments extends Plugin {
 			*/
 		}
 
-		console.log('Loaded plugin Import Attachments+!!!!');
+		console.log('Loaded plugin Import Attachments+');
 	}
 
 	onunload() {
@@ -599,14 +598,14 @@ export default class ImportAttachments extends Plugin {
 		if (md_file.ext !== ".md") {
 			throw new Error("No Markdown file was found.");
 		}
-
+		
 		const currentNoteFolderPath = md_file.dir;
 		const notename = md_file.filename;
 
 		let referencePath = '';
 		switch (this.settings.relativeLocation) {
 			case RelativeLocation.VAULT:
-				referencePath = '/';
+				referencePath = '';
 				break;
 			case RelativeLocation.SAME:
 				referencePath = currentNoteFolderPath;
@@ -616,7 +615,7 @@ export default class ImportAttachments extends Plugin {
 		const relativePath = this.settings.folderPath.replace(/\$\{notename\}/g, notename);
 
 		const attachmentsFolderPath = Utils.joinPaths(referencePath, relativePath);
-
+		
 		return {
 			attachmentsFolderPath,
 			currentNoteFolderPath,
@@ -648,8 +647,8 @@ export default class ImportAttachments extends Plugin {
 		// add the extension
 		attachmentName += originalFilePath_parsed.ext;
 
-		const {attachmentsFolderPath} = this.getAttachmentFolder(md_file);
-
+		const { attachmentsFolderPath } = this.getAttachmentFolder(md_file);
+		
 		// Ensure the directory exists before moving the file
 		await Utils.createFolderIfNotExists(this.app.vault,attachmentsFolderPath);
 

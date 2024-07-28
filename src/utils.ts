@@ -10,14 +10,14 @@ import * as path from 'path';
 
 // Joins multiple path segments into a single normalized path.
 export function joinPaths(...paths: string[]): string {
-	return paths.join('/');
+	return normalizePath(paths.join('/'));
 }
 
 export function parseFilePath(filePath: string): ParsedPath {
 	filePath = normalizePath(filePath);
 	const lastSlashIndex = filePath.lastIndexOf('/');
 
-	const dir = lastSlashIndex !== -1 ? filePath.substring(0, lastSlashIndex) : '/';
+	const dir = lastSlashIndex !== -1 ? filePath.substring(0, lastSlashIndex) : '';
 	const base = lastSlashIndex !== -1 ? filePath.substring(lastSlashIndex + 1) : filePath;
 	const extIndex = base.lastIndexOf('.');
 	const filename = extIndex !== -1 ? base.substring(0, extIndex) : base;
