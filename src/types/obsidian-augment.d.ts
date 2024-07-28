@@ -7,6 +7,24 @@ declare module 'obsidian' {
 	interface App {
 		openWithDefaultApp(filepath: string): Promise<void>;
 		saveAttachment(fileName: string, fileExtension: string, fileData: ArrayBuffer): Promise<TFile>;
+		internalPlugins: InternalPlugins;
+		plugins: Plugins;
+	}
+
+	interface Plugins {
+		manifests: Record<string, PluginManifest>;
+		plugins: Record<string, Plugin>;
+		getPlugin(id: string): Plugin;
+		uninstallPlugin(pluginId: string): Promise<void>;
+    }
+
+	interface InternalPlugins {
+		plugins: Record<string, Plugin>;
+		getPluginById(id: string): Plugin;
+	}
+
+	interface Plugin {
+		views: { [viewType: string]: (leaf: WorkspaceLeaf) => View };
 	}
 
 	interface Vault {
@@ -28,6 +46,11 @@ declare module 'obsidian' {
 		promptForDeletion(file: TAbstractFile): Promise<void>;
 	}
 
+	interface FileExplorerView extends View {
+		createFolderDom(folder: TFolder): FileExplorerItem;
+		fileItems: FileItems;
+	}
+
 	interface Editor {
 		cm: EditorView;
 	}
@@ -44,4 +67,7 @@ declare module 'obsidian' {
 		file: TFile;
 	}
 
+	type FileItems = {
+		[fileName: string]: FileExplorerItem;
+	}
 }

@@ -15,7 +15,7 @@ import {
 	Platform,
 	PluginManifest,
 	TextComponent,
-	normalizePath
+	normalizePath,
 } from "obsidian";
 
 // Import utility and modal components
@@ -230,7 +230,6 @@ export default class ImportAttachments extends Plugin {
 		}
 	}
 
-
 	// Load plugin settings
 	async onload() {
 		// Load and add settings tab
@@ -256,6 +255,9 @@ export default class ImportAttachments extends Plugin {
 		// Monkey-patch file manager to handle the deletion of the attachment folder
 		// when the function promptForDeletion is triggered by the user
 		patchFilemanager(this);
+
+		// Monkey-path file explorer to hide attachment folders
+		// patchFileExplorer(this);
 
 		// Commands for moving or copying files to the vault
 		if (Platform.isDesktopApp) {
@@ -648,8 +650,7 @@ export default class ImportAttachments extends Plugin {
 		}
 
 		const relativePath = this.settings.folderPath.replace(/\$\{notename\}/g, notename);
-
-		const attachmentsFolderPath = Utils.joinPaths(referencePath, relativePath);
+		const attachmentsFolderPath = normalizePath(Utils.joinPaths(referencePath, relativePath));
 		
 		return {
 			attachmentsFolderPath,
@@ -657,7 +658,7 @@ export default class ImportAttachments extends Plugin {
 		};
 	}
 
-	async createAttachmentName(originalFilePath:string, data: File | ArrayBuffer, md_file: ParsedPath | null = null): Promise<string> {
+	async createAttachmentName(originalFilePath:string, data: File | ArrayBuffer, md_file: ParsedPath | null, createFolder: boolean): Promise<string> {
 
 		const originalFilePath_parsed = Utils.parseFilePath(originalFilePath);
 		const namePattern = this.settings.attachmentName;
@@ -685,7 +686,7 @@ export default class ImportAttachments extends Plugin {
 		const { attachmentsFolderPath } = this.getAttachmentFolder(md_file);
 		
 		// Ensure the directory exists before moving the file
-		await Utils.createFolderIfNotExists(this.app.vault,attachmentsFolderPath);
+		if(createFolder) await Utils.createFolderIfNotExists(this.app.vault,attachmentsFolderPath);
 
 		return Utils.joinPaths(attachmentsFolderPath,attachmentName);
 	}
@@ -742,7 +743,7 @@ export default class ImportAttachments extends Plugin {
 
 		const tasks = filesToImport.map(async (fileToImport): Promise<string | null> => {
 			const originalFilePath = fileToImport.path;
-			let destFilePath = await this.createAttachmentName(originalFilePath,fileToImport);
+			let destFilePath = await this.createAttachmentName(originalFilePath,fileToImport,null,false);
 
 			// Check if file already exists in the vault
 			const existingFile = await Utils.doesFileExist(this.app.vault,destFilePath);

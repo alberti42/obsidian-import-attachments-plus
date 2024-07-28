@@ -2,8 +2,10 @@
 
 /* eslint-disable @typescript-eslint/no-inferrable-types */
 
-import { App, Vault, TFile, FileStats } from 'obsidian';
+import { App, Vault, TFile } from 'obsidian';
 import ImportAttachments from 'main';
+
+import { parseFilePath } from 'utils';
 
 // Save a reference to the original method for the monkey patch
 let originalGetAvailablePathForAttachments: ((fileName: string, extension: string, currentFile: TFile | null) => Promise<string>) | null = null;
@@ -36,7 +38,9 @@ function patchImportFunctions(plugin: ImportAttachments) {
 
 		if(!data) throw new Error("The variable data is unexpectedly null.")
 		
-		return await plugin.createAttachmentName(fileName + "." + extension,data);
+		const currentFile_parsed = currentFile ? parseFilePath(currentFile.path) : null;
+		
+		return await plugin.createAttachmentName(fileName + "." + extension,data,currentFile_parsed,true);
 	};
 
 	if (!originalSaveAttachment) {
@@ -72,77 +76,6 @@ function patchImportFunctions(plugin: ImportAttachments) {
 		// Return the created file
 		return newAttachmentFile;
 	}
-
-	/*
-	if (!originalOnChange) {
-		originalOnChange = Vault.prototype.onChange;
-	}
-	*/
-
-	/*
-	function matchesPatternWithHolder(filePath: string): boolean {
-		// Check if filePath starts with startsWidth or contains /startsWidth
-		const startsWithMatch = filePath.startsWith(plugin.folderPathStartsWith) || filePath.includes(`/${plugin.folderPathStartsWith}`);
-		
-		// Check if filePath ends with endsWidth
-		const endsWithMatch = filePath.endsWith(plugin.folderPathEndsWith);
-		
-		// Return true only if both conditions are met
-		return startsWithMatch && endsWithMatch;
-	}
-
-	function matchesPatternWithoutHolder(filePath: string): boolean {
-		const folderName = plugin.settings.folderPath;
-		return filePath.endsWith(`/${folderName}`) || filePath === folderName;
-	}
-
-	Vault.prototype.onChange = function (this: Vault, eventType: string, filePath: string, oldPath?: string, stat?: FileStats) {
-		if (!originalOnChange) {
-			throw new Error("Could not execute the original onChange function.");
-		}
-
-		// const fileExplorerPlugin = plugin.app.internalPlugins.getPluginById('file-explorer');
-		
-		// if(filePath.endsWith('.xyz')) {
-		// 	// console.log("XYZ:",eventType);
-		// 	// console.log(originalOnChange);
-		// 	originalOnChange.call(this, eventType, filePath, oldPath, stat);
-		// 	return;
-		// }
-
-		// if(filePath.endsWith('.md')) {
-		// 	// console.log("MD:",eventType);
-		// 	return;
-		// }
-
-		if (eventType === 'folder-created') {
-			const placeholder = "${notename}";
-
-			if (plugin.settings.folderPath.includes(placeholder) && matchesPatternWithHolder(filePath)) {
-				// console.log("1",filePath)
-				// console.log(TFolder);
-
-				// Handle folder creation event manually
-				const newFolder = new TFolder(this, filePath);
-				this.fileMap[filePath] = newFolder;
-				// debugger
-				this.addChild(newFolder);
-
-				this.trigger("create", this.fileMap[filePath]);
-				return;
-			} else if (matchesPatternWithoutHolder(filePath)) {
-				console.log("2",filePath)
-			}
-		}
-
-		originalOnChange.call(this, eventType, filePath, oldPath, stat);
-	};
-
-    // const fileExplorer = plugin.app.internalPlugins.getPluginById('file-explorer');
-	// const xyz = fileExplorer.views['file-explorer']
-    // console.log(xyz);
-
-    */
 }
 
 export { patchImportFunctions, unpatchImportFunctions };
