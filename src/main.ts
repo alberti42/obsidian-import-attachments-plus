@@ -81,6 +81,7 @@ export default class ImportAttachments extends Plugin {
 	private deleteCallbackEnabled: boolean = true;
 	private observer: MutationObserver | null = null;
 	private hideFolderNames: Array<string> = [];
+	private saveTimeout: number | null = null;
 	matchAttachmentFolder: ((str:string)=>boolean) = (_:string) => true;
 
 	constructor(app: App, manifest: PluginManifest) {
@@ -276,7 +277,7 @@ export default class ImportAttachments extends Plugin {
 		patchFilemanager(this);
 
 		// Monkey-path file explorer to hide attachment folders
-		// patchFileExplorer(this);
+		patchFileExplorer(this);
 
 		// Commands for moving or copying files to the vault
 		if (Platform.isDesktopApp) {
@@ -629,7 +630,7 @@ export default class ImportAttachments extends Plugin {
 				this.settings.embedFilesOnImport = embedOption;
 			}
 			this.settings.lastEmbedFilesOnImport = embedOption;
-			await this.saveSettings();
+			await this.debouncedSaveSettings();
 		}
 
 		const doEmbed = (embedOption == YesNoTypes.YES);
@@ -764,7 +765,7 @@ export default class ImportAttachments extends Plugin {
 
 		const tasks = filesToImport.map(async (fileToImport): Promise<string | null> => {
 			const originalFilePath = fileToImport.path;
-			let destFilePath = await this.createAttachmentName(originalFilePath,fileToImport,null,false);
+			let destFilePath = await this.createAttachmentName(originalFilePath,fileToImport,null,true);
 
 			// Check if file already exists in the vault
 			const existingFile = await Utils.doesFileExist(this.app.vault,destFilePath);
@@ -810,6 +811,9 @@ export default class ImportAttachments extends Plugin {
 				}
 			}
 
+			console.log(originalFilePath);
+			console.log(Utils.joinPaths(this.vaultPath,destFilePath));
+	
 			try {
 				switch (importSettings.action) {
 					case ImportActionType.MOVE:
@@ -857,62 +861,9 @@ export default class ImportAttachments extends Plugin {
 
 	async openAttachmentsFolder() {
 
-		// Monkey-path file explorer to hide attachment folders
-		patchFileExplorer(this);
-
-		return;
-
-		// Get the file explorer plugin
-		const fileExplorer = this.app.internalPlugins.getPluginById('file-explorer');
-
-		// Check if the plugin is loaded and enabled
-		if (fileExplorer) {
-
-			const leaves = this.app.workspace.getLeavesOfType('file-explorer');
-			for (const leaf of leaves) {
-				console.log(leaf);
-				const viewInstance = leaf.view;
-				if (viewInstance) {
-					
-
-					break;
-				}
-			}
-
-			console.log(fileExplorer);
-			const viewFactory = fileExplorer.views['file-explorer'];
-
-			// Create a new instance of the view to identify its class
-			const leaf = this.app.workspace.getLeaf(false); // Get an inactive leaf
-			const viewInstance = viewFactory(leaf);
-
-			// Identify the class used in createItemDom
-			const viewClass = viewInstance.constructor;
-
-			// Log the createItemDom method to inspect it
-			console.log('viewClass createFolderDom:', viewClass.prototype.createFolderDom);
-
-			// Patch the createItemDom method in viewClass prototype
-			if (viewClass.prototype.createFolderDom) {
-				const originalCreateFolderDom = viewClass.prototype.createFolderDom;
-				viewClass.prototype.createFolderDom = function(...args) {
-					console.log('Custom behavior before createFolderDom');
-					const result = originalCreateFolderDom.apply(this, args);
-					console.log(result);
-					console.log('Custom behavior after createFolderDom');
-					return result;
-				};
-				console.log('createFolderDom PATCHED');
-			} else {
-				console.error('createFolderDom method not found on viewClass prototype');
-			}
-
-			
-		} else {
-			console.error('File Explorer plugin not found or not enabled');
-		}
-		return;
-
+		// // Monkey-path file explorer to hide attachment folders
+		// patchFileExplorer(this);
+		// return;
 
 		const md_active_file = this.app.workspace.getActiveFile();
 
@@ -1031,6 +982,20 @@ export default class ImportAttachments extends Plugin {
 			editor.setCursor(newCursorPos);
 		}
 	}
+
+	debouncedSaveSettings() {
+		// timeout after 250 ms
+		const timeout_ms = 250;
+
+		if (this.saveTimeout) {
+			clearTimeout(this.saveTimeout);
+		}
+
+		this.saveTimeout = window.setTimeout(() => {
+			this.saveSettings();
+			this.saveTimeout = null;
+		}, timeout_ms);
+	}
 }
 
 // Plugin settings tab
@@ -1064,7 +1029,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 								if (value != ImportActionType.ASK_USER) {
 									this.plugin.settings.lastActionDroppedFilesOnImport = value as ImportActionType;
 								}
-								await this.plugin.saveSettings();
+								await this.plugin.debouncedSaveSettings();
 							} else {
 								console.error('Invalid import action type:', value);
 							}
@@ -1085,7 +1050,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 								if (value != ImportActionType.ASK_USER) {
 									this.plugin.settings.lastActionPastedFilesOnImport = value as ImportActionType;
 								}
-								await this.plugin.saveSettings();
+								await this.plugin.debouncedSaveSettings();
 							} else {
 								console.error('Invalid import action type:', value);
 							}
@@ -1106,7 +1071,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 								if (value != YesNoTypes.ASK_USER) {
 									this.plugin.settings.lastEmbedFilesOnImport = value as YesNoTypes;
 								}
-								await this.plugin.saveSettings();
+								await this.plugin.debouncedSaveSettings();
 							} else {
 								console.error('Invalid option selection:', value);
 							}
@@ -1124,7 +1089,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 						.onChange(async (value: string) => {
 							if (Object.values(MultipleFilesImportTypes).includes(value as MultipleFilesImportTypes)) {
 								this.plugin.settings.multipleFilesImportType = value as MultipleFilesImportTypes;
-								await this.plugin.saveSettings();
+								await this.plugin.debouncedSaveSettings();
 							} else {
 								console.error('Invalid option selection:', value);
 							}
@@ -1138,7 +1103,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.customDisplayText)
 					.onChange(async (value: boolean) => {
 						this.plugin.settings.customDisplayText = value;
-						await this.plugin.saveSettings(); // Update visibility based on the toggle
+						await this.plugin.debouncedSaveSettings(); // Update visibility based on the toggle
 					}));
 
 			new Setting(containerEl).setName('Opening').setHeading();
@@ -1180,7 +1145,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 					text.setValue(this.plugin.settings.openAttachmentExternalExtExcluded);
 					text.onChange(async (value: string) => {
 						this.plugin.settings.openAttachmentExternalExtExcluded = validate_exts(text, value);
-						await this.plugin.saveSettings();
+						await this.plugin.debouncedSaveSettings();
 					});
 					// Event when the text field loses focus
 					text.inputEl.onblur = async () => {
@@ -1197,7 +1162,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 				.onChange(async (value: boolean) => {
 					// Hide external_exclude_ext if the toggle is off
 					this.plugin.settings.openAttachmentExternal = value;
-					await this.plugin.saveSettings();
+					await this.plugin.debouncedSaveSettings();
 					external_exclude_ext.settingEl.style.display = value ? "" : "none"; // Update visibility based on the toggle
 				}));
 
@@ -1219,7 +1184,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 					text.setValue(this.plugin.settings.revealAttachmentExtExcluded);
 					text.onChange(async (value: string) => {
 						this.plugin.settings.revealAttachmentExtExcluded = validate_exts(text, value);
-						await this.plugin.saveSettings();
+						await this.plugin.debouncedSaveSettings();
 					});
 					// Event when the text field loses focus
 					text.inputEl.onblur = async () => {
@@ -1236,7 +1201,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 				.onChange(async (value: boolean) => {
 					// Hide reveal_exclude_ext if the toggle is off
 					this.plugin.settings.revealAttachment = value;
-					await this.plugin.saveSettings();
+					await this.plugin.debouncedSaveSettings();
 					reveal_exclude_ext.settingEl.style.display = value ? "" : "none";  // Update visibility based on the toggle
 				}));
 		}
@@ -1251,7 +1216,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.autoRenameAttachmentFolder)
 				.onChange(async (value: boolean) => {
 					this.plugin.settings.autoRenameAttachmentFolder = value;
-					await this.plugin.saveSettings();
+					await this.plugin.debouncedSaveSettings();
 				}));
 
 		new Setting(containerEl)
@@ -1263,7 +1228,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.autoDeleteAttachmentFolder)
 				.onChange(async (value: boolean) => {
 					this.plugin.settings.autoDeleteAttachmentFolder = value;
-					await this.plugin.saveSettings();
+					await this.plugin.debouncedSaveSettings();
 				}));
 
 		new Setting(containerEl)
@@ -1273,7 +1238,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.confirmDeleteAttachmentFolder)
 				.onChange(async (value: boolean) => {
 					this.plugin.settings.confirmDeleteAttachmentFolder = value;
-					await this.plugin.saveSettings();
+					await this.plugin.debouncedSaveSettings();
 				}));
 
 		new Setting(containerEl).setName('Attachment folder').setHeading();
@@ -1289,7 +1254,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 						.onChange(async (value: string) => {
 							if (Object.values(RelativeLocation).includes(value as RelativeLocation)) {
 								this.plugin.settings.relativeLocation = value as RelativeLocation;
-								await this.plugin.saveSettings();
+								await this.plugin.debouncedSaveSettings();
 							} else {
 								console.error('Invalid option selection:', value);
 							}
@@ -1304,7 +1269,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 					text.setValue(this.plugin.settings.folderPath);
 					text.onChange(async (value: string) => {
 						this.plugin.settings.folderPath = value;
-						await this.plugin.saveSettings();
+						await this.plugin.debouncedSaveSettings();
 						this.plugin.parseAttachmentFolderPath();
 						updateVisibilityAttachmentFolders(this.plugin);
 					})
@@ -1320,7 +1285,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 						.onChange(async (value: string) => {
 							if (Object.values(LinkFormat).includes(value as LinkFormat)) {
 								this.plugin.settings.linkFormat = value as LinkFormat;
-								await this.plugin.saveSettings();
+								await this.plugin.debouncedSaveSettings();
 							} else {
 								console.error('Invalid option selection:', value);
 							}
@@ -1345,7 +1310,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 							value = '${original}'; // TODO: improve checking the input by the user that it is not empty
 						}
 						this.plugin.settings.attachmentName = value;
-						await this.plugin.saveSettings();
+						await this.plugin.debouncedSaveSettings();
 					})
 				});
 
@@ -1364,7 +1329,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 					text.setValue(this.plugin.settings.dateFormat);
 					text.onChange(async (value: string) => {
 						this.plugin.settings.dateFormat = value;
-						await this.plugin.saveSettings();
+						await this.plugin.debouncedSaveSettings();
 					})
 				});
 		}
@@ -1376,7 +1341,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.hideAttachmentFolders)
 				.onChange(async (value: boolean) => {
 					this.plugin.settings.hideAttachmentFolders = value;
-					await this.plugin.saveSettings();
+					await this.plugin.debouncedSaveSettings();
 					updateVisibilityAttachmentFolders(this.plugin);
 				}));
 	}

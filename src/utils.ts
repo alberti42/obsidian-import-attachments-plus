@@ -10,7 +10,7 @@ import * as path from 'path';
 
 // Joins multiple path segments into a single normalized path.
 export function joinPaths(...paths: string[]): string {
-	return normalizePath(paths.join('/'));
+	return paths.join('/');
 }
 
 export function parseFilePath(filePath: string): ParsedPath {

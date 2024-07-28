@@ -42,10 +42,9 @@ function patchCreateFolderDom(plugin: ImportAttachments, viewInstance: FileExplo
 		if(!originalCreateFolderDom) throw new Error('Something went wrong in patching file-explorer plugin.');
 		
 		const result = originalCreateFolderDom.apply(this, [folder]);
-		
-		if(result) {
-			if(plugin.matchAttachmentFolder(result.file.name)) result.el.toggleClass("import-plugin-hidden",true);
-		}
+			
+		if(plugin.settings.hideAttachmentFolders && plugin.matchAttachmentFolder(result.file.name)) result.el.toggleClass("import-plugin-hidden",true);
+
 		return result;
 	};
 }
