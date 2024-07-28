@@ -12,6 +12,7 @@ declare module 'obsidian' {
     interface Vault {
         getConfig(configName: string): unknown;
         getAvailablePathForAttachments(fileName: string, extension: string, currentFile: TFile | null): Promise<string>;
+        onChange(eventType: string, filePath: string, oldPath?: string, stat?: FileStats): void;
     }
 
     interface MenuItem {

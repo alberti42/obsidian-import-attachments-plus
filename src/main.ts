@@ -73,7 +73,6 @@ const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 	logs: {}, // Initialize logs as an empty array
 };
 
-
 // Main plugin class
 export default class ImportAttachments extends Plugin {
 	settings: ImportAttachmentsSettings = { ...DEFAULT_SETTINGS };
@@ -81,13 +80,15 @@ export default class ImportAttachments extends Plugin {
 	private deleteCallbackEnabled: boolean = true;
 	private observer: MutationObserver | null = null;
 	private hideFolderNames: Array<string> = [];
+	folderPathStartsWith: string = "";
+	folderPathEndsWith: string = "";
 
 	constructor(app: App, manifest: PluginManifest) {
 		super(app, manifest);
 
 		if (process.env.NODE_ENV === "development") {
 			monkeyPatchConsole(this);
-			console.debug("Import Attachments+: development mode including extra logging and debug features");
+			console.log("Import Attachments+: development mode including extra logging and debug features");
 		}
 
 		// Store the path to the vault
@@ -122,25 +123,35 @@ export default class ImportAttachments extends Plugin {
 			subtree: true,
 		};
 
-		this.observer.observe(document.body, config);
+		const navContainer = document.querySelector('.nav-files-container') || document.body;
+		this.observeNavFilesContainer(navContainer, config);
+	}
+
+	// Function to observe the nav-files-container
+	observeNavFilesContainer(container: Element, config: MutationObserverInit) {
+		// Disconnect any existing observer on the same container to avoid duplicate observers
+		if (this.observer) {
+			this.observer.disconnect();
+		}
+		this.observer?.observe(container, config);
 	}
 
 	// Function to hide attachment folders
-	async hideAttachmentFolders(forceRecheckingAllFolders?: boolean) {
+	async hideAttachmentFolders(forceRecheckingAllFolders?: boolean, specificElement?: HTMLElement) {
 		if (forceRecheckingAllFolders) {
 			document.querySelectorAll(".import-plugin-hidden").forEach((divElement: Element) => {
-				divElement.removeClass('import-plugin-hidden');
+				divElement.classList.remove('import-plugin-hidden');
 			});
 		}
 
 		this.hideFolderNames.forEach(folderPattern => {
 			if (folderPattern === "") return;
-			const folderElements = document.querySelectorAll(folderPattern);
+			const folderElements = specificElement ? specificElement.querySelectorAll(folderPattern) : document.querySelectorAll(folderPattern);
 
 			folderElements.forEach((folder: Element) => {
 				if (folder.parentNode && folder.parentNode instanceof HTMLElement) {
 					if (this.settings.hideAttachmentFolders) {
-						folder.parentNode.addClass('import-plugin-hidden');
+						folder.parentNode.classList.add('import-plugin-hidden');
 					}
 				} else {
 					console.error('Parent node is not an HTML element:', folder);
@@ -172,6 +183,30 @@ export default class ImportAttachments extends Plugin {
 		return [beforeFirst, afterLast];
 	}
 
+	// Function to split around the original
+	parseAttachmentFolderPath() {
+		const folderPath = this.settings.folderPath;
+		const placeholder = "${notename}";
+
+		// Find the index of the first occurrence of the placeholder
+		const firstIndex = folderPath.indexOf(placeholder);
+
+		// If the placeholder is not found, return the whole string as the first part and an empty string as the second part
+		if (firstIndex === -1) {
+			return [folderPath, ""];
+		}
+
+		// Find the index of the last occurrence of the placeholder
+		const lastIndex = folderPath.lastIndexOf(placeholder);
+
+		// Calculate the starting index of the text after the placeholder
+		const endOfPlaceholderIndex = lastIndex + placeholder.length;
+
+		// Extract the parts before the first occurrence and after the last occurrence of the placeholder
+		this.folderPathStartsWith = folderPath.substring(0, firstIndex);
+		this.folderPathEndsWith = folderPath.substring(endOfPlaceholderIndex);
+	}
+
 	// Configure the folder names to hide
 	configureHideFolderNames() {
 		const placeholder = "${notename}";
@@ -192,6 +227,7 @@ export default class ImportAttachments extends Plugin {
 			];
 		}
 	}
+
 
 	// Load plugin settings
 	async onload() {
@@ -403,8 +439,7 @@ export default class ImportAttachments extends Plugin {
 
 						const oldPath = oldAttachmentFolderPath.attachmentsFolderPath;
 						const newPath = newAttachmentFolderPath.attachmentsFolderPath;
-						console.log(oldPath);
-						console.log(newPath);
+						
 						try {
 							renameCallbackEnabled = false;
 							await this.renameFile(oldPath, newPath);
@@ -472,6 +507,7 @@ export default class ImportAttachments extends Plugin {
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
 		this.settings.logs = {};
+		this.parseAttachmentFolderPath();
 	}
 
 	async saveSettings() {
@@ -796,7 +832,65 @@ export default class ImportAttachments extends Plugin {
 	}
 
 	async openAttachmentsFolder() {
-		const attachmentsFolder = this.getAttachmentFolder();
+/*
+		// Get the file explorer plugin
+		const fileExplorer = this.app.internalPlugins.getPluginById('file-explorer');
+
+		// Check if the plugin is loaded and enabled
+		if (fileExplorer) {
+			const viewFactory = fileExplorer.views['file-explorer'];
+
+			// Create a new instance of the view to identify its class
+			const leaf = this.app.workspace.getLeaf(false); // Get an inactive leaf
+			const viewInstance = viewFactory(leaf);
+
+			// Identify the class used in createItemDom
+			const viewClass = viewInstance.constructor;
+
+			// Find the JJ class by exploring the prototype
+			// console.log('viewClass:', viewClass.prototype.createItemDom);
+
+			// Use a dummy instance to explore properties (assuming createItemDom creates JJ instances)
+			const dummyItem = viewClass.prototype.createItemDom.call(viewInstance, {}); // Pass an empty object as an argument
+
+			// Log the dummy item to inspect it
+			// console.log('dummyItem:', dummyItem);
+
+			// Get the JJ class from the dummy item
+			const JJClass = dummyItem.constructor;
+
+			// Log the JJ class to ensure it's identified correctly
+			console.log('JJClass:', JJClass.prototype.updateTitle);
+
+			// Patch the JJ class prototype
+			if (JJClass.prototype.updateTitle) {
+				const originalUpdateTitle = JJClass.prototype.updateTitle;
+				JJClass.prototype.updateTitle = function(...args: any) {
+					console.log('Custom behavior before updateTitle');
+					console.log(args);
+					const result = originalUpdateTitle.apply(this, args);
+					console.log('Custom behavior after updateTitle');
+					return result;
+				};
+				console.log('PATCHED');
+			} else {
+				console.error('updateTitle method not found on JJ prototype');
+			}
+		} else {
+			console.error('File Explorer plugin not found or not enabled');
+		}
+
+		return;
+*/
+
+		const md_active_file = this.app.workspace.getActiveFile();
+
+		if(!md_active_file) {
+			console.error("Cannot open the attachment folder. The user must first select a markdown note.")
+			return;
+		}
+
+		const attachmentsFolder = this.getAttachmentFolder(Utils.parseFilePath(md_active_file.path));
 		
 		if (!attachmentsFolder) { return }
 
@@ -1185,6 +1279,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 						this.plugin.settings.folderPath = value;
 						await this.plugin.saveSettings();
 						this.plugin.configureHideFolderNames();
+						this.plugin.parseAttachmentFolderPath();
 						await this.plugin.hideAttachmentFolders(true);
 					})
 				});
