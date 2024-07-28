@@ -49,6 +49,7 @@ declare module 'obsidian' {
 	interface FileExplorerView extends View {
 		createFolderDom(folder: TFolder): FileExplorerItem;
 		fileItems: FileItems;
+		fileBeingRenamed: TAbstractFile;
 	}
 
 	interface Editor {

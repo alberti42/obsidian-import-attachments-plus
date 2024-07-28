@@ -15,6 +15,8 @@ let viewClass: ({ new(leaf: WorkspaceLeaf): FileExplorerView }) | null = null;
 let originalCreateFolderDom: ((folder: TFolder) => FileExplorerItem) | null = null;
 let originalViewFactory: ViewFactory | null = null;
 
+let originalAcceptRename: (() => Promise<void>) | null = null;
+
 function unpatchFileExplorer() {
 	if(originalViewFactory && fileExplorerViews) {
 		fileExplorerViews['file-explorer'] = originalViewFactory;
@@ -25,28 +27,52 @@ function unpatchFileExplorer() {
 		viewClass.prototype.createFolderDom = originalCreateFolderDom;
 		originalCreateFolderDom = null;
 	}
+
+	if (originalAcceptRename && viewClass) {
+		viewClass.prototype.acceptRename = originalAcceptRename;
+		originalAcceptRename = null;
+	}
 }
 
-function patchCreateFolderDom(plugin: ImportAttachments, viewInstance: FileExplorerView) {
-	if (originalCreateFolderDom) { return; }
+function patchAcceptRename(plugin: ImportAttachments, viewClass: { new(leaf: WorkspaceLeaf): FileExplorerView }) {
+	if(originalAcceptRename) return;
 
-	if (!viewInstance) {
-		console.error("file-explorer plugin could not be patched.");
-		return;
+	originalAcceptRename = viewClass.prototype.acceptRename;
+	
+	viewClass.prototype.acceptRename = async function(this: FileExplorerView) {
+		if(!originalAcceptRename) throw new Error('Something went wrong in patching file-explorer plugin.');
+
+		const fileBeingRenamed = this.fileBeingRenamed;
+
+		if(fileBeingRenamed instanceof TFolder) {
+			const item = this.fileItems[fileBeingRenamed.path];
+			await originalAcceptRename.apply(this);
+			if(plugin.settings.hideAttachmentFolders && plugin.matchAttachmentFolder(item.file.name)) item.el.toggleClass("import-plugin-hidden",true);
+		} else {
+			await originalAcceptRename.apply(this);
+		}
 	}
+}
 
-	originalCreateFolderDom = viewInstance.constructor.prototype.createFolderDom;
-	viewClass = viewInstance.constructor as { new(leaf: WorkspaceLeaf): FileExplorerView };
+function patchCreateFolderDom(plugin: ImportAttachments, viewClass: { new(leaf: WorkspaceLeaf): FileExplorerView }) {
+	if(originalCreateFolderDom) return;
+
+	originalCreateFolderDom = viewClass.prototype.createFolderDom;
 
 	viewClass.prototype.createFolderDom = function(this: FileExplorerView, folder: TFolder): FileExplorerItem {
 		if(!originalCreateFolderDom) throw new Error('Something went wrong in patching file-explorer plugin.');
 		
-		const result = originalCreateFolderDom.apply(this, [folder]);
+		const item = originalCreateFolderDom.apply(this, [folder]);
 			
-		if(plugin.settings.hideAttachmentFolders && plugin.matchAttachmentFolder(result.file.name)) result.el.toggleClass("import-plugin-hidden",true);
+		if(plugin.settings.hideAttachmentFolders && plugin.matchAttachmentFolder(item.file.name)) item.el.toggleClass("import-plugin-hidden",true);
 
-		return result;
+		return item;
 	};
+}
+
+function patchFileExplorerView(plugin: ImportAttachments, viewClass: { new(leaf: WorkspaceLeaf): FileExplorerView }) {
+	patchCreateFolderDom(plugin,viewClass);
+	patchAcceptRename(plugin,viewClass);
 }
 
 function updateVisibilityAttachmentFolders(plugin: ImportAttachments){
@@ -73,7 +99,8 @@ function patchFileExplorer(plugin: ImportAttachments) {
 	const leaves = plugin.app.workspace.getLeavesOfType('file-explorer');
 	for (const leaf of leaves) {
 		const viewInstance = leaf.view as FileExplorerView;
-		patchCreateFolderDom(plugin,viewInstance);
+		viewClass = viewInstance.constructor as { new(leaf: WorkspaceLeaf): FileExplorerView }; // Get the class from the instance
+		patchFileExplorerView(plugin,viewClass);
 		patched = true;
 		break;
 	}
@@ -101,8 +128,11 @@ function patchFileExplorer(plugin: ImportAttachments) {
 		// Call the original factory to get the view instance
 		const viewInstance = originalViewFactory.apply(this, [leaf]);
 		
+		// Get the class from the instance
+		viewClass = viewInstance.constructor as { new(leaf: WorkspaceLeaf): FileExplorerView };
+
 		// Apply the patch to CreateFolderDom
-		patchCreateFolderDom(plugin, viewInstance);
+		patchFileExplorerView(plugin, viewClass);
 
 		// One execution of the patch to createFolderDom is sufficent
 		fileExplorer.views['file-explorer'] = originalViewFactory;
