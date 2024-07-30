@@ -45,6 +45,10 @@ export function arePathsSameFile(vault: Vault, filePath1: string, filePath2: str
 	return false;
 }
 
+export function makePosixPathOScompatible(posixPath:string): string {
+	return posixPath.split(path.posix.sep).join(path.sep);
+}
+
 export async function hashFile(filePath: string): Promise<string> {
 	const hash = crypto.createHash('md5');
 	let fileHandle = null;

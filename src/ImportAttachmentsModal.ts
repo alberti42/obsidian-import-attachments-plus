@@ -213,7 +213,7 @@ export class OverwriteChoiceModal extends Modal {
 		origFileLink.addEventListener('click', (e) => {
 			e.preventDefault(); // Prevent the default anchor behavior
 			// Open the folder in the system's default file explorer
-			window.require('electron').remote.shell.showItemInFolder(this.originalFilePath);
+			window.require('electron').remote.shell.showItemInFolder(Utils.makePosixPathOScompatible(this.originalFilePath));
 		});
 
 		paragraph.append(' into the vault. However, a ');
@@ -226,7 +226,7 @@ export class OverwriteChoiceModal extends Modal {
 		vaultFileLink.addEventListener('click', (e) => {
 			e.preventDefault(); // Prevent the default anchor behavior
 			// Open the folder in the system's default file explorer
-			window.require('electron').remote.shell.showItemInFolder(Utils.joinPaths(this.plugin.vaultPath,this.destFilePath));
+			window.require('electron').remote.shell.showItemInFolder(Utils.makePosixPathOScompatible(Utils.joinPaths(this.plugin.vaultPath,this.destFilePath)));
 		});
 
 		paragraph.append(' with the same name already exists at the destination location.');
@@ -309,7 +309,7 @@ export class DeleteAttachmentFolderModal extends Modal {
 				e.preventDefault(); // Prevent the default anchor behavior
 				// Open the folder in the system's default file explorer
 				// window.require('electron').remote.shell.showItemInFolder(this.attachmentFolderPath);
-				window.require('electron').remote.shell.openPath(Utils.joinPaths(this.plugin.vaultPath,this.attachmentFolderPath));
+				window.require('electron').remote.shell.openPath(Utils.makePosixPathOScompatible(Utils.joinPaths(this.plugin.vaultPath,this.attachmentFolderPath)));
 			});
 		} else {
 			paragraph.createEl('strong', {text: attachmentFolderPath_parsed.filename});
@@ -384,7 +384,7 @@ export class ImportFromVaultChoiceModal extends Modal {
 		fileLink.addEventListener('click', (e) => {
 			e.preventDefault(); // Prevent the default anchor behavior
 			// Open the folder in the system's default file explorer
-			window.require('electron').remote.shell.showItemInFolder(Utils.joinPaths(this.plugin.vaultPath,this.relativeFilePath));
+			window.require('electron').remote.shell.showItemInFolder(Utils.makePosixPathOScompatible(Utils.joinPaths(this.plugin.vaultPath,this.relativeFilePath)));
 		});
 
 		paragraph.append(' is already stored in the vault.');
@@ -482,7 +482,7 @@ export class FolderImportErrorModal extends Modal {
             fileLink.addEventListener('click', (e) => {
                 e.preventDefault(); // Prevent the default anchor behavior
                 // Open the folder in the system's default file explorer
-                window.require('electron').remote.shell.openPath(folder.path);
+                window.require('electron').remote.shell.openPath(Utils.makePosixPathOScompatible(folder.path));
             });
         });
 

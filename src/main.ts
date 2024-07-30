@@ -36,6 +36,8 @@ import {
 } from './types';
 import * as Utils from "utils";
 
+import { sep, posix } from 'path';
+
 import { promises as fs } from 'fs';  // This imports the promises API from fs
 
 import { patchOpenFile, unpatchOpenFile, addKeyListeners, removeKeyListeners } from 'patchOpenFile';
@@ -97,7 +99,8 @@ export default class ImportAttachments extends Plugin {
 			if (!(adapter instanceof FileSystemAdapter)) {
 				throw new Error("The vault folder could not be determined.");
 			}
-			this.vaultPath = adapter.getBasePath();
+			// Normalize to POSIX-style path
+			this.vaultPath = adapter.getBasePath().split(sep).join(posix.sep);
 		} else {
 			this.vaultPath = "";
 		}
@@ -919,9 +922,7 @@ export default class ImportAttachments extends Plugin {
 
 		// Open the folder in the system's default file explorer
 		// eslint-disable-next-line @typescript-eslint/no-var-requires
-		const { shell } = require('electron');
-		// window.require('electron').remote.shell.showItemInFolder(attachmentsFolder.attachmentsFolderPath);
-		shell.openPath(absAttachmentsFolderPath);
+		require('electron').remote.shell.openPath(Utils.makePosixPathOScompatible(absAttachmentsFolderPath));
 	}
 
 	// Function to insert links to the imported files in the editor
