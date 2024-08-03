@@ -43,7 +43,7 @@ export interface ImportAttachmentsSettings {
 	lastEmbedFilesOnImport: YesNoTypes;
 	multipleFilesImportType: MultipleFilesImportTypes;
 	customDisplayText: boolean;
-	relativeLocation: RelativeLocation;
+	// relativeLocation: RelativeLocation;
 	// folderPath: string;
 	dateFormat: string;
 	dateFormatFolders: string;
@@ -133,15 +133,17 @@ export function isAttachmentFolderPathType(value: unknown): value is AttachmentF
 }
 
 export function findFolderType(folderPath:string):AttachmentFolderPathType {
-	if ("/" !== folderPath && "" !== folderPath)
-		if ("." !== folderPath && "./" !== folderPath) { // folder or subfolder
+	if ("/" === folderPath || "" === folderPath) { // vault root
+		return 'root';
+	} else {
+		if ( "./" === folderPath || "." === folderPath ) { // current folder
+			return 'current';
+		} else { // folder or subfolder
 			if (folderPath.startsWith("./")) { // subfolder
-				return 'subfolder'
+				return 'subfolder';
 			} else { // folder
-				return 'folder'
+				return 'folder';
 			}
-		} else // current folder
-			return 'current'
-	else
-		return 'root'
+		}
+	} 
 }

@@ -15,6 +15,12 @@ export function joinPaths(...paths: string[]): string {
 	return paths.join('/');
 }
 
+export function removeRelative(path:string): string {
+	if(path.startsWith('./')) return path.slice(2);
+	if(path.startsWith('.')) return path.slice(1);
+	return path;
+}
+
 export function parseFilePath(filePath: string): ParsedPath {
 	filePath = normalizePath(filePath);
 	const lastSlashIndex = filePath.lastIndexOf('/');

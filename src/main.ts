@@ -65,7 +65,7 @@ const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 	lastActionDroppedFilesOnImport: ImportActionType.COPY, // Default to copying files
 	lastEmbedFilesOnImport: YesNoTypes.NO, // Default to linking
 	multipleFilesImportType: MultipleFilesImportTypes.BULLETED, // Default to bulleted list when importing multiple files
-	relativeLocation: RelativeLocation.SAME, // Default to vault
+	// relativeLocation: RelativeLocation.SAME, // Default to vault
 	// folderPath: '${notename} (attachments)', // Default to a folder in the vault
 	attachmentName: '${original}', // Default to the original name of the attachment
 	dateFormat: 'YYYY_MM_DDTHH_mm_ss',
@@ -200,7 +200,7 @@ export default class ImportAttachments extends Plugin {
 			return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
 		}
 
-		function createRegexFromString(template:string) {
+		function createRegexFromFolderPattern(template:string) {
 			const [leftPart, rightPart] = template.split('${notename}');
 			const escapedLeftPart = escapeRegex(leftPart);
 			const escapedRightPart = escapeRegex(rightPart);
@@ -228,38 +228,47 @@ export default class ImportAttachments extends Plugin {
 			const endOfPlaceholderIndex = lastIndex + placeholder.length;
 
 			// Extract the parts before the first occurrence and after the last occurrence of the placeholder
-			const folderPathStartsWith = folderPath.substring(0, firstIndex);
-			const folderPathEndsWith = folderPath.substring(endOfPlaceholderIndex);
+			const folderPathStartsWith = escapeRegex(Utils.removeRelative(folderPath.substring(0, firstIndex))).replace(/\\\$\\\{date\\\}/g, '.*?')
+			const folderPathEndsWith = escapeRegex(folderPath.substring(endOfPlaceholderIndex)).replace(/\\\$\\\{date\\\}/g, '.*?') + '$';
 
-			const regex = createRegexFromString(folderPath);
+			const folderPathStartsWithRegEx1 = new RegExp('^'+folderPathStartsWith);
+			const folderPathStartsWithRegEx2 = new RegExp('/'+folderPathStartsWith);
+			const folderPathEndsWithRegEx = new RegExp(folderPathEndsWith);
+			
+			this.matchAttachmentFolder = (filePath: string, relativeLocation?: boolean | undefined): boolean => {
 
-			this.matchAttachmentFolder = (filePath: string): boolean => {
 				// Check if filePath starts with startsWidth or contains /startsWidth
-				const startsWithMatch = filePath.startsWith(folderPathStartsWith) || filePath.includes(`/${folderPathStartsWith}`);
-				
+				const startsWithMatch = filePath.match(folderPathStartsWithRegEx1) || filePath.match(folderPathStartsWithRegEx2); // filePath.startsWith(folderPathStartsWith) || filePath.includes(`/${folderPathStartsWith}`);
 				// Check if filePath ends with endsWidth
-				const endsWithMatch = filePath.endsWith(folderPathEndsWith);
+				const endsWithMatch = filePath.match(folderPathEndsWithRegEx);
 				
 				// Check that both conditions are met
-				const heuristicMatch = startsWithMatch && endsWithMatch;
-
-				if(heuristicMatch && this.settings.relativeLocation===RelativeLocation.SAME)
+				const heuristicMatch = (startsWithMatch !== null) && (endsWithMatch !==null);
+				
+				if(heuristicMatch)
 				{
-					const {filename, dir} = Utils.parseFilePath(filePath);
-
-					// Use the match method to get the groups
-					const match = filename.match(regex);
-
-					if (match && match[1]) {
-						const noteName = normalizePath(Utils.joinPaths(dir,match[1])+".md");
-						return Utils.doesFileExist(this.app.vault,noteName);
-					} else {
-						// No match found
-						return false;
+					if(relativeLocation === undefined) {
+						const folderPath = this.app.vault.getConfig('attachmentFolderPath') as string;
+						relativeLocation = folderPath == '.' || folderPath == './';
 					}
-				} else {
-					return heuristicMatch;
+					if(relativeLocation) {
+						const {filename, dir} = Utils.parseFilePath(filePath);
+
+						const regex = createRegexFromFolderPattern(folderPath);
+
+						// Use the match method to get the groups
+						const match = filename.match(regex);
+
+						if (match && match[1]) {
+							const noteName = normalizePath(Utils.joinPaths(dir,match[1])+".md");
+							return Utils.doesFileExist(this.app.vault,noteName);
+						} else {
+							// No match found
+							return false;
+						}
+					}
 				}
+				return heuristicMatch;
 			}
 		} else {
 			this.matchAttachmentFolder = (filePath: string): boolean => {
@@ -704,7 +713,7 @@ export default class ImportAttachments extends Plugin {
 		const currentNoteFolderPath = md_file.dir;
 		const notename = md_file.filename;
 
-		let referencePath = '';
+		/*let referencePath = '';
 		switch (this.settings.relativeLocation) {
 			case RelativeLocation.VAULT:
 				referencePath = '';
@@ -712,7 +721,7 @@ export default class ImportAttachments extends Plugin {
 			case RelativeLocation.SAME:
 				referencePath = currentNoteFolderPath;
 				break;
-		}
+		}*/
 
 		const dateFormatFolders = this.settings.dateFormatFolders;
 		const folderPathSetting = (this.app.vault.getConfig('attachmentFolderPath') as string).replace(/\$\{notename\}/g, notename).replace(/\$\{date\}/g, Utils.formatDateTime(dateFormatFolders));
@@ -721,19 +730,13 @@ export default class ImportAttachments extends Plugin {
 		switch(findFolderType(folderPathSetting)) {
 		case "current":
 		case "subfolder":
-			attachmentsFolderPath = normalizePath(Utils.joinPaths(currentNoteFolderPath, folderPathSetting))
+			attachmentsFolderPath = normalizePath(Utils.joinPaths(currentNoteFolderPath, Utils.removeRelative(folderPathSetting)))
 			break;
 		case "root":
 		case "folder":
 			attachmentsFolderPath = normalizePath(folderPathSetting)
 			break;
 		}
-
-		console.log(findFolderType(folderPathSetting));
-		console.log(attachmentsFolderPath);
-		console.log(normalizePath('/fefd/vff'));
-		console.log(normalizePath('./fefd/vff'));
-		console.log(normalizePath('.'));
 
 		return {
 			attachmentsFolderPath,
@@ -1579,6 +1582,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 					attachmentFolderSetting.settingEl.style.display = '';
 					break;
 				}
+				this.plugin.parseAttachmentFolderPath();
 			}
 
 			const attachmentFolderPath = this.app.vault.getConfig("attachmentFolderPath");

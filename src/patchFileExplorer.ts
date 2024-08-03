@@ -82,10 +82,10 @@ function updateVisibilityAttachmentFolders(plugin: ImportAttachments){
 		const viewInstance = leaf.view as FileExplorerView;
 
 		Object.entries(viewInstance.fileItems).forEach(([folderPath, item]) => {
-			if(!hide) {
-				item.el.toggleClass("import-plugin-hidden",false);
-			} else {
+			if(hide) {
 				item.el.toggleClass("import-plugin-hidden",plugin.matchAttachmentFolder(folderPath))
+			} else {
+				item.el.toggleClass("import-plugin-hidden",false);
 			}
 		});
 	}
