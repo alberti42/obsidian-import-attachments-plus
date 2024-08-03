@@ -165,12 +165,12 @@ export default class ImportAttachments extends Plugin {
 				this.matchAttachmentFolder = (filePath: string): boolean => {
 					return filePath === folderPath;
 				}	
-				break;
+				return;
 			case AttachmentFolderLocationType.SUBFOLDER:
 				this.matchAttachmentFolder = (filePath: string): boolean => {
 					return filePath.endsWith(`/${folderPath}`) || filePath === folderPath;
 				}	
-				break;
+				return;
 			}
 		}		
 	}
@@ -515,11 +515,7 @@ export default class ImportAttachments extends Plugin {
 		}
 		
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, getSettingsFromData(await this.loadData()));
-	}
-
-	async loadSettingss() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-		this.settings.logs = {};
+		delete this.settings.logs;
 		this.parseAttachmentFolderPath();
 	}
 

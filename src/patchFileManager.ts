@@ -117,7 +117,7 @@ async function deleteAttachmentFolder(plugin: ImportAttachments, file: TAbstract
 	const file_parsed = Utils.parseFilePath(file.path);
 	if (file_parsed.ext !== ".md") { return; }
 
-	const attachmentFolderPath = plugin.getAttachmentFolder(file_parsed);
+	const attachmentFolderPath = plugin.getFullAttachmentFolder(file_parsed);
 	if (!attachmentFolderPath) { return; }
 
 	if (await Utils.doesFolderExist(plugin.app.vault,attachmentFolderPath.attachmentsFolderPath)) {
