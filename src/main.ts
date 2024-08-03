@@ -567,6 +567,9 @@ export default class ImportAttachments extends Plugin {
 	}
 
 	async loadSettings() {
+
+		// data = 
+
 		const getSettingsFromData = (data:unknown): unknown =>
 		{
 			if (isSettingsLatestFormat(data)) {
@@ -590,7 +593,7 @@ export default class ImportAttachments extends Plugin {
 				const attachmentFolderPath = folderPath;
 
 				// Exclude folderPath and relativeLocation from oldSettings
-	            const { folderPath: _, relativeLocation: __, ...filteredOldSettings } = oldSettings;
+	            const { folderPath: _, relativeLocation: __, linkFormat: ___, ...filteredOldSettings } = oldSettings;
 				
 				// Update the data with the new format
 				const newSettings: ImportAttachmentsSettings = {
@@ -599,13 +602,11 @@ export default class ImportAttachments extends Plugin {
 					attachmentFolderLocation: attachmentFolderLocation,
 					compatibility: '1.4.0',
 				};
-
 				return getSettingsFromData(newSettings);
 			}
 		}
 		
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, getSettingsFromData(await this.loadData()));
-		console.log(this.settings);
 	}
 
 	async loadSettingss() {

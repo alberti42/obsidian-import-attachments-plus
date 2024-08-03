@@ -56,24 +56,11 @@ export interface ImportAttachmentsSettings {
 	logs?: Record<string, string[]>; // To include logs on mobile apps
 }
 
-// Extend the original interface and override the annotations property
-export interface ImportAttachmentsSettings_1_3_0 extends Omit<ImportAttachmentsSettings, 'attachmentFolderLocation' | 'attachmentFolderPath' | 'compatibility'> {
-  relativeLocation: RelativeLocation;
-  folderPath: string;
-}
-
 export function isSettingsLatestFormat(s:unknown): s is ImportAttachmentsSettings {
 	if (typeof s !== 'object' || s === null) {
 		return false;
 	}
 	return 'folderPath' in s && 'compatibility' in s && s.compatibility === DEFAULT_SETTINGS.compatibility;
-}
-
-export function isSettingsFormat_1_3_0(s:unknown): s is ImportAttachmentsSettings_1_3_0 {
-	if (typeof s !== 'object' || s === null) {
-		return false;
-	}
-	return !('compatibility' in s);
 }
 
 export interface ParsedPath {
@@ -158,18 +145,24 @@ export function isAttachmentFolderLocationType(value: unknown): value is Attachm
            value === AttachmentFolderLocationType.SUBFOLDER;
 }
 
-// export function findFolderType(folderPath: string): AttachmentFolderPathType {
-//     if ("/" === folderPath || "" === folderPath) { // vault root
-//         return AttachmentFolderPathType.ROOT;
-//     } else {
-//         if ("./" === folderPath || "." === folderPath) { // current folder
-//             return AttachmentFolderPathType.CURRENT;
-//         } else { // folder or subfolder
-//             if (folderPath.startsWith("./")) { // subfolder
-//                 return AttachmentFolderPathType.SUBFOLDER;
-//             } else { // folder
-//                 return AttachmentFolderPathType.FOLDER;
-//             }
-//         }
-//     } 
-// }
+
+/* Format version 1.3.0 */
+
+export enum LinkFormat {
+	RELATIVE='RELATIVE', // Same folder as current file
+	ABSOLUTE='ABSOLUTE', // Vault folder
+}
+
+export function isSettingsFormat_1_3_0(s:unknown): s is ImportAttachmentsSettings_1_3_0 {
+	if (typeof s !== 'object' || s === null) {
+		return false;
+	}
+	return !('compatibility' in s);
+}
+
+// Extend the original interface and override the annotations property
+export interface ImportAttachmentsSettings_1_3_0 extends Omit<ImportAttachmentsSettings, 'attachmentFolderLocation' | 'attachmentFolderPath' | 'compatibility'> {
+  relativeLocation: RelativeLocation;
+  folderPath: string;
+  linkFormat: LinkFormat;
+}

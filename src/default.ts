@@ -1,6 +1,6 @@
 // defaults.ts
 
-import {AttachmentFolderLocationType, ImportActionType, ImportAttachmentsSettings, ImportAttachmentsSettings_1_3_0, MultipleFilesImportTypes, RelativeLocation, YesNoTypes} from 'types'
+import {AttachmentFolderLocationType, ImportActionType, ImportAttachmentsSettings, ImportAttachmentsSettings_1_3_0, LinkFormat, MultipleFilesImportTypes, RelativeLocation, YesNoTypes} from 'types'
 
 // Default plugin settings
 export const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
@@ -35,4 +35,5 @@ export const DEFAULT_SETTINGS_1_3_0: ImportAttachmentsSettings_1_3_0 = {
   ...DEFAULT_SETTINGS_1_3_0_FILTERED,
   relativeLocation: RelativeLocation.SAME, // Default to vault
   folderPath: '${notename} (attachments)', // Default to a folder in the vault
+  linkFormat: LinkFormat.RELATIVE,
 };
