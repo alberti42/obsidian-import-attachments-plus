@@ -29,11 +29,6 @@ export enum RelativeLocation {
 	VAULT='VAULT', // Vault folder
 }
 
-export enum LinkFormat {
-	RELATIVE='RELATIVE', // Same folder as current file
-	ABSOLUTE='ABSOLUTE', // Vault folder
-}
-
 export interface ImportAttachmentsSettings {
 	actionDroppedFilesOnImport: ImportActionType;
 	lastActionDroppedFilesOnImport: ImportActionType;
@@ -44,6 +39,7 @@ export interface ImportAttachmentsSettings {
 	multipleFilesImportType: MultipleFilesImportTypes;
 	customDisplayText: boolean;
 	relativeLocation: RelativeLocation;
+	folderLocation: AttachmentFolderLocationType;
 	folderPath: string;
 	dateFormat: string;
 	attachmentName: string;
@@ -113,7 +109,13 @@ export enum CheckboxOptions {
 
 // Obsidian options 
 export type LinkType = 'absolute' | 'relative' | 'shortest';
-export type AttachmentFolderPathType = 'root' | 'current' | 'folder' | 'subfolder';
+
+export enum AttachmentFolderLocationType {
+    ROOT = 'ROOT',
+    CURRENT = 'CURRENT',
+    FOLDER = 'FOLDER',
+    SUBFOLDER = 'SUBFOLDER'
+}
 
 export function isBoolean(value: unknown): value is boolean {
     return typeof value === 'boolean';
@@ -127,22 +129,25 @@ export function isLinkType(value: unknown): value is LinkType {
     return value === 'absolute' || value === 'relative' || value === 'shortest';
 }
 
-export function isAttachmentFolderPathType(value: unknown): value is AttachmentFolderPathType {
-    return value === 'root' || value === 'current' || value === 'folder' || value === 'subfolder';
+export function isAttachmentFolderLocationType(value: unknown): value is AttachmentFolderLocationType {
+    return value === AttachmentFolderLocationType.ROOT || 
+           value === AttachmentFolderLocationType.CURRENT || 
+           value === AttachmentFolderLocationType.FOLDER || 
+           value === AttachmentFolderLocationType.SUBFOLDER;
 }
 
-export function findFolderType(folderPath:string):AttachmentFolderPathType {
-	if ("/" === folderPath || "" === folderPath) { // vault root
-		return 'root';
-	} else {
-		if ( "./" === folderPath || "." === folderPath ) { // current folder
-			return 'current';
-		} else { // folder or subfolder
-			if (folderPath.startsWith("./")) { // subfolder
-				return 'subfolder';
-			} else { // folder
-				return 'folder';
-			}
-		}
-	} 
-}
+// export function findFolderType(folderPath: string): AttachmentFolderPathType {
+//     if ("/" === folderPath || "" === folderPath) { // vault root
+//         return AttachmentFolderPathType.ROOT;
+//     } else {
+//         if ("./" === folderPath || "." === folderPath) { // current folder
+//             return AttachmentFolderPathType.CURRENT;
+//         } else { // folder or subfolder
+//             if (folderPath.startsWith("./")) { // subfolder
+//                 return AttachmentFolderPathType.SUBFOLDER;
+//             } else { // folder
+//                 return AttachmentFolderPathType.FOLDER;
+//             }
+//         }
+//     } 
+// }

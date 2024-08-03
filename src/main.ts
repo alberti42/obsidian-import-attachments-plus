@@ -16,8 +16,8 @@ import {
 	PluginManifest,
 	TextComponent,
 	normalizePath,
-    DropdownComponent,
-    BaseComponent,
+	DropdownComponent,
+	BaseComponent,
 } from "obsidian";
 
 // Import utility and modal components
@@ -35,11 +35,10 @@ import {
 	RelativeLocation,
 	isBoolean,
 	isLinkType,
-	isAttachmentFolderPathType,
-	AttachmentFolderPathType,
+	isAttachmentFolderLocationType,
+	AttachmentFolderLocationType,
 	ParsedPath,
 	isString,
-	findFolderType,
 } from './types';
 import * as Utils from "utils";
 
@@ -66,6 +65,7 @@ const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 	lastEmbedFilesOnImport: YesNoTypes.NO, // Default to linking
 	multipleFilesImportType: MultipleFilesImportTypes.BULLETED, // Default to bulleted list when importing multiple files
 	relativeLocation: RelativeLocation.SAME, // Default to vault
+	folderLocation: AttachmentFolderLocationType.SUBFOLDER, // Default to vault
 	folderPath: '${notename} (attachments)', // Default to a folder in the vault
 	attachmentName: '${original}', // Default to the original name of the attachment
 	dateFormat: 'YYYY_MM_DDTHH_mm_ss',
@@ -85,10 +85,10 @@ const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 export default class ImportAttachments extends Plugin {
 	settings: ImportAttachmentsSettings = { ...DEFAULT_SETTINGS };
 	vaultPath: string;
+	private settingsTab: ImportAttachmentsSettingTab;
 	private deleteCallbackEnabled: boolean = true;
 	private observer: MutationObserver | null = null;
 	private hideFolderNames: Array<string> = [];
-	private saveTimeout: number | null = null;
 	matchAttachmentFolder: ((str:string)=>boolean) = (_:string) => true;
 
 	constructor(app: App, manifest: PluginManifest) {
@@ -98,6 +98,8 @@ export default class ImportAttachments extends Plugin {
 			monkeyPatchConsole(this);
 			console.log("Import Attachments+: development mode including extra logging and debug features");
 		}
+
+		this.settingsTab = new ImportAttachmentsSettingTab(this.app, this);
 
 		// Store the path to the vault
 		if (Platform.isDesktopApp) {
@@ -208,17 +210,21 @@ export default class ImportAttachments extends Plugin {
 			return new RegExp(regexPattern);
 		}
 
-		const folderPath = this.app.vault.getConfig('attachmentFolderPath') as string;
+		switch(this.settings.folderLocation) {
+		case AttachmentFolderLocationType.CURRENT:
+		case AttachmentFolderLocationType.ROOT:
+			this.matchAttachmentFolder = (filePath: string): boolean => {
+				return false;
+			}
+			return;
+		}
+
+		const folderPath = this.settings.folderPath;
 		const placeholder = "${notename}";
 
-		if(folderPath.includes("${notename}")) {
+		if(folderPath.includes(placeholder)) {
 			// Find the index of the first occurrence of the placeholder
 			const firstIndex = folderPath.indexOf(placeholder);
-
-			// If the placeholder is not found, return the whole string as the first part and an empty string as the second part
-			if (firstIndex === -1) {
-				return [folderPath, ""];
-			}
 
 			// Find the index of the last occurrence of the placeholder
 			const lastIndex = folderPath.lastIndexOf(placeholder);
@@ -227,10 +233,10 @@ export default class ImportAttachments extends Plugin {
 			const endOfPlaceholderIndex = lastIndex + placeholder.length;
 
 			// Extract the parts before the first occurrence and after the last occurrence of the placeholder
-			const folderPathStartsWith = Utils.removeRelative(folderPath.substring(0, firstIndex))
+			const folderPathStartsWith = folderPath.substring(0, firstIndex)
 			const folderPathEndsWith = folderPath.substring(endOfPlaceholderIndex);
 			
-			this.matchAttachmentFolder = (filePath: string, relativeLocation?: boolean | undefined): boolean => {
+			this.matchAttachmentFolder = (filePath: string): boolean => {
 
 				// Check if filePath starts with startsWidth or contains /startsWidth
 				const startsWithMatch = filePath.startsWith(folderPathStartsWith) || filePath.includes(`/${folderPathStartsWith}`);
@@ -240,34 +246,38 @@ export default class ImportAttachments extends Plugin {
 				// Check that both conditions are met
 				const heuristicMatch = startsWithMatch && endsWithMatch;
 
-				if(heuristicMatch)
+				if(heuristicMatch && this.settings.folderLocation === AttachmentFolderLocationType.SUBFOLDER)
 				{
-					if(relativeLocation === undefined) {
-						const folderPath = this.app.vault.getConfig('attachmentFolderPath') as string;
-						relativeLocation = folderPath == '.' || folderPath == './';
-					}
-					if(relativeLocation) {
-						const {filename, dir} = Utils.parseFilePath(filePath);
+					const folderPath = this.settings.folderPath;
+					const {filename, dir} = Utils.parseFilePath(filePath);
 
-						const regex = createRegexFromFolderPattern(folderPath);
+					const regex = createRegexFromFolderPattern(folderPath);
 
-						// Use the match method to get the groups
-						const match = filename.match(regex);
+					// Use the match method to get the groups
+					const match = filename.match(regex);
 
-						if (match && match[1]) {
-							const noteName = normalizePath(Utils.joinPaths(dir,match[1])+".md");
-							return Utils.doesFileExist(this.app.vault,noteName);
-						} else {
-							// No match found
-							return false;
-						}
+					if (match && match[1]) {
+						const noteName = normalizePath(Utils.joinPaths(dir,match[1])+".md");
+						return Utils.doesFileExist(this.app.vault,noteName);
+					} else {
+						// No match found
+						return false;
 					}
 				}
 				return heuristicMatch;
 			}
 		} else {
-			this.matchAttachmentFolder = (filePath: string): boolean => {
-				return filePath.endsWith(`/${folderPath}`) || filePath === folderPath;	
+			switch(this.settings.folderLocation) {
+			case AttachmentFolderLocationType.FOLDER:
+				this.matchAttachmentFolder = (filePath: string): boolean => {
+					return filePath === folderPath;
+				}	
+				break;
+			case AttachmentFolderLocationType.SUBFOLDER:
+				this.matchAttachmentFolder = (filePath: string): boolean => {
+					return filePath.endsWith(`/${folderPath}`) || filePath === folderPath;
+				}	
+				break;
 			}
 		}		
 	}
@@ -300,8 +310,8 @@ export default class ImportAttachments extends Plugin {
 	async onload() {
 		// Load and add settings tab
 		await this.loadSettings();
-		this.addSettingTab(new ImportAttachmentsSettingTab(this.app, this));
-
+		this.addSettingTab(this.settingsTab);
+		
 		// Set up the mutation observer for hiding folders
 		// this.setupObserver();
 
@@ -502,10 +512,10 @@ export default class ImportAttachments extends Plugin {
 					const oldPath_parsed = Utils.parseFilePath(oldPath);
 					if (oldPath_parsed.ext !== ".md") { return }
 
-					const oldAttachmentFolderPath = this.getAttachmentFolder(oldPath_parsed);
+					const oldAttachmentFolderPath = this.getFullAttachmentFolder(oldPath_parsed);
 					if (!oldAttachmentFolderPath) { return }
 					if (Utils.doesFolderExist(this.app.vault,oldAttachmentFolderPath.attachmentsFolderPath)) {
-						const newAttachmentFolderPath = this.getAttachmentFolder(Utils.parseFilePath(newFile.path));
+						const newAttachmentFolderPath = this.getFullAttachmentFolder(Utils.parseFilePath(newFile.path));
 
 						const oldPath = oldAttachmentFolderPath.attachmentsFolderPath;
 						const newPath = newAttachmentFolderPath.attachmentsFolderPath;
@@ -677,7 +687,7 @@ export default class ImportAttachments extends Plugin {
 				this.settings.embedFilesOnImport = embedOption;
 			}
 			this.settings.lastEmbedFilesOnImport = embedOption;
-			await this.debouncedSaveSettings();
+			await this.settingsTab.debouncedSaveSettings();
 		}
 
 		const doEmbed = (embedOption == YesNoTypes.YES);
@@ -691,7 +701,7 @@ export default class ImportAttachments extends Plugin {
 	}
 
 	// Get attachment folder path based on current note
-	getAttachmentFolder(md_file: ParsedPath | null = null): AttachmentFolderPath {	
+	getFullAttachmentFolder(md_file: ParsedPath | null = null): AttachmentFolderPath {	
 		// Get the current active note if md_file is not provided
 		if (!md_file) {
 			const md_active_file = this.app.workspace.getActiveFile();
@@ -708,29 +718,27 @@ export default class ImportAttachments extends Plugin {
 		const currentNoteFolderPath = md_file.dir;
 		const notename = md_file.filename;
 
-		/*let referencePath = '';
-		switch (this.settings.relativeLocation) {
-			case RelativeLocation.VAULT:
-				referencePath = '';
-				break;
-			case RelativeLocation.SAME:
-				referencePath = currentNoteFolderPath;
-				break;
-		}*/
+		this.settingsTab.cleanUpAttachmentFolderSettings();
 
-		const folderPathSetting = (this.app.vault.getConfig('attachmentFolderPath') as string).replace(/\$\{notename\}/g, notename);
+		const folderPath = this.settings.folderPath.replace(/\$\{notename\}/g, notename);
 
 		let attachmentsFolderPath;
-		switch(findFolderType(folderPathSetting)) {
-		case "current":
-		case "subfolder":
-			attachmentsFolderPath = normalizePath(Utils.joinPaths(currentNoteFolderPath, Utils.removeRelative(folderPathSetting)))
+		switch(this.settings.folderLocation) {
+		case AttachmentFolderLocationType.CURRENT:
+			attachmentsFolderPath = currentNoteFolderPath;
 			break;
-		case "root":
-		case "folder":
-			attachmentsFolderPath = normalizePath(folderPathSetting)
+		case AttachmentFolderLocationType.SUBFOLDER:
+			attachmentsFolderPath = Utils.joinPaths(currentNoteFolderPath, folderPath)
+			break;
+		case AttachmentFolderLocationType.ROOT:
+			attachmentsFolderPath = '/';
+			break;
+		case AttachmentFolderLocationType.FOLDER:
+			attachmentsFolderPath = folderPath
 			break;
 		}
+
+		attachmentsFolderPath = normalizePath(attachmentsFolderPath);
 
 		return {
 			attachmentsFolderPath,
@@ -763,7 +771,7 @@ export default class ImportAttachments extends Plugin {
 		// add the extension
 		attachmentName += originalFilePath_parsed.ext;
 
-		const { attachmentsFolderPath } = this.getAttachmentFolder(md_file);
+		const { attachmentsFolderPath } = this.getFullAttachmentFolder(md_file);
 		
 		// Ensure the directory exists before moving the file
 		if(createFolder) await Utils.createFolderIfNotExists(this.app.vault,attachmentsFolderPath);
@@ -805,7 +813,7 @@ export default class ImportAttachments extends Plugin {
 	// Function to move files to the attachments folder using fs.rename
 	async moveFileToAttachmentsFolder(filesToImport: File[], editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface) {
 
-		const { currentNoteFolderPath } = this.getAttachmentFolder();
+		const { currentNoteFolderPath } = this.getFullAttachmentFolder();
 
 		const cursor = editor.getCursor(); // Get the current cursor position before insertion
 
@@ -927,7 +935,7 @@ export default class ImportAttachments extends Plugin {
 			return;
 		}
 
-		const attachmentsFolder = this.getAttachmentFolder(Utils.parseFilePath(md_active_file.path));
+		const attachmentsFolder = this.getFullAttachmentFolder(Utils.parseFilePath(md_active_file.path));
 		
 		if (!attachmentsFolder) { return }
 
@@ -1069,29 +1077,35 @@ export default class ImportAttachments extends Plugin {
 			editor.setCursor(newCursorPos);
 		}
 	}
-
-	debouncedSaveSettings() {
-		// timeout after 250 ms
-		const timeout_ms = 250;
-
-		if (this.saveTimeout) {
-			clearTimeout(this.saveTimeout);
-		}
-
-		this.saveTimeout = window.setTimeout(() => {
-			this.saveSettings();
-			this.saveTimeout = null;
-		}, timeout_ms);
-	}
 }
 
 // Plugin settings tab
 class ImportAttachmentsSettingTab extends PluginSettingTab {
 	plugin: ImportAttachments;
 
+	private saveTimeout: number | null = null;
+
 	constructor(app: App, plugin: ImportAttachments) {
 		super(app, plugin);
 		this.plugin = plugin;
+	}
+
+	debouncedSaveSettings(fnc?:(()=>void) | undefined) {
+		// timeout after 250 ms
+		const timeout_ms = 50;
+
+		if (this.saveTimeout) {
+			clearTimeout(this.saveTimeout);
+		}
+
+		this.saveTimeout = window.setTimeout(() => {
+			if(fnc===undefined) {
+				this.plugin.saveSettings();
+			} else {
+				fnc.call(this);
+			}
+			this.saveTimeout = null;
+		}, timeout_ms);
 	}
 
 	display(): void {
@@ -1116,7 +1130,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 								if (value != ImportActionType.ASK_USER) {
 									this.plugin.settings.lastActionDroppedFilesOnImport = value as ImportActionType;
 								}
-								await this.plugin.debouncedSaveSettings();
+								await this.debouncedSaveSettings();
 							} else {
 								console.error('Invalid import action type:', value);
 							}
@@ -1137,7 +1151,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 								if (value != ImportActionType.ASK_USER) {
 									this.plugin.settings.lastActionPastedFilesOnImport = value as ImportActionType;
 								}
-								await this.plugin.debouncedSaveSettings();
+								await this.debouncedSaveSettings();
 							} else {
 								console.error('Invalid import action type:', value);
 							}
@@ -1158,7 +1172,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 								if (value != YesNoTypes.ASK_USER) {
 									this.plugin.settings.lastEmbedFilesOnImport = value as YesNoTypes;
 								}
-								await this.plugin.debouncedSaveSettings();
+								await this.debouncedSaveSettings();
 							} else {
 								console.error('Invalid option selection:', value);
 							}
@@ -1176,7 +1190,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 						.onChange(async (value: string) => {
 							if (Object.values(MultipleFilesImportTypes).includes(value as MultipleFilesImportTypes)) {
 								this.plugin.settings.multipleFilesImportType = value as MultipleFilesImportTypes;
-								await this.plugin.debouncedSaveSettings();
+								await this.debouncedSaveSettings();
 							} else {
 								console.error('Invalid option selection:', value);
 							}
@@ -1190,7 +1204,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.customDisplayText)
 					.onChange(async (value: boolean) => {
 						this.plugin.settings.customDisplayText = value;
-						await this.plugin.debouncedSaveSettings(); // Update visibility based on the toggle
+						await this.debouncedSaveSettings(); // Update visibility based on the toggle
 					}));
 
 			const wikilinksSetting = new Setting(containerEl)
@@ -1277,7 +1291,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 					text.setValue(this.plugin.settings.openAttachmentExternalExtExcluded);
 					text.onChange(async (value: string) => {
 						this.plugin.settings.openAttachmentExternalExtExcluded = validate_exts(text, value);
-						await this.plugin.debouncedSaveSettings();
+						await this.debouncedSaveSettings();
 					});
 					// Event when the text field loses focus
 					text.inputEl.onblur = async () => {
@@ -1294,7 +1308,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 				.onChange(async (value: boolean) => {
 					// Hide external_exclude_ext if the toggle is off
 					this.plugin.settings.openAttachmentExternal = value;
-					await this.plugin.debouncedSaveSettings();
+					await this.debouncedSaveSettings();
 					external_exclude_ext.settingEl.style.display = value ? "" : "none"; // Update visibility based on the toggle
 				}));
 
@@ -1316,7 +1330,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 					text.setValue(this.plugin.settings.revealAttachmentExtExcluded);
 					text.onChange(async (value: string) => {
 						this.plugin.settings.revealAttachmentExtExcluded = validate_exts(text, value);
-						await this.plugin.debouncedSaveSettings();
+						await this.debouncedSaveSettings();
 					});
 					// Event when the text field loses focus
 					text.inputEl.onblur = async () => {
@@ -1333,7 +1347,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 				.onChange(async (value: boolean) => {
 					// Hide reveal_exclude_ext if the toggle is off
 					this.plugin.settings.revealAttachment = value;
-					await this.plugin.debouncedSaveSettings();
+					await this.debouncedSaveSettings();
 					reveal_exclude_ext.settingEl.style.display = value ? "" : "none";  // Update visibility based on the toggle
 				}));
 		}
@@ -1348,7 +1362,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.autoRenameAttachmentFolder)
 				.onChange(async (value: boolean) => {
 					this.plugin.settings.autoRenameAttachmentFolder = value;
-					await this.plugin.debouncedSaveSettings();
+					await this.debouncedSaveSettings();
 				}));
 
 		new Setting(containerEl)
@@ -1360,7 +1374,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.autoDeleteAttachmentFolder)
 				.onChange(async (value: boolean) => {
 					this.plugin.settings.autoDeleteAttachmentFolder = value;
-					await this.plugin.debouncedSaveSettings();
+					await this.debouncedSaveSettings();
 				}));
 
 		new Setting(containerEl)
@@ -1370,7 +1384,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.confirmDeleteAttachmentFolder)
 				.onChange(async (value: boolean) => {
 					this.plugin.settings.confirmDeleteAttachmentFolder = value;
-					await this.plugin.debouncedSaveSettings();
+					await this.debouncedSaveSettings();
 				}));
 
 		new Setting(containerEl).setName('Attachment folder').setHeading();
@@ -1379,44 +1393,16 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 
 			this.addAttachmentFolderSettings(containerEl);
 
-			/*
 			new Setting(containerEl)
-				.setName('Default location for new attachments:')
-				.setDesc('The reference folder for importing new attachments.')
-				.addDropdown(dropdown => {
-					dropdown.addOption(RelativeLocation.VAULT, 'Vault folder');
-					dropdown.addOption(RelativeLocation.SAME, 'Same folder as current file');
-					dropdown.setValue(this.plugin.settings.relativeLocation)
-						.onChange(async (value: string) => {
-							if (Object.values(RelativeLocation).includes(value as RelativeLocation)) {
-								this.plugin.settings.relativeLocation = value as RelativeLocation;
-								await this.plugin.debouncedSaveSettings();
-							} else {
-								console.error('Invalid option selection:', value);
-							}
-						})
-				});
-			*/
-
-			/*
-			new Setting(containerEl)
-				.setName('Attachment folder where to import new attachments, relative to the default location:')
-				.setDesc(createFragment((frag) => {
-					frag.appendText('Where attachments are placed, using the following variables as a placeholder:');
-					frag.createEl('ul')
-						.createEl('li', { text: '${notename} for the name of the original file' })
-						.createEl('li', { text: '${date} for the current date' });
-				})).addText(text => {
-					text.setPlaceholder('Enter folder path');
-					text.setValue(this.plugin.settings.folderPath);
-					text.onChange(async (value: string) => {
-						this.plugin.settings.folderPath = value;
-						await this.plugin.debouncedSaveSettings();
-						this.plugin.parseAttachmentFolderPath();
-						updateVisibilityAttachmentFolders(this.plugin);
-					})
-				});
-			*/
+			.setName('Hide attachment folders:')
+			.setDesc('If this option is enabled, the attachment folders will not be shown.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.hideAttachmentFolders)
+				.onChange(async (value: boolean) => {
+					this.plugin.settings.hideAttachmentFolders = value;
+					await this.debouncedSaveSettings();
+					updateVisibilityAttachmentFolders(this.plugin);
+				}));
 
 			new Setting(containerEl).setName('Attachments').setHeading();
 
@@ -1438,7 +1424,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 							value = '${original}'; // TODO: improve checking the input by the user that it is not empty
 						}
 						this.plugin.settings.attachmentName = value;
-						await this.plugin.debouncedSaveSettings();
+						await this.debouncedSaveSettings();
 					})
 				});
 
@@ -1457,127 +1443,101 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 					text.setValue(this.plugin.settings.dateFormat);
 					text.onChange(async (value: string) => {
 						this.plugin.settings.dateFormat = value;
-						await this.plugin.debouncedSaveSettings();
+						await this.debouncedSaveSettings();
 					})
 				});
 		}
 
-		new Setting(containerEl)
-			.setName('Hide attachment folders:')
-			.setDesc('If this option is enabled, the attachment folders will not be shown.')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.hideAttachmentFolders)
-				.onChange(async (value: boolean) => {
-					this.plugin.settings.hideAttachmentFolders = value;
-					await this.plugin.debouncedSaveSettings();
-					updateVisibilityAttachmentFolders(this.plugin);
-				}));
 	}
 
-	addAttachmentFolderSettings(containerEl:HTMLElement): void  {
+	cleanUpAttachmentFolderSettings(): void {
+		let folderPath = normalizePath(this.plugin.settings.folderPath).replace(/^(\.\/)*\.?/,'');  // map ./././path1/path2 to path1/path2
 
-		const defaultLocationSetting = new Setting(containerEl)
-			.setName('Default location for new attachments:')
-			.setDesc(createFragment((frag) => {
-				frag.appendText('Where newly added attachments are placed. ');
-				this.addWarningGeneralSettings(frag);
-			}));
-
-		const saveAttachmentFolderSetting = (type:AttachmentFolderPathType,folderPath:string):void => {
-			if (type==='root') {
-				attachmentFolderSetting.settingEl.style.display = 'none';
-				this.app.vault.setConfig("attachmentFolderPath", '/');
-			} else if (type=='folder') {
-				attachmentFolderSetting.settingEl.style.display = '';
-				if(folderPathComponent instanceof TextComponent) {
-					this.app.vault.setConfig("attachmentFolderPath", folderPath);
-				}
-			} else if (type=='current') {
-				attachmentFolderSetting.settingEl.style.display = 'none';
-				this.app.vault.setConfig("attachmentFolderPath", './');
-			} else if (type=='subfolder') {
-				attachmentFolderSetting.settingEl.style.display = '';
-				if(folderPathComponent instanceof TextComponent) {
-					this.app.vault.setConfig("attachmentFolderPath", './' + folderPath);
-				}
-			} else {
-				console.error('Invalid option selection:', type);
+		if(this.plugin.settings.folderLocation === AttachmentFolderLocationType.FOLDER) {
+			if(folderPath=='/') {
+				this.plugin.settings.folderLocation = AttachmentFolderLocationType.ROOT;
 			}
 		}
 
-		let folderPathComponent:TextComponent;
+		if(this.plugin.settings.folderLocation === AttachmentFolderLocationType.SUBFOLDER) {
+			if(folderPath=='/') {
+				this.plugin.settings.folderLocation = AttachmentFolderLocationType.CURRENT;
+			}
+		}
+	}
+
+	hide(): void {
+        this.cleanUpAttachmentFolderSettings();
+    }
+
+	addAttachmentFolderSettings(containerEl:HTMLElement): void  {
+
+		this.cleanUpAttachmentFolderSettings();
+
+		const attachmentFolderLocationSetting = new Setting(containerEl)
+			.setName('Default location for new attachments:')
+			.setDesc(createFragment((frag) => {
+				frag.appendText('Where newly added attachments are placed.');
+			}));
+
 		const attachmentFolderSetting = new Setting(containerEl)
 			.setName('Attachment folder path:')
 			.setDesc(createFragment((frag) => {
 				frag.appendText('Place newly created attachment files, such as images created via drag-and-drop or audio recordings, in this folder.  Use the following variables as a placeholder:');
 				const ul = frag.createEl('ul');
 				ul.createEl('li', { text: '${notename} for the name of the original file' });
-				
-        		// Create a div and append the fragment containing the warning
-        		const warningDiv = frag.createDiv().appendChild(createFragment((frag) => {
-        			const span = this.addWarningGeneralSettings(frag);
-        			span.appendText(' If you decide to disable this plugin, remember to remove from the pane "Files and links" any placeholder because placeholders are not recognized by Obsidian standard import functions.');
-        			return frag;
-        		}));
-			}));
-
-		attachmentFolderSetting.addText(text => {
-			folderPathComponent = text;
-			text.setPlaceholder('Example: folder 1/folder');
+			})).addText(text => {
+				text.setPlaceholder('Example: folder 1/folder');
+				text.setValue(this.plugin.settings.folderPath);
+				text.onChange(async (value: string) => {
+					this.plugin.settings.folderPath = value;
+					this.debouncedSaveSettings(():void => {
+						this.plugin.saveSettings();
+						this.plugin.parseAttachmentFolderPath();
+						updateVisibilityAttachmentFolders(this.plugin);
+					});
+				})
 		});
 
-		let folderTypeComponent:DropdownComponent;
-		defaultLocationSetting.addDropdown(dropdown => {
-			folderTypeComponent = dropdown;
-			const setValue = (folderPath:string) => {
-				switch(findFolderType(folderPath)) {
-				case "root":
-					folderTypeComponent.setValue("root");
+		attachmentFolderLocationSetting.addDropdown(dropdown => {
+			const updateVisibilityFolderPath = (folderLocation:AttachmentFolderLocationType):void => {
+				switch(folderLocation) {
+				case AttachmentFolderLocationType.ROOT:
+				case AttachmentFolderLocationType.CURRENT:
 					attachmentFolderSetting.settingEl.style.display = 'none';
 					break;
-				case "current":
-					folderTypeComponent.setValue("current");
-					attachmentFolderSetting.settingEl.style.display = 'none';
-					break;
-				case "subfolder":
-					folderTypeComponent.setValue("subfolder");
-					folderPathComponent.setValue(folderPath.slice(2));
-					attachmentFolderSetting.settingEl.style.display = '';
-					break;
-				case "folder":
-					folderTypeComponent.setValue("folder");
-					folderPathComponent.setValue(folderPath);
+				case AttachmentFolderLocationType.FOLDER:
+				case AttachmentFolderLocationType.SUBFOLDER:
 					attachmentFolderSetting.settingEl.style.display = '';
 					break;
 				}
-				this.plugin.parseAttachmentFolderPath();
 			}
 
-			const attachmentFolderPath = this.app.vault.getConfig("attachmentFolderPath");
-			if (!isString(attachmentFolderPath)) {
-				defaultLocationSetting.settingEl.remove();
-				attachmentFolderSetting.settingEl.remove();
-				return;
-			}
-			
-			dropdown.addOption('root', 'Vault folder');
-			dropdown.addOption('folder', 'In the folder specified below');
-			dropdown.addOption('current', 'Same folder as current file');
-			dropdown.addOption('subfolder', 'In subfolder under current folder');
-			
-			if(folderPathComponent instanceof TextComponent) {
-				setValue(attachmentFolderPath)
-			}
+			dropdown.addOption(AttachmentFolderLocationType.ROOT, 'Vault folder');
+			dropdown.addOption(AttachmentFolderLocationType.FOLDER, 'In the folder specified below');
+			dropdown.addOption(AttachmentFolderLocationType.CURRENT, 'Same folder as current file');
+			dropdown.addOption(AttachmentFolderLocationType.SUBFOLDER, 'In subfolder under current folder');
 
+			dropdown.setValue(this.plugin.settings.folderLocation);
+			updateVisibilityFolderPath(this.plugin.settings.folderLocation);
+									
 			dropdown.onChange(async (value: string) => {
-					if(isAttachmentFolderPathType(value)) saveAttachmentFolderSetting(value,folderPathComponent.getValue());
+				if(!isAttachmentFolderLocationType(value)) {
+					console.error('Invalid option selection:', value);
+					return;
+				}
+
+				this.plugin.settings.folderLocation = value;
+				updateVisibilityFolderPath(value);
+			
+				this.debouncedSaveSettings(():void => {
+					this.plugin.saveSettings();
+					this.plugin.parseAttachmentFolderPath();
+					updateVisibilityAttachmentFolders(this.plugin);
+				});
 			})
 		});
 
-		folderPathComponent!.onChange(async (value: string) => {
-			const folderType = folderTypeComponent.getValue();
-			if(isAttachmentFolderPathType(folderType)) saveAttachmentFolderSetting(folderType,value);
-		});
 	}
 
 	addWarningGeneralSettings(frag: DocumentFragment): HTMLElement {
