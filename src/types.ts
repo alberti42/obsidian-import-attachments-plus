@@ -43,8 +43,8 @@ export interface ImportAttachmentsSettings {
 	lastEmbedFilesOnImport: YesNoTypes;
 	multipleFilesImportType: MultipleFilesImportTypes;
 	customDisplayText: boolean;
-	// relativeLocation: RelativeLocation;
-	// folderPath: string;
+	relativeLocation: RelativeLocation;
+	folderPath: string;
 	dateFormat: string;
 	attachmentName: string;
 	autoRenameAttachmentFolder: boolean;

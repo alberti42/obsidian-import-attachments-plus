@@ -65,8 +65,8 @@ const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 	lastActionDroppedFilesOnImport: ImportActionType.COPY, // Default to copying files
 	lastEmbedFilesOnImport: YesNoTypes.NO, // Default to linking
 	multipleFilesImportType: MultipleFilesImportTypes.BULLETED, // Default to bulleted list when importing multiple files
-	// relativeLocation: RelativeLocation.SAME, // Default to vault
-	// folderPath: '${notename} (attachments)', // Default to a folder in the vault
+	relativeLocation: RelativeLocation.SAME, // Default to vault
+	folderPath: '${notename} (attachments)', // Default to a folder in the vault
 	attachmentName: '${original}', // Default to the original name of the attachment
 	dateFormat: 'YYYY_MM_DDTHH_mm_ss',
 	customDisplayText: true,  // Default to true
