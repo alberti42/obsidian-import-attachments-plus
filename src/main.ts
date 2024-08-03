@@ -468,7 +468,7 @@ export default class ImportAttachments extends Plugin {
 
 		// unpatch Vault
 		unpatchImportFunctions();
-		
+
 		// unpatch file-explorer plugin
 		unpatchFileExplorer();
 
@@ -514,7 +514,7 @@ export default class ImportAttachments extends Plugin {
 			}
 		}
 		
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, getSettingsFromData(DEFAULT));
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, getSettingsFromData(await this.loadData()));
 	}
 
 	async loadSettingss() {
