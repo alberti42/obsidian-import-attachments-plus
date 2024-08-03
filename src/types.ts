@@ -1,5 +1,7 @@
 // types.ts
 
+import { DEFAULT_SETTINGS } from "default";
+
 export enum ImportActionType {
 	MOVE='MOVE',
 	COPY='COPY',
@@ -38,7 +40,6 @@ export interface ImportAttachmentsSettings {
 	lastEmbedFilesOnImport: YesNoTypes;
 	multipleFilesImportType: MultipleFilesImportTypes;
 	customDisplayText: boolean;
-	relativeLocation: RelativeLocation;
 	folderLocation: AttachmentFolderLocationType;
 	folderPath: string;
 	dateFormat: string;
@@ -51,7 +52,27 @@ export interface ImportAttachmentsSettings {
 	revealAttachmentExtExcluded: string;
 	openAttachmentExternal: boolean;
 	openAttachmentExternalExtExcluded: string;
+	compatibility: string;
 	logs?: Record<string, string[]>; // To include logs on mobile apps
+}
+
+// Extend the original interface and override the annotations property
+export interface ImportAttachmentsSettings_1_3_0 extends Omit<ImportAttachmentsSettings, 'folderLocation'> {
+  relativeLocation: RelativeLocation;  
+}
+
+export function isSettingsLatestFormat(s:unknown): s is ImportAttachmentsSettings {
+	if (typeof s !== 'object' || s === null) {
+		return false;
+	}
+	return 'compatibility' in s	&& s.compatibility === DEFAULT_SETTINGS.compatibility;
+}
+
+export function isSettingsFormat_1_3_0(s:unknown): s is ImportAttachmentsSettings {
+	if (typeof s !== 'object' || s === null) {
+		return false;
+	}
+	return !('compatibility' in s);
 }
 
 export interface ParsedPath {

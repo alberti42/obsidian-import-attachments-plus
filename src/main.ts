@@ -39,6 +39,8 @@ import {
 	AttachmentFolderLocationType,
 	ParsedPath,
 	isString,
+    isSettingsLatestFormat,
+    isSettingsFormat_1_3_0,
 } from './types';
 import * as Utils from "utils";
 
@@ -55,31 +57,7 @@ import { patchImportFunctions, unpatchImportFunctions } from "patchImportFunctio
 import { patchFileExplorer, unpatchFileExplorer, updateVisibilityAttachmentFolders } from "patchFileExplorer";
 import { monkeyPatchConsole, unpatchConsole } from "patchConsole";
 
-// Default plugin settings
-const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
-	actionDroppedFilesOnImport: ImportActionType.ASK_USER, // Default to asking the user
-	actionPastedFilesOnImport: ImportActionType.ASK_USER, // Default to asking the user
-	embedFilesOnImport: YesNoTypes.ASK_USER, // Default to linking files
-	lastActionPastedFilesOnImport: ImportActionType.COPY, // Default to copying files
-	lastActionDroppedFilesOnImport: ImportActionType.COPY, // Default to copying files
-	lastEmbedFilesOnImport: YesNoTypes.NO, // Default to linking
-	multipleFilesImportType: MultipleFilesImportTypes.BULLETED, // Default to bulleted list when importing multiple files
-	relativeLocation: RelativeLocation.SAME, // Default to vault
-	folderLocation: AttachmentFolderLocationType.SUBFOLDER, // Default to vault
-	folderPath: '${notename} (attachments)', // Default to a folder in the vault
-	attachmentName: '${original}', // Default to the original name of the attachment
-	dateFormat: 'YYYY_MM_DDTHH_mm_ss',
-	customDisplayText: true,  // Default to true
-	autoRenameAttachmentFolder: true, // Default to true
-	autoDeleteAttachmentFolder: true, // Default to true
-	confirmDeleteAttachmentFolder: true, // Default to true
-	hideAttachmentFolders: true, // Default to true
-	revealAttachment: true, // Default to true
-	revealAttachmentExtExcluded: '.md', // Default to Markdown files
-	openAttachmentExternal: true, // Default to true
-	openAttachmentExternalExtExcluded: '.md', // Default to Markdown files
-	logs: {}, // Initialize logs as an empty array
-};
+import { DEFAULT_SETTINGS } from "default";
 
 // Main plugin class
 export default class ImportAttachments extends Plugin {
@@ -587,7 +565,48 @@ export default class ImportAttachments extends Plugin {
 		unpatchConsole();
 	}
 
-	async loadSettings() {
+	async loadSettings(): Promise<Record<string,string>> {
+		const getSettingsFromData = (data:unknown): unknown =>
+		{
+			if (isSettingsLatestFormat(data)) {
+				const settings: ImportAttachmentsSettings = data;
+				return settings;
+			} else if (isSettingsFormat_1_3_0(data)) { // previous versions where the name of the plugins was not stored
+				// Upgrade annotations format
+				const upgradedAnnotations:PluginAnnotationDict = {};
+				const idMapToPluginName = this.generateInvertedMap(pluginNameToIdMap);
+
+				for (const pluginId in data.annotations) {
+					const annotation = data.annotations[pluginId];
+					upgradedAnnotations[pluginId] = {
+						name: idMapToPluginName[pluginId] || pluginId,
+						anno: annotation
+					};
+				}
+				const oldSettings:PluginsAnnotationsSettingsWithoutNames = data;
+				
+				// Update the data with the new format
+				const newSettings: PluginsAnnotationsSettings = {
+					...oldSettings,
+					annotations: upgradedAnnotations,
+					plugins_annotations_uuid: DEFAULT_SETTINGS.plugins_annotations_uuid,
+				};
+
+				return getSettingsFromData(newSettings);
+			} else {
+				// Very first version of the plugin -- no options were stored, only the dictionary of annotations
+				const newSettings:PluginsAnnotationsSettingsWithoutNames = {...DEFAULT_SETTINGS_WITHOUT_NAMES};
+				newSettings.annotations = isPluginAnnotationDictWithoutNames(data) ? data : DEFAULT_SETTINGS_WITHOUT_NAMES.annotations;
+				return getSettingsFromData(newSettings);
+			}
+		}
+
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, getSettingsFromData(await this.loadData()));
+
+		return pluginNameToIdMap;
+	}
+
+	async loadSettingss() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
 		this.settings.logs = {};
 		this.parseAttachmentFolderPath();
