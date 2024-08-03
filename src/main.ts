@@ -16,8 +16,6 @@ import {
 	PluginManifest,
 	TextComponent,
 	normalizePath,
-	DropdownComponent,
-	BaseComponent,
 } from "obsidian";
 
 // Import utility and modal components
@@ -38,14 +36,13 @@ import {
 	isAttachmentFolderLocationType,
 	AttachmentFolderLocationType,
 	ParsedPath,
-	isString,
     isSettingsLatestFormat,
     isSettingsFormat_1_3_0,
     ImportAttachmentsSettings_1_3_0,
 } from './types';
 import * as Utils from "utils";
 
-import { sep, posix, normalize } from 'path';
+import { sep, posix } from 'path';
 
 import { promises as fs } from 'fs';  // This imports the promises API from fs
 
@@ -65,9 +62,6 @@ export default class ImportAttachments extends Plugin {
 	settings: ImportAttachmentsSettings = { ...DEFAULT_SETTINGS };
 	vaultPath: string;
 	private settingsTab: ImportAttachmentsSettingTab;
-	private deleteCallbackEnabled: boolean = true;
-	private observer: MutationObserver | null = null;
-	private hideFolderNames: Array<string> = [];
 	matchAttachmentFolder: ((str:string)=>boolean) = (_:string) => true;
 
 	constructor(app: App, manifest: PluginManifest) {
@@ -93,86 +87,6 @@ export default class ImportAttachments extends Plugin {
 			this.vaultPath = "";
 		}
 	}
-
-	// Observer to hide attachment folders
-	/*
-	setupObserver() {
-		this.configureHideFolderNames();
-
-		const callback: MutationCallback = (mutationsList, observer) => {
-			mutationsList.forEach(record => {
-				if (record.target?.parentElement?.classList.contains("nav-folder")) {
-					this.hideAttachmentFolders();
-				}
-			});
-		};
-
-		this.observer = new MutationObserver(callback);
-
-		const config = {
-			childList: true,
-			subtree: true,
-		};
-
-		const navContainer = document.querySelector('.nav-files-container') || document.body;
-		this.observeNavFilesContainer(navContainer, config);
-	}
-
-	// Function to observe the nav-files-container
-	observeNavFilesContainer(container: Element, config: MutationObserverInit) {
-		// Disconnect any existing observer on the same container to avoid duplicate observers
-		if (this.observer) {
-			this.observer.disconnect();
-		}
-		this.observer?.observe(container, config);
-	}
-
-	// Function to hide attachment folders
-	async hideAttachmentFolders(forceRecheckingAllFolders?: boolean, specificElement?: HTMLElement) {
-		if (forceRecheckingAllFolders) {
-			document.querySelectorAll(".import-plugin-hidden").forEach((divElement: Element) => {
-				divElement.classList.remove('import-plugin-hidden');
-			});
-		}
-
-		this.hideFolderNames.forEach(folderPattern => {
-			if (folderPattern === "") return;
-			const folderElements = specificElement ? specificElement.querySelectorAll(folderPattern) : document.querySelectorAll(folderPattern);
-
-			folderElements.forEach((folder: Element) => {
-				if (folder.parentNode && folder.parentNode instanceof HTMLElement) {
-					// console.log(folder);
-					if (this.settings.hideAttachmentFolders) {
-						folder.parentNode.classList.add('import-plugin-hidden');
-					}
-				} else {
-					console.error('Parent node is not an HTML element:', folder);
-				}
-			});
-		});
-	}
-
-	// Configure the folder names to hide
-	configureHideFolderNames() {
-		const placeholder = "${notename}";
-		if (this.settings.folderPath.includes(placeholder)) {
-			const [startsWith, endsWith] = this.splitAroundOriginal(this.settings.folderPath, placeholder);
-			if (endsWith != "") {
-				this.hideFolderNames = [
-					`[data-path$="${endsWith}"]`
-				];
-			} else if (startsWith != "") {
-				this.hideFolderNames = [
-					`.nav-folder-title[data-path^="${startsWith}"], .nav-folder-title[data-path*="/${startsWith}"]`
-				];
-			}
-		} else {
-			this.hideFolderNames = [
-				`[data-path$="/${this.settings.folderPath}"], [data-path="${this.settings.folderPath}"]`
-			];
-		}
-	}
-	*/
 
 	// Function to split around the original
 	parseAttachmentFolderPath() {
@@ -554,11 +468,7 @@ export default class ImportAttachments extends Plugin {
 
 		// unpatch Vault
 		unpatchImportFunctions();
-
-		// if (this.observer) {
-		// 	this.observer.disconnect();
-		// }
-
+		
 		// unpatch file-explorer plugin
 		unpatchFileExplorer();
 
@@ -567,8 +477,6 @@ export default class ImportAttachments extends Plugin {
 	}
 
 	async loadSettings() {
-
-		// data = 
 
 		const getSettingsFromData = (data:unknown): unknown =>
 		{
@@ -606,7 +514,7 @@ export default class ImportAttachments extends Plugin {
 			}
 		}
 		
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, getSettingsFromData(await this.loadData()));
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, getSettingsFromData(DEFAULT));
 	}
 
 	async loadSettingss() {
