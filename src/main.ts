@@ -16,6 +16,8 @@ import {
 	PluginManifest,
 	TextComponent,
 	normalizePath,
+    DropdownComponent,
+    BaseComponent,
 } from "obsidian";
 
 // Import utility and modal components
@@ -31,12 +33,17 @@ import {
 	ImportFromVaultOptions,
 	YesNoTypes,
 	RelativeLocation,
-	// LinkFormat,
-	ParsedPath
+	isBoolean,
+	isLinkType,
+	isAttachmentFolderPathType,
+	AttachmentFolderPathType,
+	ParsedPath,
+	isString,
+	findFolderType,
 } from './types';
 import * as Utils from "utils";
 
-import { sep, posix } from 'path';
+import { sep, posix, normalize } from 'path';
 
 import { promises as fs } from 'fs';  // This imports the promises API from fs
 
@@ -59,9 +66,10 @@ const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 	lastEmbedFilesOnImport: YesNoTypes.NO, // Default to linking
 	multipleFilesImportType: MultipleFilesImportTypes.BULLETED, // Default to bulleted list when importing multiple files
 	relativeLocation: RelativeLocation.SAME, // Default to vault
-	folderPath: '${notename} (attachments)', // Default to a folder in the vault
+	// folderPath: '${notename} (attachments)', // Default to a folder in the vault
 	attachmentName: '${original}', // Default to the original name of the attachment
 	dateFormat: 'YYYY_MM_DDTHH_mm_ss',
+	dateFormatFolders: 'YYYY_MM_DD',
 	customDisplayText: true,  // Default to true
 	autoRenameAttachmentFolder: true, // Default to true
 	autoDeleteAttachmentFolder: true, // Default to true
@@ -201,7 +209,7 @@ export default class ImportAttachments extends Plugin {
 			return new RegExp(regexPattern);
 		}
 
-		const folderPath = this.settings.folderPath;
+		const folderPath = this.app.vault.getConfig('attachmentFolderPath') as string;
 		const placeholder = "${notename}";
 
 		if(folderPath.includes("${notename}")) {
@@ -289,7 +297,7 @@ export default class ImportAttachments extends Plugin {
 		// Load and add settings tab
 		await this.loadSettings();
 		this.addSettingTab(new ImportAttachmentsSettingTab(this.app, this));
-		
+
 		// Set up the mutation observer for hiding folders
 		// this.setupObserver();
 
@@ -679,7 +687,7 @@ export default class ImportAttachments extends Plugin {
 	}
 
 	// Get attachment folder path based on current note
-	getAttachmentFolder(md_file: ParsedPath | null = null): AttachmentFolderPath {
+	getAttachmentFolder(md_file: ParsedPath | null = null): AttachmentFolderPath {	
 		// Get the current active note if md_file is not provided
 		if (!md_file) {
 			const md_active_file = this.app.workspace.getActiveFile();
@@ -706,9 +714,27 @@ export default class ImportAttachments extends Plugin {
 				break;
 		}
 
-		const relativePath = this.settings.folderPath.replace(/\$\{notename\}/g, notename);
-		const attachmentsFolderPath = normalizePath(Utils.joinPaths(referencePath, relativePath));
-		
+		const dateFormatFolders = this.settings.dateFormatFolders;
+		const folderPathSetting = (this.app.vault.getConfig('attachmentFolderPath') as string).replace(/\$\{notename\}/g, notename).replace(/\$\{date\}/g, Utils.formatDateTime(dateFormatFolders));
+
+		let attachmentsFolderPath;
+		switch(findFolderType(folderPathSetting)) {
+		case "current":
+		case "subfolder":
+			attachmentsFolderPath = normalizePath(Utils.joinPaths(currentNoteFolderPath, folderPathSetting))
+			break;
+		case "root":
+		case "folder":
+			attachmentsFolderPath = normalizePath(folderPathSetting)
+			break;
+		}
+
+		console.log(findFolderType(folderPathSetting));
+		console.log(attachmentsFolderPath);
+		console.log(normalizePath('/fefd/vff'));
+		console.log(normalizePath('./fefd/vff'));
+		console.log(normalizePath('.'));
+
 		return {
 			attachmentsFolderPath,
 			currentNoteFolderPath,
@@ -940,7 +966,6 @@ export default class ImportAttachments extends Plugin {
 				relativePath = relative(this.vaultPath, importedFilePath);
 				break;
 		}
-
 		*/
 
 		let prefix = '';
@@ -1171,6 +1196,51 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 						await this.plugin.debouncedSaveSettings(); // Update visibility based on the toggle
 					}));
 
+			const wikilinksSetting = new Setting(containerEl)
+				.setName('Use [[Wikilinks]]:')
+				.setDesc(createFragment((frag) => {
+					frag.appendText('Auto-generate Wikilinks for [[links]] and [[images]] instead of Markdown links and images. Disable this option to generate Markdown links instead. ');
+					this.addWarningGeneralSettings(frag);
+				}));
+			wikilinksSetting.addToggle(toggle => {
+				const useMarkdownLinks = this.app.vault.getConfig("useMarkdownLinks");
+				if (!isBoolean(useMarkdownLinks)) {
+					wikilinksSetting.settingEl.remove();
+					return;
+				}
+				toggle.setValue(!useMarkdownLinks)
+					.onChange(async (value: boolean) => {
+						this.app.vault.setConfig("useMarkdownLinks", !value);
+					});
+			});
+		
+
+			const newLinkFormatSetting = new Setting(containerEl)
+				.setName('New link format:')
+				.setDesc(createFragment((frag) => {
+					frag.appendText('What links to insert when auto-generating internal links. ');
+					this.addWarningGeneralSettings(frag);
+				}))
+			newLinkFormatSetting.addDropdown(dropdown => {
+				const newLinkFormat = this.app.vault.getConfig("newLinkFormat");
+				if (!isLinkType(newLinkFormat)) {
+					newLinkFormatSetting.settingEl.remove();
+					return;
+				}
+				
+				dropdown.addOption('shortest', 'Shortest path when possible');
+				dropdown.addOption('relative', 'Relative path to note');
+				dropdown.addOption('absolute', 'Absolute path in vault');
+				dropdown.setValue(newLinkFormat)
+					.onChange(async (value: string) => {
+						if (isLinkType(value)) {
+							this.app.vault.setConfig("newLinkFormat", value);
+						} else {
+							console.error('Invalid option selection:', value);
+						}
+					})
+				});
+
 			new Setting(containerEl).setName('Opening').setHeading();
 
 			let key;
@@ -1309,6 +1379,29 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 		new Setting(containerEl).setName('Attachment folder').setHeading();
 
 		if (Platform.isDesktopApp) {
+
+			this.addAttachmentFolderSettings(containerEl);
+
+			new Setting(containerEl)
+				.setName('Date format for folders:')
+				.setDesc(createFragment((frag) => {
+					frag.appendText('Choose the date format for the placeholder ${date} in the folder name, based on ');
+					frag.createEl('a', {
+						href: 'https://momentjscom.readthedocs.io/en/latest/moment/04-displaying/01-format',
+						text: 'momentjs',
+					});
+					frag.appendText(' syntax.');
+				}))
+				.addText(text => {
+					text.setPlaceholder('Enter date format');
+					text.setValue(this.plugin.settings.dateFormatFolders);
+					text.onChange(async (value: string) => {
+						this.plugin.settings.dateFormatFolders = value;
+						await this.plugin.debouncedSaveSettings();
+					})
+				});
+
+			/*
 			new Setting(containerEl)
 				.setName('Default location for new attachments:')
 				.setDesc('The reference folder for importing new attachments.')
@@ -1325,11 +1418,17 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 							}
 						})
 				});
+			*/
 
+			/*
 			new Setting(containerEl)
 				.setName('Attachment folder where to import new attachments, relative to the default location:')
-				.setDesc('Where newly created notes are placed. Use ${notename} as a placeholder for the name of the note.')
-				.addText(text => {
+				.setDesc(createFragment((frag) => {
+					frag.appendText('Where attachments are placed, using the following variables as a placeholder:');
+					frag.createEl('ul')
+						.createEl('li', { text: '${notename} for the name of the original file' })
+						.createEl('li', { text: '${date} for the current date' });
+				})).addText(text => {
 					text.setPlaceholder('Enter folder path');
 					text.setValue(this.plugin.settings.folderPath);
 					text.onChange(async (value: string) => {
@@ -1339,35 +1438,19 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 						updateVisibilityAttachmentFolders(this.plugin);
 					})
 				});
-
-			/*
-			new Setting(containerEl)
-				.setName('Attachment link format:')
-				.setDesc('What types of links to use for the imported attachments.')
-				.addDropdown(dropdown => {
-					dropdown.addOption(LinkFormat.RELATIVE, 'With respect to the note\'s path (relative path)');
-					dropdown.addOption(LinkFormat.ABSOLUTE, 'With respect to the vault\'s path (absolute path)');
-					dropdown.setValue(this.plugin.settings.linkFormat)
-						.onChange(async (value: string) => {
-							if (Object.values(LinkFormat).includes(value as LinkFormat)) {
-								this.plugin.settings.linkFormat = value as LinkFormat;
-								await this.plugin.debouncedSaveSettings();
-							} else {
-								console.error('Invalid option selection:', value);
-							}
-						})
-				});
 			*/
+
+			new Setting(containerEl).setName('Attachments').setHeading();
 
 			new Setting(containerEl)
 				.setName('Name of the imported attachments:')
 				.setDesc(createFragment((frag) => {
 					frag.appendText('Choose how to name the imported attachments, using the following variables as a placeholder:');
-					frag.createEl('ul')
-						.createEl('li', { text: '${original} for the name of the original file' })
-						.createEl('li', { text: '${date} for the current date' })
-						.createEl('li', { text: '${uuid} for a 128-bit Universally Unique Identifier' })
-						.createEl('li', { text: '${md5} for a MD5 hash of the imported file' });
+					const ul = frag.createEl('ul');
+					ul.createEl('li', { text: '${original} for the name of the original file' });
+					ul.createEl('li', { text: '${date} for the current date' })
+					ul.createEl('li', { text: '${uuid} for a 128-bit Universally Unique Identifier' })
+					ul.createEl('li', { text: '${md5} for a MD5 hash of the imported file' });
 				}))
 				.addText(text => {
 					text.setPlaceholder('Enter attachment name');
@@ -1382,9 +1465,9 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 				});
 
 			new Setting(containerEl)
-				.setName('Date format:')
+				.setName('Date format for files:')
 				.setDesc(createFragment((frag) => {
-					frag.appendText('Choose the date format, based on ');
+					frag.appendText('Choose the date format for the placeholder ${date} in the attachment name, based on ');
 					frag.createEl('a', {
 						href: 'https://momentjscom.readthedocs.io/en/latest/moment/04-displaying/01-format',
 						text: 'momentjs',
@@ -1411,5 +1494,136 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 					await this.plugin.debouncedSaveSettings();
 					updateVisibilityAttachmentFolders(this.plugin);
 				}));
+	}
+
+	addAttachmentFolderSettings(containerEl:HTMLElement): void  {
+
+		const defaultLocationSetting = new Setting(containerEl)
+			.setName('Default location for new attachments:')
+			.setDesc(createFragment((frag) => {
+				frag.appendText('Where newly added attachments are placed. ');
+				this.addWarningGeneralSettings(frag);
+			}));
+
+		const saveAttachmentFolderSetting = (type:AttachmentFolderPathType,folderPath:string):void => {
+			if (type==='root') {
+				attachmentFolderSetting.settingEl.style.display = 'none';
+				this.app.vault.setConfig("attachmentFolderPath", '/');
+			} else if (type=='folder') {
+				attachmentFolderSetting.settingEl.style.display = '';
+				if(folderPathComponent instanceof TextComponent) {
+					this.app.vault.setConfig("attachmentFolderPath", folderPath);
+				}
+			} else if (type=='current') {
+				attachmentFolderSetting.settingEl.style.display = 'none';
+				this.app.vault.setConfig("attachmentFolderPath", './');
+			} else if (type=='subfolder') {
+				attachmentFolderSetting.settingEl.style.display = '';
+				if(folderPathComponent instanceof TextComponent) {
+					this.app.vault.setConfig("attachmentFolderPath", './' + folderPath);
+				}
+			} else {
+				console.error('Invalid option selection:', type);
+			}
+		}
+
+		createFragment((frag) => {
+					frag.appendText('Where attachments are placed, using the following variables as a placeholder:');
+					frag.createEl('ul')
+						.createEl('li', { text: '${notename} for the name of the original file' })
+						.createEl('li', { text: '${date} for the current date' });
+				})
+		let folderPathComponent:TextComponent;
+		const attachmentFolderSetting = new Setting(containerEl)
+			.setName('Attachment folder path:')
+			.setDesc(createFragment((frag) => {
+				frag.appendText('Place newly created attachment files, such as images created via drag-and-drop or audio recordings, in this folder. ');
+				const ul = frag.createEl('ul');
+				ul.createEl('li', { text: '${notename} for the name of the original file' });
+				ul.createEl('li', { text: '${date} for the current date' });
+		        
+        		// Create a div and append the fragment containing the warning
+        		const warningDiv = frag.createDiv().appendChild(createFragment((frag) => {
+        			const span = this.addWarningGeneralSettings(frag);
+        			span.appendText(' If you decide to disable this plugin, remember to remove from the pane "Files and links" any placeholder because placeholders are not recognized by Obsidian standard import functions.');
+        			return frag;
+        		}));
+			}));
+
+		attachmentFolderSetting.addText(text => {
+			folderPathComponent = text;
+			text.setPlaceholder('Example: folder 1/folder');
+		});
+
+		let folderTypeComponent:DropdownComponent;
+		defaultLocationSetting.addDropdown(dropdown => {
+			folderTypeComponent = dropdown;
+			const setValue = (folderPath:string) => {
+				switch(findFolderType(folderPath)) {
+				case "root":
+					folderTypeComponent.setValue("root");
+					attachmentFolderSetting.settingEl.style.display = 'none';
+					break;
+				case "current":
+					folderTypeComponent.setValue("current");
+					attachmentFolderSetting.settingEl.style.display = 'none';
+					break;
+				case "subfolder":
+					folderTypeComponent.setValue("subfolder");
+					folderPathComponent.setValue(folderPath.slice(2));
+					attachmentFolderSetting.settingEl.style.display = '';
+					break;
+				case "folder":
+					folderTypeComponent.setValue("folder");
+					folderPathComponent.setValue(folderPath);
+					attachmentFolderSetting.settingEl.style.display = '';
+					break;
+				}
+			}
+
+			const attachmentFolderPath = this.app.vault.getConfig("attachmentFolderPath");
+			if (!isString(attachmentFolderPath)) {
+				defaultLocationSetting.settingEl.remove();
+				attachmentFolderSetting.settingEl.remove();
+				return;
+			}
+			
+			dropdown.addOption('root', 'Vault folder');
+			dropdown.addOption('folder', 'In the folder specified below');
+			dropdown.addOption('current', 'Same folder as current file');
+			dropdown.addOption('subfolder', 'In subfolder under current folder');
+			
+			if(folderPathComponent instanceof TextComponent) {
+				setValue(attachmentFolderPath)
+			}
+
+			dropdown.onChange(async (value: string) => {
+					if(isAttachmentFolderPathType(value)) saveAttachmentFolderSetting(value,folderPathComponent.getValue());
+			})
+		});
+
+		folderPathComponent!.onChange(async (value: string) => {
+			const folderType = folderTypeComponent.getValue();
+			if(isAttachmentFolderPathType(folderType)) saveAttachmentFolderSetting(folderType,value);
+		});
+	}
+
+	addWarningGeneralSettings(frag: DocumentFragment): HTMLElement {
+		// Create the warning span
+		const warning = frag.createSpan({text: 'Be aware that this setting is a mirror of the corresponding setting in the vault preference pane ', cls: "mod-warning" });
+		
+		// Create the link
+		const link = warning.createEl('a', { text: 'Files and links', href: '#' });
+		link.id = 'file-link-settings';
+		
+		// Add event listener to the link
+		link.addEventListener('click', (e) => {
+			e.preventDefault();
+			this.app.setting.openTabById('file');
+		});
+
+		warning.appendText('. Any change made here is carried over to the general setting and viceversa.');
+
+		return warning;
 	}
 }

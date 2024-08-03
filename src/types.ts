@@ -44,8 +44,9 @@ export interface ImportAttachmentsSettings {
 	multipleFilesImportType: MultipleFilesImportTypes;
 	customDisplayText: boolean;
 	relativeLocation: RelativeLocation;
-	folderPath: string;
+	// folderPath: string;
 	dateFormat: string;
+	dateFormatFolders: string;
 	attachmentName: string;
 	autoRenameAttachmentFolder: boolean;
 	autoDeleteAttachmentFolder: boolean;
@@ -109,4 +110,38 @@ export type ImportFromVaultChoiceResult = ImportFromVaultOptions | null;
 export enum CheckboxOptions {
 	A,
 	B
+}
+
+// Obsidian options 
+export type LinkType = 'absolute' | 'relative' | 'shortest';
+export type AttachmentFolderPathType = 'root' | 'current' | 'folder' | 'subfolder';
+
+export function isBoolean(value: unknown): value is boolean {
+    return typeof value === 'boolean';
+}
+
+export function isString(value: unknown): value is string {
+	return typeof value === 'string';
+}
+
+export function isLinkType(value: unknown): value is LinkType {
+    return value === 'absolute' || value === 'relative' || value === 'shortest';
+}
+
+export function isAttachmentFolderPathType(value: unknown): value is AttachmentFolderPathType {
+    return value === 'root' || value === 'current' || value === 'folder' || value === 'subfolder';
+}
+
+export function findFolderType(folderPath:string):AttachmentFolderPathType {
+	if ("/" !== folderPath && "" !== folderPath)
+		if ("." !== folderPath && "./" !== folderPath) { // folder or subfolder
+			if (folderPath.startsWith("./")) { // subfolder
+				return 'subfolder'
+			} else { // folder
+				return 'folder'
+			}
+		} else // current folder
+			return 'current'
+	else
+		return 'root'
 }

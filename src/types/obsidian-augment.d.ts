@@ -9,6 +9,7 @@ declare module 'obsidian' {
 		saveAttachment(fileName: string, fileExtension: string, fileData: ArrayBuffer): Promise<TFile>;
 		internalPlugins: InternalPlugins;
 		plugins: Plugins;
+		setting: Setting;
 	}
 
 	interface Plugins {
@@ -29,6 +30,7 @@ declare module 'obsidian' {
 
 	interface Vault {
 		getConfig(configName: string): unknown;
+		setConfig(configName: string, value: unknown): void;
 		getAvailablePathForAttachments(fileName: string, extension: string, currentFile: TFile | null): Promise<string>;
 		onChange(eventType: string, filePath: string, oldPath?: string, stat?: FileStats): void;
 	}
@@ -70,5 +72,9 @@ declare module 'obsidian' {
 
 	type FileItems = {
 		[fileName: string]: FileExplorerItem;
+	}
+
+	interface Setting {
+		openTabById(id: string): void;
 	}
 }

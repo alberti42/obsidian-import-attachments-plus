@@ -27,7 +27,7 @@ function patchFilemanager(plugin: ImportAttachments) {
 	FileManager.prototype.promptForDeletion = async function patchedPromptForDeletion(file: TAbstractFile): Promise<void> {
 		
 		// Access the 'promptDelete' configuration setting
-		const promptDelete = plugin.app.vault.getConfig("promptDelete");
+		const promptDelete = plugin.app.vault.getConfig('promptDelete');
 		
 		if(promptDelete)
 		{
@@ -112,7 +112,7 @@ async function deleteAttachmentFolder(plugin: ImportAttachments, file: TAbstract
 
 	// Automatic deletion only works when the attachment name contains ${notename}
 	// In order to avoid deleting common attachment folders, shared between multiple notes
-	if (!plugin.settings.folderPath.includes('${notename}')) { return; }
+	if (!(plugin.app.vault.getConfig('attachmentFolderPath') as string).includes('${notename}')) { return; }
 
 	const file_parsed = Utils.parseFilePath(file.path);
 	if (file_parsed.ext !== ".md") { return; }
