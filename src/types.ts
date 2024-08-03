@@ -40,8 +40,8 @@ export interface ImportAttachmentsSettings {
 	lastEmbedFilesOnImport: YesNoTypes;
 	multipleFilesImportType: MultipleFilesImportTypes;
 	customDisplayText: boolean;
-	folderLocation: AttachmentFolderLocationType;
-	folderPath: string;
+	attachmentFolderLocation: AttachmentFolderLocationType;
+	attachmentFolderPath: string;
 	dateFormat: string;
 	attachmentName: string;
 	autoRenameAttachmentFolder: boolean;
@@ -57,18 +57,19 @@ export interface ImportAttachmentsSettings {
 }
 
 // Extend the original interface and override the annotations property
-export interface ImportAttachmentsSettings_1_3_0 extends Omit<ImportAttachmentsSettings, 'folderLocation'> {
-  relativeLocation: RelativeLocation;  
+export interface ImportAttachmentsSettings_1_3_0 extends Omit<ImportAttachmentsSettings, 'attachmentFolderLocation' | 'attachmentFolderPath' | 'compatibility'> {
+  relativeLocation: RelativeLocation;
+  folderPath: string;
 }
 
 export function isSettingsLatestFormat(s:unknown): s is ImportAttachmentsSettings {
 	if (typeof s !== 'object' || s === null) {
 		return false;
 	}
-	return 'compatibility' in s	&& s.compatibility === DEFAULT_SETTINGS.compatibility;
+	return 'folderPath' in s && 'compatibility' in s && s.compatibility === DEFAULT_SETTINGS.compatibility;
 }
 
-export function isSettingsFormat_1_3_0(s:unknown): s is ImportAttachmentsSettings {
+export function isSettingsFormat_1_3_0(s:unknown): s is ImportAttachmentsSettings_1_3_0 {
 	if (typeof s !== 'object' || s === null) {
 		return false;
 	}

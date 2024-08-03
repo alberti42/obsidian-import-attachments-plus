@@ -41,6 +41,7 @@ import {
 	isString,
     isSettingsLatestFormat,
     isSettingsFormat_1_3_0,
+    ImportAttachmentsSettings_1_3_0,
 } from './types';
 import * as Utils from "utils";
 
@@ -57,7 +58,7 @@ import { patchImportFunctions, unpatchImportFunctions } from "patchImportFunctio
 import { patchFileExplorer, unpatchFileExplorer, updateVisibilityAttachmentFolders } from "patchFileExplorer";
 import { monkeyPatchConsole, unpatchConsole } from "patchConsole";
 
-import { DEFAULT_SETTINGS } from "default";
+import { DEFAULT_SETTINGS, DEFAULT_SETTINGS_1_3_0 } from "default";
 
 // Main plugin class
 export default class ImportAttachments extends Plugin {
@@ -188,7 +189,7 @@ export default class ImportAttachments extends Plugin {
 			return new RegExp(regexPattern);
 		}
 
-		switch(this.settings.folderLocation) {
+		switch(this.settings.attachmentFolderLocation) {
 		case AttachmentFolderLocationType.CURRENT:
 		case AttachmentFolderLocationType.ROOT:
 			this.matchAttachmentFolder = (filePath: string): boolean => {
@@ -197,7 +198,7 @@ export default class ImportAttachments extends Plugin {
 			return;
 		}
 
-		const folderPath = this.settings.folderPath;
+		const folderPath = this.settings.attachmentFolderPath;
 		const placeholder = "${notename}";
 
 		if(folderPath.includes(placeholder)) {
@@ -224,9 +225,9 @@ export default class ImportAttachments extends Plugin {
 				// Check that both conditions are met
 				const heuristicMatch = startsWithMatch && endsWithMatch;
 
-				if(heuristicMatch && this.settings.folderLocation === AttachmentFolderLocationType.SUBFOLDER)
+				if(heuristicMatch && this.settings.attachmentFolderLocation === AttachmentFolderLocationType.SUBFOLDER)
 				{
-					const folderPath = this.settings.folderPath;
+					const folderPath = this.settings.attachmentFolderPath;
 					const {filename, dir} = Utils.parseFilePath(filePath);
 
 					const regex = createRegexFromFolderPattern(folderPath);
@@ -245,7 +246,7 @@ export default class ImportAttachments extends Plugin {
 				return heuristicMatch;
 			}
 		} else {
-			switch(this.settings.folderLocation) {
+			switch(this.settings.attachmentFolderLocation) {
 			case AttachmentFolderLocationType.FOLDER:
 				this.matchAttachmentFolder = (filePath: string): boolean => {
 					return filePath === folderPath;
@@ -565,45 +566,46 @@ export default class ImportAttachments extends Plugin {
 		unpatchConsole();
 	}
 
-	async loadSettings(): Promise<Record<string,string>> {
+	async loadSettings() {
 		const getSettingsFromData = (data:unknown): unknown =>
 		{
 			if (isSettingsLatestFormat(data)) {
 				const settings: ImportAttachmentsSettings = data;
 				return settings;
 			} else if (isSettingsFormat_1_3_0(data)) { // previous versions where the name of the plugins was not stored
-				// Upgrade annotations format
-				const upgradedAnnotations:PluginAnnotationDict = {};
-				const idMapToPluginName = this.generateInvertedMap(pluginNameToIdMap);
+				const oldSettings:ImportAttachmentsSettings_1_3_0 = Object.assign({}, DEFAULT_SETTINGS_1_3_0, data);
 
-				for (const pluginId in data.annotations) {
-					const annotation = data.annotations[pluginId];
-					upgradedAnnotations[pluginId] = {
-						name: idMapToPluginName[pluginId] || pluginId,
-						anno: annotation
-					};
+				const folderPath = oldSettings.folderPath;
+				const relativeLocation = oldSettings.relativeLocation;
+
+				let attachmentFolderLocation:AttachmentFolderLocationType;
+				switch(relativeLocation) {
+				case RelativeLocation.SAME:
+					attachmentFolderLocation = AttachmentFolderLocationType.SUBFOLDER;
+					break;
+				case RelativeLocation.VAULT:
+					attachmentFolderLocation = AttachmentFolderLocationType.ROOT;
+					break;
 				}
-				const oldSettings:PluginsAnnotationsSettingsWithoutNames = data;
+				const attachmentFolderPath = folderPath;
+
+				// Exclude folderPath and relativeLocation from oldSettings
+	            const { folderPath: _, relativeLocation: __, ...filteredOldSettings } = oldSettings;
 				
 				// Update the data with the new format
-				const newSettings: PluginsAnnotationsSettings = {
-					...oldSettings,
-					annotations: upgradedAnnotations,
-					plugins_annotations_uuid: DEFAULT_SETTINGS.plugins_annotations_uuid,
+				const newSettings: ImportAttachmentsSettings = {
+					...filteredOldSettings,
+					attachmentFolderPath: attachmentFolderPath,
+					attachmentFolderLocation: attachmentFolderLocation,
+					compatibility: '1.4.0',
 				};
 
 				return getSettingsFromData(newSettings);
-			} else {
-				// Very first version of the plugin -- no options were stored, only the dictionary of annotations
-				const newSettings:PluginsAnnotationsSettingsWithoutNames = {...DEFAULT_SETTINGS_WITHOUT_NAMES};
-				newSettings.annotations = isPluginAnnotationDictWithoutNames(data) ? data : DEFAULT_SETTINGS_WITHOUT_NAMES.annotations;
-				return getSettingsFromData(newSettings);
 			}
 		}
-
+		
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, getSettingsFromData(await this.loadData()));
-
-		return pluginNameToIdMap;
+		console.log(this.settings);
 	}
 
 	async loadSettingss() {
@@ -739,10 +741,10 @@ export default class ImportAttachments extends Plugin {
 
 		this.settingsTab.cleanUpAttachmentFolderSettings();
 
-		const folderPath = this.settings.folderPath.replace(/\$\{notename\}/g, notename);
+		const folderPath = this.settings.attachmentFolderPath.replace(/\$\{notename\}/g, notename);
 
 		let attachmentsFolderPath;
-		switch(this.settings.folderLocation) {
+		switch(this.settings.attachmentFolderLocation) {
 		case AttachmentFolderLocationType.CURRENT:
 			attachmentsFolderPath = currentNoteFolderPath;
 			break;
@@ -1470,17 +1472,17 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 	}
 
 	cleanUpAttachmentFolderSettings(): void {
-		let folderPath = normalizePath(this.plugin.settings.folderPath).replace(/^(\.\/)*\.?/,'');  // map ./././path1/path2 to path1/path2
+		let folderPath = normalizePath(this.plugin.settings.attachmentFolderPath).replace(/^(\.\/)*\.?/,'');  // map ./././path1/path2 to path1/path2
 
-		if(this.plugin.settings.folderLocation === AttachmentFolderLocationType.FOLDER) {
+		if(this.plugin.settings.attachmentFolderLocation === AttachmentFolderLocationType.FOLDER) {
 			if(folderPath=='/') {
-				this.plugin.settings.folderLocation = AttachmentFolderLocationType.ROOT;
+				this.plugin.settings.attachmentFolderLocation = AttachmentFolderLocationType.ROOT;
 			}
 		}
 
-		if(this.plugin.settings.folderLocation === AttachmentFolderLocationType.SUBFOLDER) {
+		if(this.plugin.settings.attachmentFolderLocation === AttachmentFolderLocationType.SUBFOLDER) {
 			if(folderPath=='/') {
-				this.plugin.settings.folderLocation = AttachmentFolderLocationType.CURRENT;
+				this.plugin.settings.attachmentFolderLocation = AttachmentFolderLocationType.CURRENT;
 			}
 		}
 	}
@@ -1507,9 +1509,9 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 				ul.createEl('li', { text: '${notename} for the name of the original file' });
 			})).addText(text => {
 				text.setPlaceholder('Example: folder 1/folder');
-				text.setValue(this.plugin.settings.folderPath);
+				text.setValue(this.plugin.settings.attachmentFolderPath);
 				text.onChange(async (value: string) => {
-					this.plugin.settings.folderPath = value;
+					this.plugin.settings.attachmentFolderPath = value;
 					this.debouncedSaveSettings(():void => {
 						this.plugin.saveSettings();
 						this.plugin.parseAttachmentFolderPath();
@@ -1537,8 +1539,8 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 			dropdown.addOption(AttachmentFolderLocationType.CURRENT, 'Same folder as current file');
 			dropdown.addOption(AttachmentFolderLocationType.SUBFOLDER, 'In subfolder under current folder');
 
-			dropdown.setValue(this.plugin.settings.folderLocation);
-			updateVisibilityFolderPath(this.plugin.settings.folderLocation);
+			dropdown.setValue(this.plugin.settings.attachmentFolderLocation);
+			updateVisibilityFolderPath(this.plugin.settings.attachmentFolderLocation);
 									
 			dropdown.onChange(async (value: string) => {
 				if(!isAttachmentFolderLocationType(value)) {
@@ -1546,7 +1548,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 					return;
 				}
 
-				this.plugin.settings.folderLocation = value;
+				this.plugin.settings.attachmentFolderLocation = value;
 				updateVisibilityFolderPath(value);
 			
 				this.debouncedSaveSettings(():void => {
