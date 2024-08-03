@@ -69,7 +69,6 @@ const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 	// folderPath: '${notename} (attachments)', // Default to a folder in the vault
 	attachmentName: '${original}', // Default to the original name of the attachment
 	dateFormat: 'YYYY_MM_DDTHH_mm_ss',
-	dateFormatFolders: 'YYYY_MM_DD',
 	customDisplayText: true,  // Default to true
 	autoRenameAttachmentFolder: true, // Default to true
 	autoDeleteAttachmentFolder: true, // Default to true
@@ -228,23 +227,19 @@ export default class ImportAttachments extends Plugin {
 			const endOfPlaceholderIndex = lastIndex + placeholder.length;
 
 			// Extract the parts before the first occurrence and after the last occurrence of the placeholder
-			const folderPathStartsWith = escapeRegex(Utils.removeRelative(folderPath.substring(0, firstIndex))).replace(/\\\$\\\{date\\\}/g, '.*?')
-			const folderPathEndsWith = escapeRegex(folderPath.substring(endOfPlaceholderIndex)).replace(/\\\$\\\{date\\\}/g, '.*?') + '$';
-
-			const folderPathStartsWithRegEx1 = new RegExp('^'+folderPathStartsWith);
-			const folderPathStartsWithRegEx2 = new RegExp('/'+folderPathStartsWith);
-			const folderPathEndsWithRegEx = new RegExp(folderPathEndsWith);
+			const folderPathStartsWith = Utils.removeRelative(folderPath.substring(0, firstIndex))
+			const folderPathEndsWith = folderPath.substring(endOfPlaceholderIndex);
 			
 			this.matchAttachmentFolder = (filePath: string, relativeLocation?: boolean | undefined): boolean => {
 
 				// Check if filePath starts with startsWidth or contains /startsWidth
-				const startsWithMatch = filePath.match(folderPathStartsWithRegEx1) || filePath.match(folderPathStartsWithRegEx2); // filePath.startsWith(folderPathStartsWith) || filePath.includes(`/${folderPathStartsWith}`);
+				const startsWithMatch = filePath.startsWith(folderPathStartsWith) || filePath.includes(`/${folderPathStartsWith}`);
 				// Check if filePath ends with endsWidth
-				const endsWithMatch = filePath.match(folderPathEndsWithRegEx);
+				const endsWithMatch = filePath.endsWith(folderPathEndsWith);
 				
 				// Check that both conditions are met
-				const heuristicMatch = (startsWithMatch !== null) && (endsWithMatch !==null);
-				
+				const heuristicMatch = startsWithMatch && endsWithMatch;
+
 				if(heuristicMatch)
 				{
 					if(relativeLocation === undefined) {
@@ -723,8 +718,7 @@ export default class ImportAttachments extends Plugin {
 				break;
 		}*/
 
-		const dateFormatFolders = this.settings.dateFormatFolders;
-		const folderPathSetting = (this.app.vault.getConfig('attachmentFolderPath') as string).replace(/\$\{notename\}/g, notename).replace(/\$\{date\}/g, Utils.formatDateTime(dateFormatFolders));
+		const folderPathSetting = (this.app.vault.getConfig('attachmentFolderPath') as string).replace(/\$\{notename\}/g, notename);
 
 		let attachmentsFolderPath;
 		switch(findFolderType(folderPathSetting)) {
@@ -1385,25 +1379,6 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 
 			this.addAttachmentFolderSettings(containerEl);
 
-			new Setting(containerEl)
-				.setName('Date format for folders:')
-				.setDesc(createFragment((frag) => {
-					frag.appendText('Choose the date format for the placeholder ${date} in the folder name, based on ');
-					frag.createEl('a', {
-						href: 'https://momentjscom.readthedocs.io/en/latest/moment/04-displaying/01-format',
-						text: 'momentjs',
-					});
-					frag.appendText(' syntax.');
-				}))
-				.addText(text => {
-					text.setPlaceholder('Enter date format');
-					text.setValue(this.plugin.settings.dateFormatFolders);
-					text.onChange(async (value: string) => {
-						this.plugin.settings.dateFormatFolders = value;
-						await this.plugin.debouncedSaveSettings();
-					})
-				});
-
 			/*
 			new Setting(containerEl)
 				.setName('Default location for new attachments:')
@@ -1530,21 +1505,14 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 			}
 		}
 
-		createFragment((frag) => {
-					frag.appendText('Where attachments are placed, using the following variables as a placeholder:');
-					frag.createEl('ul')
-						.createEl('li', { text: '${notename} for the name of the original file' })
-						.createEl('li', { text: '${date} for the current date' });
-				})
 		let folderPathComponent:TextComponent;
 		const attachmentFolderSetting = new Setting(containerEl)
 			.setName('Attachment folder path:')
 			.setDesc(createFragment((frag) => {
-				frag.appendText('Place newly created attachment files, such as images created via drag-and-drop or audio recordings, in this folder. ');
+				frag.appendText('Place newly created attachment files, such as images created via drag-and-drop or audio recordings, in this folder.  Use the following variables as a placeholder:');
 				const ul = frag.createEl('ul');
 				ul.createEl('li', { text: '${notename} for the name of the original file' });
-				ul.createEl('li', { text: '${date} for the current date' });
-		        
+				
         		// Create a div and append the fragment containing the warning
         		const warningDiv = frag.createDiv().appendChild(createFragment((frag) => {
         			const span = this.addWarningGeneralSettings(frag);

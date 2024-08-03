@@ -46,7 +46,6 @@ export interface ImportAttachmentsSettings {
 	// relativeLocation: RelativeLocation;
 	// folderPath: string;
 	dateFormat: string;
-	dateFormatFolders: string;
 	attachmentName: string;
 	autoRenameAttachmentFolder: boolean;
 	autoDeleteAttachmentFolder: boolean;
