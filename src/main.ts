@@ -1316,10 +1316,10 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 		new Setting(containerEl).setName('Attachment folder').setHeading();
 
 		if (Platform.isDesktopApp) {
-
 			this.addAttachmentFolderSettings(containerEl);
+		}
 
-			new Setting(containerEl)
+		new Setting(containerEl)
 			.setName('Hide attachment folders:')
 			.setDesc('If this option is enabled, the attachment folders will not be shown.')
 			.addToggle(toggle => toggle
@@ -1330,6 +1330,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 					updateVisibilityAttachmentFolders(this.plugin);
 				}));
 
+		if (Platform.isDesktopApp) {
 			new Setting(containerEl).setName('Attachments').setHeading();
 
 			new Setting(containerEl)
