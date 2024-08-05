@@ -8,8 +8,6 @@ import { Vault, normalizePath, TAbstractFile, TFile, TFolder } from 'obsidian';
 import { ParsedPath } from 'types';
 import * as path from 'path';
 
-import {LinkType} from 'types';
-
 // Joins multiple path segments into a single normalized path.
 export function joinPaths(...paths: string[]): string {
 	return paths.join('/');

@@ -16,6 +16,7 @@ import {
 	PluginManifest,
 	TextComponent,
 	normalizePath,
+	TFile,
 } from "obsidian";
 
 // Import utility and modal components
@@ -25,7 +26,6 @@ import {
 	MultipleFilesImportTypes,
 	ImportOperationType,
 	ImportAttachmentsSettings,
-	AttachmentFolderPath,
 	ImportSettingsInterface,
 	OverwriteChoiceOptions,
 	ImportFromVaultOptions,
@@ -36,9 +36,9 @@ import {
 	isAttachmentFolderLocationType,
 	AttachmentFolderLocationType,
 	ParsedPath,
-    isSettingsLatestFormat,
-    isSettingsFormat_1_3_0,
-    ImportAttachmentsSettings_1_3_0,
+	isSettingsLatestFormat,
+	isSettingsFormat_1_3_0,
+	ImportAttachmentsSettings_1_3_0,
 } from './types';
 import * as Utils from "utils";
 
@@ -407,11 +407,11 @@ export default class ImportAttachments extends Plugin {
 
 					const oldAttachmentFolderPath = this.getFullAttachmentFolder(oldPath_parsed);
 					if (!oldAttachmentFolderPath) { return }
-					if (Utils.doesFolderExist(this.app.vault,oldAttachmentFolderPath.attachmentsFolderPath)) {
+					if (Utils.doesFolderExist(this.app.vault,oldAttachmentFolderPath)) {
 						const newAttachmentFolderPath = this.getFullAttachmentFolder(Utils.parseFilePath(newFile.path));
 
-						const oldPath = oldAttachmentFolderPath.attachmentsFolderPath;
-						const newPath = newAttachmentFolderPath.attachmentsFolderPath;
+						const oldPath = oldAttachmentFolderPath;
+						const newPath = newAttachmentFolderPath;
 						
 						try {
 							renameCallbackEnabled = false;
@@ -501,7 +501,8 @@ export default class ImportAttachments extends Plugin {
 				const attachmentFolderPath = folderPath;
 
 				// Exclude folderPath and relativeLocation from oldSettings
-	            const { folderPath: _, relativeLocation: __, linkFormat: ___, ...filteredOldSettings } = oldSettings;
+				// eslint-disable-next-line @typescript-eslint/no-unused-vars
+				const { folderPath: _, relativeLocation: __, linkFormat: ___, ...filteredOldSettings } = oldSettings;
 				
 				// Update the data with the new format
 				const newSettings: ImportAttachmentsSettings = {
@@ -627,18 +628,18 @@ export default class ImportAttachments extends Plugin {
 	}
 
 	// Get attachment folder path based on current note
-	getFullAttachmentFolder(md_file: ParsedPath | null = null): AttachmentFolderPath {	
+	getFullAttachmentFolder(md_file?: ParsedPath | undefined): string {	
 		// Get the current active note if md_file is not provided
-		if (!md_file) {
+		if (md_file===undefined) {
 			const md_active_file = this.app.workspace.getActiveFile();
-			if (md_active_file == null) {
+			if (md_active_file === null) {
 				throw new Error("The active note could not be determined.");
 			}
 			md_file = Utils.parseFilePath(md_active_file.path);
 		}
 
 		if (md_file.ext !== ".md") {
-			throw new Error("No Markdown file was found.");
+			throw new Error("No Markdown file was provided.");
 		}
 		
 		const currentNoteFolderPath = md_file.dir;
@@ -666,13 +667,10 @@ export default class ImportAttachments extends Plugin {
 
 		attachmentsFolderPath = normalizePath(attachmentsFolderPath);
 
-		return {
-			attachmentsFolderPath,
-			currentNoteFolderPath,
-		};
+		return attachmentsFolderPath;			
 	}
 
-	async createAttachmentName(originalFilePath:string, data: File | ArrayBuffer, md_file: ParsedPath | null, createFolder: boolean): Promise<string> {
+	async createAttachmentName(originalFilePath:string, data: File | ArrayBuffer, md_file?: ParsedPath | undefined): Promise<string> {
 
 		const originalFilePath_parsed = Utils.parseFilePath(originalFilePath);
 		const namePattern = this.settings.attachmentName;
@@ -697,10 +695,10 @@ export default class ImportAttachments extends Plugin {
 		// add the extension
 		attachmentName += originalFilePath_parsed.ext;
 
-		const { attachmentsFolderPath } = this.getFullAttachmentFolder(md_file);
+		const attachmentsFolderPath = this.getFullAttachmentFolder(md_file);
 		
 		// Ensure the directory exists before moving the file
-		if(createFolder) await Utils.createFolderIfNotExists(this.app.vault,attachmentsFolderPath);
+		await Utils.createFolderIfNotExists(this.app.vault,attachmentsFolderPath);
 
 		return Utils.joinPaths(attachmentsFolderPath,attachmentName);
 	}
@@ -739,7 +737,16 @@ export default class ImportAttachments extends Plugin {
 	// Function to move files to the attachments folder using fs.rename
 	async moveFileToAttachmentsFolder(filesToImport: File[], editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface) {
 
-		const { currentNoteFolderPath } = this.getFullAttachmentFolder();
+		// Get the current active note if md_file is not provided
+		// const md_active_file = this.app.workspace.getActiveFile();
+		// if (md_active_file == null) {
+		// 	throw new Error("The active note could not be determined.");
+		// }
+
+		const md_file = view.file;
+		if(md_file===null) { throw new Error("The active note could not be determined."); }
+
+		const md_file_parsed = Utils.parseFilePath(md_file.path)
 
 		const cursor = editor.getCursor(); // Get the current cursor position before insertion
 
@@ -757,7 +764,7 @@ export default class ImportAttachments extends Plugin {
 
 		const tasks = filesToImport.map(async (fileToImport): Promise<string | null> => {
 			const originalFilePath = fileToImport.path;
-			let destFilePath = await this.createAttachmentName(originalFilePath,fileToImport,null,true);
+			let destFilePath = await this.createAttachmentName(originalFilePath,fileToImport,md_file_parsed);
 
 			// Check if file already exists in the vault
 			const existingFile = await Utils.doesFileExist(this.app.vault,destFilePath);
@@ -830,7 +837,7 @@ export default class ImportAttachments extends Plugin {
 		let counter = 0;
 		results.forEach((importedFilePath: (string | null)) => {
 			if (importedFilePath) {
-				this.insertLinkToEditor(currentNoteFolderPath, importedFilePath, editor, view, importSettings, multipleFiles ? ++counter : 0);
+				this.insertLinkToEditor(importedFilePath, editor, md_file.path, importSettings, multipleFiles ? ++counter : 0);
 			}
 		});
 
@@ -861,12 +868,8 @@ export default class ImportAttachments extends Plugin {
 			return;
 		}
 
-		const attachmentsFolder = this.getFullAttachmentFolder(Utils.parseFilePath(md_active_file.path));
+		const attachmentsFolderPath = this.getFullAttachmentFolder(Utils.parseFilePath(md_active_file.path));
 		
-		if (!attachmentsFolder) { return }
-
-		const { attachmentsFolderPath } = attachmentsFolder;
-
 		if (!Utils.doesFolderExist(this.app.vault,attachmentsFolderPath)) {
 			const modal = new CreateAttachmentFolderModal(this, attachmentsFolderPath);
 			modal.open();
@@ -883,9 +886,8 @@ export default class ImportAttachments extends Plugin {
 	}
 
 	// Function to insert links to the imported files in the editor
-	insertLinkToEditor(currentNoteFolderPath: string, importedFilePath: string, editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface, counter: number) {
-		// Extract just the file name from the path
-		
+	insertLinkToEditor(importedFilePath: string, editor: Editor, md_file: string, importSettings: ImportSettingsInterface, counter: number) {
+
 		/*
 		let relativePath;
 		switch (this.settings.linkFormat) {
@@ -925,7 +927,7 @@ export default class ImportAttachments extends Plugin {
 		const filename = file.name;
 		const customDisplayText = (this.settings.customDisplayText) ? filename : "";
 		
-		const generatedLink = this.app.fileManager.generateMarkdownLink(file,currentNoteFolderPath,undefined,(this.settings.customDisplayText) ? customDisplayText : undefined);
+		const generatedLink = this.app.fileManager.generateMarkdownLink(file,md_file,undefined,(this.settings.customDisplayText) ? customDisplayText : undefined);
 
 		const MDLink_regex = new RegExp('^(!)?(\\[[^\\]]*\\])(.*)$');
 		const WikiLink_regex = new RegExp('^(!)?(.*?)(|[^|]*)?$');
@@ -1394,8 +1396,8 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 	}
 
 	hide(): void {
-        this.cleanUpAttachmentFolderSettings();
-    }
+		this.cleanUpAttachmentFolderSettings();
+	}
 
 	addAttachmentFolderSettings(containerEl:HTMLElement): void  {
 

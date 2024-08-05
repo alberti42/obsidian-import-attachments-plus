@@ -118,17 +118,16 @@ async function deleteAttachmentFolder(plugin: ImportAttachments, file: TAbstract
 	if (file_parsed.ext !== ".md") { return; }
 
 	const attachmentFolderPath = plugin.getFullAttachmentFolder(file_parsed);
-	if (!attachmentFolderPath) { return; }
-
-	if (await Utils.doesFolderExist(plugin.app.vault,attachmentFolderPath.attachmentsFolderPath)) {
+	
+	if (await Utils.doesFolderExist(plugin.app.vault,attachmentFolderPath)) {
 		if(plugin.settings.confirmDeleteAttachmentFolder) {
-			const modal = new DeleteAttachmentFolderModal(plugin, attachmentFolderPath.attachmentsFolderPath);
+			const modal = new DeleteAttachmentFolderModal(plugin, attachmentFolderPath);
 			modal.open();
 			const choice = await modal.promise;
 			if (!choice) return;
 		}
 
-		const filePathForDeletion = attachmentFolderPath.attachmentsFolderPath;
+		const filePathForDeletion = attachmentFolderPath;
 
 		try {
 			await plugin.trashFile(filePathForDeletion);

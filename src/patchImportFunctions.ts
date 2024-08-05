@@ -38,9 +38,9 @@ function patchImportFunctions(plugin: ImportAttachments) {
 
 		if(!data) throw new Error("The variable data is unexpectedly null.")
 		
-		const currentFile_parsed = currentFile ? parseFilePath(currentFile.path) : null;
+		const currentFile_parsed = currentFile ? parseFilePath(currentFile.path) : undefined;
 		
-		return await plugin.createAttachmentName(fileName + "." + extension,data,currentFile_parsed,true);
+		return await plugin.createAttachmentName(fileName + "." + extension,data,currentFile_parsed);
 	};
 
 	if (!originalSaveAttachment) {

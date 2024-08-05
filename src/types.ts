@@ -74,7 +74,7 @@ export interface ParsedPath {
 // Define an interface for the return type
 export interface AttachmentFolderPath {
 	attachmentsFolderPath: string;
-	currentNoteFolderPath: string;
+	// currentNoteFolderPath: string;
 }
 
 export interface ImportSettingsInterface {
