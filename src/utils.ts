@@ -234,13 +234,13 @@ export async function filterOutFolders(filesArray: File[]) {
 }
 
 export async function createFolderIfNotExists(vault: Vault, folderPath: string) {
-		if(doesFolderExist(vault,folderPath)) return;
+	if(doesFolderExist(vault,folderPath)) return;
 
-		try {
-			await vault.createFolder(folderPath);
-		} catch (error) {
-			throw new Error(`Failed to create folder at ${folderPath}: ${error}`);
-		}
+	try {
+		await vault.createFolder(folderPath);
+	} catch (error) {
+		throw new Error(`Failed to create folder at ${folderPath}: ${error}`);
 	}
+}
 	
 export { uuidv4, formatDateTime, createMockTFile };

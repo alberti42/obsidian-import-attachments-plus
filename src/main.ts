@@ -16,7 +16,6 @@ import {
 	PluginManifest,
 	TextComponent,
 	normalizePath,
-	TFile,
 } from "obsidian";
 
 // Import utility and modal components
