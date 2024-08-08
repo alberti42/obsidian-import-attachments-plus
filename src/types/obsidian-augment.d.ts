@@ -35,6 +35,10 @@ declare module 'obsidian' {
 		onChange(eventType: string, filePath: string, oldPath?: string, stat?: FileStats): void;
 	}
 
+	interface Adapter {
+		getFullPath(path:string): string;
+	}
+
 	interface MenuItem {
 		dom: HTMLElement;
 		callback: () => void;
