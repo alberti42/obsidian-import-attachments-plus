@@ -148,7 +148,7 @@ export function isAttachmentFolderLocationType(value: unknown): value is Attachm
 
 /* Format version 1.3.0 */
 
-export enum LinkFormat {
+export enum LinkFormat_1_3_0 {
 	RELATIVE='RELATIVE', // Same folder as current file
 	ABSOLUTE='ABSOLUTE', // Vault folder
 }
@@ -164,5 +164,5 @@ export function isSettingsFormat_1_3_0(s:unknown): s is ImportAttachmentsSetting
 export interface ImportAttachmentsSettings_1_3_0 extends Omit<ImportAttachmentsSettings, 'attachmentFolderLocation' | 'attachmentFolderPath' | 'compatibility'> {
   relativeLocation: RelativeLocation;
   folderPath: string;
-  linkFormat: LinkFormat;
+  linkFormat: LinkFormat_1_3_0;
 }
