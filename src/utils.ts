@@ -85,43 +85,43 @@ function formatDateTime(dateFormat:string):string {
 /*
 // Function to get the available path for attachments from Obsidian
 function getAvailablePathForAttachments = async function (fileName: string, extension: string, currentFile: TFile | null): Promise<string> {
-    // Get the attachment folder path configuration
-    let attachmentFolderPath = this.getConfig("attachmentFolderPath");
-    const isCurrentFolder = attachmentFolderPath === "." || attachmentFolderPath === "./";
-    let relativePath: string | null = null;
+	// Get the attachment folder path configuration
+	let attachmentFolderPath = this.getConfig("attachmentFolderPath");
+	const isCurrentFolder = attachmentFolderPath === "." || attachmentFolderPath === "./";
+	let relativePath: string | null = null;
 
-    // If the attachment folder path starts with './', remove the './'
-    if (attachmentFolderPath.startsWith("./")) {
-        relativePath = attachmentFolderPath.slice(2);
-    }
+	// If the attachment folder path starts with './', remove the './'
+	if (attachmentFolderPath.startsWith("./")) {
+		relativePath = attachmentFolderPath.slice(2);
+	}
 
-    // If using the current folder, set the attachment folder path accordingly
-    if (isCurrentFolder) {
-        attachmentFolderPath = currentFile ? currentFile.parent?.path : "";
-    } else if (relativePath) {
-        attachmentFolderPath = (currentFile ? currentFile.parent?.getParentPrefix() : "") + relativePath;
-    }
+	// If using the current folder, set the attachment folder path accordingly
+	if (isCurrentFolder) {
+		attachmentFolderPath = currentFile ? currentFile.parent?.path : "";
+	} else if (relativePath) {
+		attachmentFolderPath = (currentFile ? currentFile.parent?.getParentPrefix() : "") + relativePath;
+	}
 
-    // Normalize the paths
-    attachmentFolderPath = normalizePath(attachmentFolderPath);
-    fileName = normalizePath(fileName);
+	// Normalize the paths
+	attachmentFolderPath = normalizePath(attachmentFolderPath);
+	fileName = normalizePath(fileName);
 
-    // Try to get the abstract file by the insensitive path
-    let folder: TAbstractFile | null = this.getAbstractFileByPathInsensitive(attachmentFolderPath);
+	// Try to get the abstract file by the insensitive path
+	let folder: TAbstractFile | null = this.getAbstractFileByPathInsensitive(attachmentFolderPath);
 
-    // If the folder does not exist and relativePath is specified, create the folder
-    if (!folder && relativePath) {
-        await this.createFolder(attachmentFolderPath);
-        folder = this.getAbstractFileByPathInsensitive(attachmentFolderPath);
-    }
+	// If the folder does not exist and relativePath is specified, create the folder
+	if (!folder && relativePath) {
+		await this.createFolder(attachmentFolderPath);
+		folder = this.getAbstractFileByPathInsensitive(attachmentFolderPath);
+	}
 
-    // If the folder is an instance of TFolder, get the available path within the folder
-    if (folder instanceof TFolder) {
-        return this.getAvailablePath(folder.getParentPrefix() + fileName, extension);
-    } else {
-        // Otherwise, get the available path in the root
-        return this.getAvailablePath(fileName, extension);
-    }
+	// If the folder is an instance of TFolder, get the available path within the folder
+	if (folder instanceof TFolder) {
+		return this.getAvailablePath(folder.getParentPrefix() + fileName, extension);
+	} else {
+		// Otherwise, get the available path in the root
+		return this.getAvailablePath(fileName, extension);
+	}
 }
 */
 
@@ -201,20 +201,20 @@ export function doesFileExist(vault: Vault, relativePath: string): boolean {
 }
 
 // Custom function to create a mock TFile object
-function createMockTFile(vault:Vault,filepath:string): TFile {
+export function createMockTFile(vault:Vault,filepath:string): TFile {
 
 	const { filename, path } = parseFilePath(filepath);
 	
-    // Create a new TFile object
-    const tfile = Object.create(TFile.prototype) as TFile;
+	// Create a new TFile object
+	const tfile = Object.create(TFile.prototype) as TFile;
 
-    // Set necessary properties
-    tfile.path = path;
-    tfile.name = filename;
-    tfile.vault = vault;
-    tfile.parent = null;
+	// Set necessary properties
+	tfile.path = path;
+	tfile.name = filename;
+	tfile.vault = vault;
+	tfile.parent = null;
   
-    return tfile;
+	return tfile;
 }
 
 export async function filterOutFolders(filesArray: File[]) {
@@ -243,4 +243,4 @@ export async function createFolderIfNotExists(vault: Vault, folderPath: string) 
 	}
 }
 	
-export { uuidv4, formatDateTime, createMockTFile };
+export { uuidv4, formatDateTime };
