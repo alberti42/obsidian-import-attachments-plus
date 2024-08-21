@@ -10,7 +10,11 @@ Features include:
 - Customizable naming conventions for imported files.
 - Management tools for attachment folders.
 
-## Installation
+## Recommended installation
+
+Search for "Import Attachments+" in the Community plugins pane in Obsidian and click on the Install button. 
+
+## Manual installation
 1. **Download the Plugin:**
    - Clone the plugin files from the [GitHub repository](https://github.com/alberti42/obsidian-import-attachments-plus).
 
@@ -19,14 +23,10 @@ Features include:
 
 3. **Build the Plugin:**
    - Run `npm run build` to compile the plugin code.
-   - The compiled code will be placed in the `dist/PLATFORM_NAME` subfolder, where `PLATFORM_NAME` is based on your platform and architecture:
-     - `dist/apple-silicon` (Apple Silicon Mac)
-     - `dist/apple-intel` (Intel Mac)
-     - `dist/windows` (Windows)
-     - `dist/linux` (Linux)
+   - The compiled code will be placed in the `dist` subfolder.
 
 4. **Copy to Obsidian Plugins Directory:**
-   - Copy the contents of the relevant platform folder (e.g., `dist/windows`) into your vault's `.obsidian/plugins/import-attachments-plus` directory.
+   - Copy the contents of the dist folder into your vault's `.obsidian/plugins/import-attachments-plus` directory.
 
 5. **Enable the Plugin:**
    - Open Obsidian and go to **Settings > Community Plugins**.
