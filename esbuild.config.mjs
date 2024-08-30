@@ -45,8 +45,8 @@ const context = await esbuild.context({
 	sourcemap: prod ? false : "inline",
 	pure: prod ? ["console.log"] : [], // Mark console.log as pure in production
 	minifySyntax: prod, // Enable syntax minification in production
-	minifyWhitespace: false, // Disable whitespace minification
-	minifyIdentifiers: true, // Disable identifier minification
+	minifyWhitespace: prod, // Disable whitespace minification
+	minifyIdentifiers: prod, // Disable identifier minification
 	outdir,
 	define: {
 		"process.env.NODE_ENV": JSON.stringify(prod ? "production" : "development"),
