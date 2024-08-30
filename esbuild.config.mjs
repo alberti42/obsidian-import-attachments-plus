@@ -43,7 +43,6 @@ const context = await esbuild.context({
 	target: "es2018",
 	logLevel: "info",
 	sourcemap: prod ? false : "inline",
-	pure: prod ? ["console.log"] : [], // Mark console.log as pure in production
 	minifySyntax: prod, // Enable syntax minification in production
 	minifyWhitespace: prod, // Disable whitespace minification
 	minifyIdentifiers: prod, // Disable identifier minification
