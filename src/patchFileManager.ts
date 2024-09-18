@@ -108,8 +108,7 @@ function patchFilemanager(plugin: ImportAttachments) {
 }
 
 async function deleteAttachmentFolder(plugin: ImportAttachments, file: TAbstractFile) {
-    debugger
-	if (!plugin.settings.autoDeleteAttachmentFolder) { return; }
+    if (!plugin.settings.autoDeleteAttachmentFolder) { return; }
 
 	// Automatic deletion only works when the attachment name contains ${notename}
 	// In order to avoid deleting common attachment folders, shared between multiple notes
