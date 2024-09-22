@@ -42,6 +42,7 @@ declare module 'obsidian' {
 	interface MenuItem {
 		dom: HTMLElement;
 		callback: () => void;
+        section: string;
 	}
 
 	interface Menu {
@@ -50,6 +51,7 @@ declare module 'obsidian' {
 
 	interface FileManager {
 		promptForDeletion(file: TAbstractFile): Promise<void>;
+        promptForFileRename(file: TAbstractFile): Promise<void>;
 	}
 
 	interface FileExplorerView extends View {

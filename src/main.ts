@@ -16,6 +16,10 @@ import {
 	PluginManifest,
 	TextComponent,
 	normalizePath,
+    Menu,
+    TFile,
+    FileManager,
+    MenuItem,
 } from "obsidian";
 
 // Import utility and modal components
@@ -57,11 +61,29 @@ import { monkeyPatchConsole, unpatchConsole } from "patchConsole";
 import { DEFAULT_SETTINGS, DEFAULT_SETTINGS_1_3_0 } from "default";
 import { debug } from "console";
 
+function escapeRegex(string:string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+}
+
+function createRegexFromFolderPattern(template:string) {
+    const [leftPart, rightPart] = template.split('${notename}');
+    const escapedLeftPart = escapeRegex(leftPart);
+    const escapedRightPart = escapeRegex(rightPart);
+
+    const regexPattern = `^${escapedLeftPart}(.*?)${escapedRightPart}$`;
+    return new RegExp(regexPattern);
+}
+
 // Main plugin class
 export default class ImportAttachments extends Plugin {
 	settings: ImportAttachmentsSettings = { ...DEFAULT_SETTINGS };
 	vaultPath: string;
 	private settingsTab: ImportAttachmentsSettingTab;
+	matchAttachmentFolder: ((str:string)=>boolean) = (_:string) => true;
+
+    private folderPathStartsWith: string = "";
+    private folderPathEndsWith: string = "";
+    private folderPath: string = "";
 
 	constructor(app: App, manifest: PluginManifest) {
 		super(app, manifest);
@@ -87,10 +109,43 @@ export default class ImportAttachments extends Plugin {
 		}
 	}
 
-    public matchAttachmentFolder(str:string):boolean {
-        // dummy implementation; it will be replaced by parseAttachmentFolderPath
-        return false;
+    private matchAttachmentFolderWithPlaceholder = (filePath: string): boolean => {
+        // Check if filePath starts with startsWidth or contains /startsWidth
+        const startsWithMatch = filePath.startsWith(this.folderPathStartsWith) || filePath.includes(`/${this.folderPathStartsWith}`);
+        // Check if filePath ends with endsWidth
+        const endsWithMatch = filePath.endsWith(this.folderPathEndsWith);
+        
+        // Check that both conditions are met
+        const heuristicMatch = startsWithMatch && endsWithMatch;
+
+        if(heuristicMatch && this.settings.attachmentFolderLocation === AttachmentFolderLocationType.SUBFOLDER)
+        {
+            const folderPath = this.settings.attachmentFolderPath;
+            const {foldername, dir} = Utils.parseFolderPath(filePath);
+
+            const regex = createRegexFromFolderPattern(folderPath);
+
+            // Use the match method to get the groups
+            const match = foldername.match(regex);
+
+            if (match && match[1]) {
+                const noteName = normalizePath(Utils.joinPaths(dir,match[1])+".md");
+                return Utils.doesFileExist(this.app.vault,noteName);
+            } else {
+                // No match found
+                return false;
+            }
+        }
+        return heuristicMatch;
     }
+
+    private matchAttachmentFolderForFolder(filePath: string): boolean {
+        return filePath === this.folderPath;
+    }
+
+    private matchAttachmentFolderForSubfolder (filePath: string): boolean {
+        return filePath.endsWith(`/${this.folderPath}`) || filePath === this.folderPath;
+    }   
 
 	// Function to split around the original
 	parseAttachmentFolderPath() {
@@ -106,77 +161,32 @@ export default class ImportAttachments extends Plugin {
             /* continue */
 		}
 
-		const folderPath = this.settings.attachmentFolderPath;
+		this.folderPath = this.settings.attachmentFolderPath;
 		const placeholder = "${notename}";
 
-		if(folderPath.includes(placeholder)) {
+		if(this.folderPath.includes(placeholder)) {
 			// Find the index of the first occurrence of the placeholder
-			const firstIndex = folderPath.indexOf(placeholder);
+			const firstIndex = this.folderPath.indexOf(placeholder);
 
 			// Find the index of the last occurrence of the placeholder
-			const lastIndex = folderPath.lastIndexOf(placeholder);
+			const lastIndex = this.folderPath.lastIndexOf(placeholder);
 
 			// Calculate the starting index of the text after the placeholder
 			const endOfPlaceholderIndex = lastIndex + placeholder.length;
 
 			// Extract the parts before the first occurrence and after the last occurrence of the placeholder
-			const folderPathStartsWith = folderPath.substring(0, firstIndex)
-			const folderPathEndsWith = folderPath.substring(endOfPlaceholderIndex);
-
-            function escapeRegex(string:string) {
-                return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
-            }
-
-            // create regex from folder pattern
-            const regex = ((template:string) => {
-                    const [leftPart, rightPart] = template.split('${notename}');
-                    const escapedLeftPart = escapeRegex(leftPart);
-                    const escapedRightPart = escapeRegex(rightPart);
-
-                    const regexPattern = `^${escapedLeftPart}(.*?)${escapedRightPart}$`;
-                    return new RegExp(regexPattern);
-                })(folderPath);
-
-            const isSubfolderSetting = this.settings.attachmentFolderLocation === AttachmentFolderLocationType.SUBFOLDER;
-
-            this.matchAttachmentFolder = (filePath: string): boolean => {
-                // Check if filePath starts with startsWidth or contains /startsWidth
-                const startsWithMatch = filePath.startsWith(folderPathStartsWith) || filePath.includes(`/${folderPathStartsWith}`);
-                // Check if filePath ends with endsWidth
-                const endsWithMatch = filePath.endsWith(folderPathEndsWith);
-                
-                // Check that both conditions are met
-                const heuristicMatch = startsWithMatch && endsWithMatch;
-
-                if(heuristicMatch && isSubfolderSetting)
-                {
-                    const {foldername, dir} = Utils.parseFolderPath(filePath);
-
-                    // Use the match method to get the groups
-                    const match = foldername.match(regex);
-
-                    if (match && match[1]) {
-                        const noteName = normalizePath(Utils.joinPaths(dir,match[1])+".md");
-                        return Utils.doesFileExist(this.app.vault,noteName);
-                    } else {
-                        // No match found
-                        return false;
-                    }
-                }
-                return heuristicMatch;
-            };
+			const folderPathStartsWith = this.folderPath.substring(0, firstIndex)
+			const folderPathEndsWith = this.folderPath.substring(endOfPlaceholderIndex);
+			
+            this.matchAttachmentFolder = this.matchAttachmentFolderWithPlaceholder;
             return;
 		} else {
 			switch(this.settings.attachmentFolderLocation) {
 			case AttachmentFolderLocationType.FOLDER:
-				this.matchAttachmentFolder = (filePath: string): boolean => {
-                    return filePath === folderPath;
-                }
+				this.matchAttachmentFolder = this.matchAttachmentFolderForFolder;
 				return;
 			case AttachmentFolderLocationType.SUBFOLDER:
-				this.matchAttachmentFolder = (filePath: string): boolean => {
-                    return filePath.endsWith(`/${folderPath}`) || filePath === folderPath;
-                }
+				this.matchAttachmentFolder = this.matchAttachmentFolderForSubfolder;
 				return;
 			}
 		}		
@@ -439,27 +449,115 @@ export default class ImportAttachments extends Plugin {
 		);
 	
 		if (Platform.isDesktopApp) {
-			/*
 			this.registerEvent(
 				this.app.workspace.on("file-menu", (menu: Menu, file: TAbstractFile) => {
 					if (file instanceof TFile) {
-						if (!file.path.endsWith(".md")) return;
+						// if (!file.path.endsWith(".md")) return;
+                        // const fileExplorer = this.app.internalPlugins.getPluginById('file-explorer');
+                        const fileManager = this.app.fileManager;  // Get the actual file manager instance
 
-						// Find and modify the existing "Delete" menu item
-						for (const item of menu.items) {
-							if (item.dom.innerText === "Delete") { // Adjust the condition as needed
-								const originalCallback = item.callback;
-								console.log(originalCallback);
-								item.onClick(async () => {
-									await originalCallback();
-								});
-								break; // Exit loop after finding and modifying the "Delete" item
-							}
-						}
+                        // Bind the correct context to promptForDeletion
+                        const promptForDeletion = fileManager.promptForDeletion.bind(fileManager);
+
+
+                        // Inspect the currently available menu items
+                        let first_action_menu: MenuItem | null = null;
+                        let renameMenu: MenuItem | null = null;
+                        let deleteMenu: MenuItem | null = null;
+                        for (const item of menu.items) {
+                            if(first_action_menu === null && item.section==='action') {
+                                first_action_menu = item
+                            }
+                            if (
+                                renameMenu === null
+                                && `${item.callback}`.contains('promptForFileRename')
+                                // && item.dom.innerText === "Rename..."  // we avoid using this condition because it relies on English language
+                               ) {
+                                renameMenu = item;
+                            }
+                            if (
+                                deleteMenu === null
+                                && `${item.callback}`.contains('promptForFileDeletion')
+                                // && item.dom.innerText === "Delete file"  // we avoid using this condition because it relies on English language
+                               ) {
+                                deleteMenu = item;
+                            }
+                        }
+                        if(renameMenu === null) renameMenu = first_action_menu;
+                        
+                        if(deleteMenu) {
+                            // we do nothing if the delete menu is already present
+                            return;
+                        }
+
+                        // Add "Delete" menu item
+                        let newDeleteMenu: MenuItem | null = null; 
+                        menu.addItem((item: MenuItem) => {
+                            newDeleteMenu = item;
+                            item
+                            .setTitle("Delete link and file")
+                            .setIcon("lucide-delete")
+                            .setSection("danger")
+                            .onClick(async () => {
+                                await promptForDeletion(file);
+                                const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+                                const editor = markdownView?.editor;
+                                if (editor) {
+                                    // Get the file name without the extension
+                                    const fileNameWithoutExtension = file.path;
+
+                                    // Get the cursor position
+                                    const cursor = editor.getCursor();
+
+                                    // Get the content of the line where the cursor is located
+                                    const lineContent = editor.getLine(cursor.line);
+
+                                    // Search to the left of the cursor for '[['
+                                    const leftPart = lineContent.slice(0, cursor.ch);
+                                    const leftIndex = leftPart.lastIndexOf('[[');
+
+                                    // Search to the right of the cursor for ']]'
+                                    const rightPart = lineContent.slice(cursor.ch);
+                                    const rightIndex = rightPart.indexOf(']]');
+
+                                    // Check if both '[[' and ']]' are found, and make sure they are in the correct order
+                                    if (leftIndex !== -1 && rightIndex !== -1) {
+                                        // Extract the content between [[ and ]]
+                                        const wikiLinkText = lineContent.slice(leftIndex + 2, cursor.ch + rightIndex).trimLeft();
+
+                                        // Check if the Wiki link matches the file being deleted
+                                        if (wikiLinkText.startsWith(fileNameWithoutExtension)) {
+                                            // Remove the entire Wiki link from the line
+                                            const updatedLineContent = lineContent.slice(0, leftIndex) + lineContent.slice(cursor.ch + rightIndex + 2);
+
+                                            // Update the editor with the modified line
+                                            editor.replaceRange(updatedLineContent, { line: cursor.line, ch: 0 }, { line: cursor.line, ch: lineContent.length });
+                                        }
+                                    }
+                                }
+                            });
+                        });
+
+                        const moveDeleteOptionNextToRename = false;
+                        if(moveDeleteOptionNextToRename) {
+                            if(renameMenu && newDeleteMenu) { // if we found the rename menu
+                                const items = menu.items;
+
+                                // Find the index of renameMenu and deleteMenu
+                                const renameMenuIndex = items.indexOf(renameMenu);
+                                const deleteMenuIndex = items.indexOf(newDeleteMenu);
+
+                                if (renameMenuIndex !== -1 && deleteMenuIndex !== -1) {
+                                    // Remove deleteMenu from its current position
+                                    const [removedDeleteMenu] = items.splice(deleteMenuIndex, 1);
+                                    // Insert deleteMenu right after renameMenu
+                                    items.splice(renameMenuIndex + 1, 0, removedDeleteMenu);
+                                }
+                            }
+                        }
 					}
 				})
 			);
-			*/
 		}
 
 		console.log('Loaded plugin Import Attachments+');
