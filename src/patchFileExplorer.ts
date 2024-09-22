@@ -81,13 +81,19 @@ function updateVisibilityAttachmentFolders(plugin: ImportAttachments){
 	for (const leaf of leaves) {
 		const viewInstance = leaf.view as FileExplorerView;
 
-		Object.entries(viewInstance.fileItems).forEach(([folderPath, item]) => {
-			if(hide) {
-				item.el.toggleClass("import-plugin-hidden",plugin.matchAttachmentFolder(folderPath))
-			} else {
-				item.el.toggleClass("import-plugin-hidden",false);
-			}
-		});
+        if(hide) {
+            Object.entries(viewInstance.fileItems).forEach(([folderPath, item]) => {
+                if(item.file instanceof TFolder) {
+                    item.el.toggleClass("import-plugin-hidden",plugin.matchAttachmentFolder(folderPath));
+                }
+            });
+        } else {
+            Object.entries(viewInstance.fileItems).forEach(([folderPath, item]) => {
+                if(item.file instanceof TFolder) {
+                    item.el.toggleClass("import-plugin-hidden",false);
+                }
+            });
+		};
 	}
 }
 

@@ -55,6 +55,20 @@ import { patchFileExplorer, unpatchFileExplorer, updateVisibilityAttachmentFolde
 import { monkeyPatchConsole, unpatchConsole } from "patchConsole";
 
 import { DEFAULT_SETTINGS, DEFAULT_SETTINGS_1_3_0 } from "default";
+import { debug } from "console";
+
+function escapeRegex(string:string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+}
+
+function createRegexFromFolderPattern(template:string) {
+    const [leftPart, rightPart] = template.split('${notename}');
+    const escapedLeftPart = escapeRegex(leftPart);
+    const escapedRightPart = escapeRegex(rightPart);
+
+    const regexPattern = `^${escapedLeftPart}(.*?)${escapedRightPart}$`;
+    return new RegExp(regexPattern);
+}
 
 // Main plugin class
 export default class ImportAttachments extends Plugin {
@@ -62,6 +76,10 @@ export default class ImportAttachments extends Plugin {
 	vaultPath: string;
 	private settingsTab: ImportAttachmentsSettingTab;
 	matchAttachmentFolder: ((str:string)=>boolean) = (_:string) => true;
+
+    private folderPathStartsWith: string = "";
+    private folderPathEndsWith: string = "";
+    private folderPath: string = "";
 
 	constructor(app: App, manifest: PluginManifest) {
 		super(app, manifest);
@@ -87,21 +105,46 @@ export default class ImportAttachments extends Plugin {
 		}
 	}
 
+    private matchAttachmentFolderWithPlaceholder = (filePath: string): boolean => {
+        // Check if filePath starts with startsWidth or contains /startsWidth
+        const startsWithMatch = filePath.startsWith(this.folderPathStartsWith) || filePath.includes(`/${this.folderPathStartsWith}`);
+        // Check if filePath ends with endsWidth
+        const endsWithMatch = filePath.endsWith(this.folderPathEndsWith);
+        
+        // Check that both conditions are met
+        const heuristicMatch = startsWithMatch && endsWithMatch;
+
+        if(heuristicMatch && this.settings.attachmentFolderLocation === AttachmentFolderLocationType.SUBFOLDER)
+        {
+            const folderPath = this.settings.attachmentFolderPath;
+            const {foldername, dir} = Utils.parseFolderPath(filePath);
+
+            const regex = createRegexFromFolderPattern(folderPath);
+
+            // Use the match method to get the groups
+            const match = foldername.match(regex);
+
+            if (match && match[1]) {
+                const noteName = normalizePath(Utils.joinPaths(dir,match[1])+".md");
+                return Utils.doesFileExist(this.app.vault,noteName);
+            } else {
+                // No match found
+                return false;
+            }
+        }
+        return heuristicMatch;
+    }
+
+    private matchAttachmentFolderForFolder(filePath: string): boolean {
+        return filePath === this.folderPath;
+    }
+
+    private matchAttachmentFolderForSubfolder (filePath: string): boolean {
+        return filePath.endsWith(`/${this.folderPath}`) || filePath === this.folderPath;
+    }   
+
 	// Function to split around the original
 	parseAttachmentFolderPath() {
-		function escapeRegex(string:string) {
-			return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
-		}
-
-		function createRegexFromFolderPattern(template:string) {
-			const [leftPart, rightPart] = template.split('${notename}');
-			const escapedLeftPart = escapeRegex(leftPart);
-			const escapedRightPart = escapeRegex(rightPart);
-
-			const regexPattern = `^${escapedLeftPart}(.*?)${escapedRightPart}$`;
-			return new RegExp(regexPattern);
-		}
-
 		switch(this.settings.attachmentFolderLocation) {
 		case AttachmentFolderLocationType.CURRENT:
 		case AttachmentFolderLocationType.ROOT:
@@ -109,66 +152,37 @@ export default class ImportAttachments extends Plugin {
 				return false;
 			}
 			return;
+        case AttachmentFolderLocationType.FOLDER:
+        case AttachmentFolderLocationType.SUBFOLDER:
+            /* continue */
 		}
 
-		const folderPath = this.settings.attachmentFolderPath;
+		this.folderPath = this.settings.attachmentFolderPath;
 		const placeholder = "${notename}";
 
-		if(folderPath.includes(placeholder)) {
+		if(this.folderPath.includes(placeholder)) {
 			// Find the index of the first occurrence of the placeholder
-			const firstIndex = folderPath.indexOf(placeholder);
+			const firstIndex = this.folderPath.indexOf(placeholder);
 
 			// Find the index of the last occurrence of the placeholder
-			const lastIndex = folderPath.lastIndexOf(placeholder);
+			const lastIndex = this.folderPath.lastIndexOf(placeholder);
 
 			// Calculate the starting index of the text after the placeholder
 			const endOfPlaceholderIndex = lastIndex + placeholder.length;
 
 			// Extract the parts before the first occurrence and after the last occurrence of the placeholder
-			const folderPathStartsWith = folderPath.substring(0, firstIndex)
-			const folderPathEndsWith = folderPath.substring(endOfPlaceholderIndex);
+			const folderPathStartsWith = this.folderPath.substring(0, firstIndex)
+			const folderPathEndsWith = this.folderPath.substring(endOfPlaceholderIndex);
 			
-			this.matchAttachmentFolder = (filePath: string): boolean => {
-
-				// Check if filePath starts with startsWidth or contains /startsWidth
-				const startsWithMatch = filePath.startsWith(folderPathStartsWith) || filePath.includes(`/${folderPathStartsWith}`);
-				// Check if filePath ends with endsWidth
-				const endsWithMatch = filePath.endsWith(folderPathEndsWith);
-				
-				// Check that both conditions are met
-				const heuristicMatch = startsWithMatch && endsWithMatch;
-
-				if(heuristicMatch && this.settings.attachmentFolderLocation === AttachmentFolderLocationType.SUBFOLDER)
-				{
-					const folderPath = this.settings.attachmentFolderPath;
-					const {filename, dir} = Utils.parseFilePath(filePath);
-
-					const regex = createRegexFromFolderPattern(folderPath);
-
-					// Use the match method to get the groups
-					const match = filename.match(regex);
-
-					if (match && match[1]) {
-						const noteName = normalizePath(Utils.joinPaths(dir,match[1])+".md");
-						return Utils.doesFileExist(this.app.vault,noteName);
-					} else {
-						// No match found
-						return false;
-					}
-				}
-				return heuristicMatch;
-			}
+            this.matchAttachmentFolder = this.matchAttachmentFolderWithPlaceholder;
+            return;
 		} else {
 			switch(this.settings.attachmentFolderLocation) {
 			case AttachmentFolderLocationType.FOLDER:
-				this.matchAttachmentFolder = (filePath: string): boolean => {
-					return filePath === folderPath;
-				}	
+				this.matchAttachmentFolder = this.matchAttachmentFolderForFolder;
 				return;
 			case AttachmentFolderLocationType.SUBFOLDER:
-				this.matchAttachmentFolder = (filePath: string): boolean => {
-					return filePath.endsWith(`/${folderPath}`) || filePath === folderPath;
-				}	
+				this.matchAttachmentFolder = this.matchAttachmentFolderForSubfolder;
 				return;
 			}
 		}		

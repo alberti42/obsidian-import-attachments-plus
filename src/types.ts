@@ -71,6 +71,12 @@ export interface ParsedPath {
 	path: string
 }
 
+export interface ParsedFolderPath {
+    dir: string,
+    foldername: string,
+    path: string
+}
+
 // Define an interface for the return type
 export interface AttachmentFolderPath {
 	attachmentsFolderPath: string;

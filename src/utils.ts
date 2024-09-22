@@ -5,7 +5,7 @@ import * as crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { Vault, normalizePath, TAbstractFile, TFile, TFolder } from 'obsidian';
 
-import { ParsedPath } from 'types';
+import { ParsedPath as ParsedFilePath, ParsedFolderPath } from 'types';
 import * as path from 'path';
 
 // Joins multiple path segments into a single normalized path.
@@ -13,7 +13,7 @@ export function joinPaths(...paths: string[]): string {
 	return paths.join('/');
 }
 
-export function parseFilePath(filePath: string): ParsedPath {
+export function parseFilePath(filePath: string): ParsedFilePath {
 	filePath = normalizePath(filePath);
 	const lastSlashIndex = filePath.lastIndexOf('/');
 
@@ -24,6 +24,16 @@ export function parseFilePath(filePath: string): ParsedPath {
 	const ext = extIndex !== -1 ? base.substring(extIndex) : '';
 
 	return { dir, base, filename, ext, path: filePath };
+}
+
+export function parseFolderPath(folderPath: string): ParsedFolderPath {
+    folderPath = normalizePath(folderPath);
+    const lastSlashIndex = folderPath.lastIndexOf('/');
+
+    const dir = lastSlashIndex !== -1 ? folderPath.substring(0, lastSlashIndex) : '';
+    const foldername = lastSlashIndex !== -1 ? folderPath.substring(lastSlashIndex + 1) : folderPath;
+
+    return { dir, foldername, path: folderPath };
 }
 
 export function isInstanceOfFolder(file: TAbstractFile): file is TFolder {

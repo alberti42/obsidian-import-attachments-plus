@@ -40,7 +40,7 @@ const context = await esbuild.context({
 		...builtins
 	],
 	format: "cjs",
-	target: "es2018",
+	target: "es2022",
 	logLevel: "info",
 	sourcemap: prod ? false : "inline",
 	minifySyntax: prod, // Enable syntax minification in production
@@ -50,8 +50,8 @@ const context = await esbuild.context({
 	define: {
 		"process.env.NODE_ENV": JSON.stringify(prod ? "production" : "development"),
 	},
-	// minify: prod,
-	treeShaking: true,
+	minify: prod,
+	treeShaking: prod,
 	plugins: [
 		copy({
 			assets: {
