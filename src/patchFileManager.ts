@@ -123,14 +123,16 @@ function patchFilemanager(plugin: ImportAttachments) {
                 }
 
 	            // In case the attachment folder still exists and it is empty, delete it
-                if(parent) {
-                    if(plugin.matchAttachmentFolder(parent.path)){ // of the type of an attachment folder
-                        if(parent.children.length===0) { // attachment folder is empty
-                            // const recursive = true;
-                            // plugin.app.vault.delete(parent,recursive);
-                            const postDescription = createEl('p',{text: "The attachment folder is now empty, and it should be safe to delete it."});
-                            await deleteAttachmentFolderAssociatedWithMdFile(plugin, parent, undefined, postDescription);
-                            
+                if(plugin.settings.deleteAttachmentFolderWhenEmpty) {
+                    if(parent) {
+                        if(plugin.matchAttachmentFolder(parent.path)){ // of the type of an attachment folder
+                            if(parent.children.length===0) { // attachment folder is empty
+                                // const recursive = true;
+                                // plugin.app.vault.delete(parent,recursive);
+                                const postDescription = createEl('p',{text: "The attachment folder is now empty, and it should be safe to delete it."});
+                                await deleteAttachmentFolderAssociatedWithMdFile(plugin, parent, undefined, postDescription);
+                                
+                            }
                         }
                     }
                 }
