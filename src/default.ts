@@ -15,14 +15,17 @@ export const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 	attachmentFolderPath: '${notename} (attachments)', // Default to a folder in the vault
 	attachmentName: '${original}', // Default to the original name of the attachment
 	dateFormat: 'YYYY_MM_DDTHH_mm_ss',
-	customDisplayText: true,  // Default to true
-	autoRenameAttachmentFolder: true, // Default to true
-	autoDeleteAttachmentFolder: true, // Default to true
-	confirmDeleteAttachmentFolder: true, // Default to true
-	hideAttachmentFolders: true, // Default to true
-	revealAttachment: true, // Default to true
+	customDisplayText: true,
+	autoRenameAttachmentFolder: true,
+	autoDeleteAttachmentFolder: true,
+    deleteAttachmentFolderWhenEmpty: true,
+    showDeleteMenu: true,
+    removeWikilinkOnFileDeletion: true,
+	confirmDeleteAttachmentFolder: true,
+	hideAttachmentFolders: true,
+	revealAttachment: true,
 	revealAttachmentExtExcluded: '.md', // Default to Markdown files
-	openAttachmentExternal: true, // Default to true
+	openAttachmentExternal: true,
 	openAttachmentExternalExtExcluded: '.md', // Default to Markdown files
 	logs: {}, // Initialize logs as an empty array
 	compatibility: '1.4.0'

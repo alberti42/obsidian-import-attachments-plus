@@ -2,7 +2,7 @@
 
 /* eslint-disable @typescript-eslint/no-inferrable-types */
 
-import { FileManager, TAbstractFile, Notice } from 'obsidian';
+import { FileManager, TAbstractFile, Notice, TFolder } from 'obsidian';
 import ImportAttachments from 'main';
 import * as Utils from 'utils';
 import { DeleteAttachmentFolderModal } from './ImportAttachmentsModal';
@@ -25,7 +25,6 @@ function patchFilemanager(plugin: ImportAttachments) {
 
 	// Monkey patch the promptForDeletion method
 	FileManager.prototype.promptForDeletion = async function patchedPromptForDeletion(file: TAbstractFile): Promise<void> {
-		
 		// Access the 'promptDelete' configuration setting
 		const promptDelete = plugin.app.vault.getConfig('promptDelete');
 		
@@ -39,7 +38,7 @@ function patchFilemanager(plugin: ImportAttachments) {
 			};
 
 			// Set up a MutationObserver to watch for the modal
-			modalCreationObserver = new MutationObserver((mutations, observer) => {
+			new MutationObserver((mutations, observer) => {
 				for (const mutation of mutations) {
 					if (mutation.addedNodes.length > 0) {
 						// Check if the added node is the modal
@@ -84,59 +83,80 @@ function patchFilemanager(plugin: ImportAttachments) {
 							}
 
 							// Disconnect the creation observer once the modal is found
-							observer.disconnect();
+                            observer.disconnect();
 							break;
 						}
 					}
 				}
-			});
+			}).observe(document.body, config);
 
-			modalCreationObserver.observe(document.body, config);
 		} else {
 			userInitiatedDelete = true;
 			// console.log("Delete without prompt");
 		}
 
-		// Call the original function
+        // Call the original function
 		if (originalPromptForDeletion) {
-			await originalPromptForDeletion.call(this, file);
+            const parent = file.parent; // store the parent element
+            await originalPromptForDeletion.call(this, file);
 			if(userInitiatedDelete) {
-				await deleteAttachmentFolder(plugin, file);
+
+                // In case the deleted file is a .md note, delete the attachment folder
+                if (plugin.settings.autoDeleteAttachmentFolder) {
+                    // Automatic deletion only works when the attachment name contains ${notename}
+                    // In order to avoid deleting common attachment folders, shared between multiple notes
+                    if (plugin.settings.attachmentFolderPath.includes('${notename}')) {
+                        const file_parsed = Utils.parseFilePath(file.path);
+                        if (file_parsed.ext === ".md") {
+                            const attachmentFolder = plugin.app.vault.getAbstractFileByPath(plugin.getAttachmentFolderOfMdNote(file_parsed));
+                            if(attachmentFolder instanceof TFolder) {
+                                const postDescription_text = attachmentFolder.children.length > 0 ?
+                                    `Please note that the folder that is associated with the MarkDown note you \
+                                        have just deleted is not empty. It still contains ${attachmentFolder.children.length} files.` 
+                                    : "The attachment folder is empty, and it should be safe to delete it.";
+                                const postDescription = createEl('p', {text:postDescription_text});
+                                await deleteAttachmentFolderAssociatedWithMdFile(plugin, attachmentFolder, undefined, postDescription);
+                            }
+                            
+                        }                        
+                    }
+                }
+
+	            // In case the attachment folder still exists and it is empty, delete it
+                if(parent) {
+                    if(plugin.matchAttachmentFolder(parent.path)){ // of the type of an attachment folder
+                        if(parent.children.length===0) { // attachment folder is empty
+                            // const recursive = true;
+                            // plugin.app.vault.delete(parent,recursive);
+                            const postDescription = createEl('p',{text: "The attachment folder is now empty, and it should be safe to delete it."});
+                            await deleteAttachmentFolderAssociatedWithMdFile(plugin, parent, undefined, postDescription);
+                            
+                        }
+                    }
+                }
 			}			
 		}
 	};
 }
 
-async function deleteAttachmentFolder(plugin: ImportAttachments, file: TAbstractFile) {
-    if (!plugin.settings.autoDeleteAttachmentFolder) { return; }
+async function deleteAttachmentFolderAssociatedWithMdFile(plugin: ImportAttachments, attachmentFolder: TFolder, preDescription?:HTMLElement, postDescription?:HTMLElement) {
 
-	// Automatic deletion only works when the attachment name contains ${notename}
-	// In order to avoid deleting common attachment folders, shared between multiple notes
-    if (!(plugin.settings.attachmentFolderPath.includes('${notename}'))) { return; }
+	if(plugin.settings.confirmDeleteAttachmentFolder) {
+		const modal = new DeleteAttachmentFolderModal(plugin, attachmentFolder, preDescription, postDescription);
+		modal.open();
+		const choice = await modal.promise;
+		if (!choice) return;
+	}
 
-	const file_parsed = Utils.parseFilePath(file.path);
-	if (file_parsed.ext !== ".md") { return; }
+	const filePathForDeletion = attachmentFolder;
 
-	const attachmentFolderPath = plugin.getFullAttachmentFolder(file_parsed);
-	
-	if (await Utils.doesFolderExist(plugin.app.vault,attachmentFolderPath)) {
-		if(plugin.settings.confirmDeleteAttachmentFolder) {
-			const modal = new DeleteAttachmentFolderModal(plugin, attachmentFolderPath);
-			modal.open();
-			const choice = await modal.promise;
-			if (!choice) return;
-		}
-
-		const filePathForDeletion = attachmentFolderPath;
-
-		try {
-			await plugin.trashFile(filePathForDeletion);
-		} catch (error: unknown) {
-			const msg = 'Failed to remove the attachment folder';
-			console.error(msg + ":", filePathForDeletion);
-			console.error("Error msg:", error);
-			new Notice(msg + '.');
-		}
+	try {
+		await plugin.trashFile(filePathForDeletion);
+	} catch (error: unknown) {
+		const msg = 'Failed to remove the attachment folder';
+		console.error(msg + ":", filePathForDeletion);
+		console.error("Error msg:", error);
+		new Notice(msg + '.');
 	}
 }
 

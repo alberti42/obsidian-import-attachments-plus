@@ -20,6 +20,7 @@ import {
     TFile,
     FileManager,
     MenuItem,
+    ToggleComponent,
 } from "obsidian";
 
 // Import utility and modal components
@@ -79,11 +80,13 @@ export default class ImportAttachments extends Plugin {
 	settings: ImportAttachmentsSettings = { ...DEFAULT_SETTINGS };
 	vaultPath: string;
 	private settingsTab: ImportAttachmentsSettingTab;
-	matchAttachmentFolder: ((str:string)=>boolean) = (_:string) => true;
+	public matchAttachmentFolder: ((str:string)=>boolean) = (_:string) => true;
 
     private folderPathStartsWith: string = "";
     private folderPathEndsWith: string = "";
     private folderPath: string = "";
+
+    private file_menu_cb: ((menu: Menu, file: TAbstractFile) => void) | null = null;
 
 	constructor(app: App, manifest: PluginManifest) {
 		super(app, manifest);
@@ -220,7 +223,7 @@ export default class ImportAttachments extends Plugin {
 	async onload() {
 		// Load and add settings tab
 		await this.loadSettings();
-		this.addSettingTab(this.settingsTab);
+        this.addSettingTab(this.settingsTab);
 		
 		// Set up the mutation observer for hiding folders
 		// this.setupObserver();
@@ -422,10 +425,10 @@ export default class ImportAttachments extends Plugin {
 					const oldPath_parsed = Utils.parseFilePath(oldPath);
 					if (oldPath_parsed.ext !== ".md") { return }
 
-					const oldAttachmentFolderPath = this.getFullAttachmentFolder(oldPath_parsed);
+					const oldAttachmentFolderPath = this.getAttachmentFolderOfMdNote(oldPath_parsed);
 					if (!oldAttachmentFolderPath) { return }
 					if (Utils.doesFolderExist(this.app.vault,oldAttachmentFolderPath)) {
-						const newAttachmentFolderPath = this.getFullAttachmentFolder(Utils.parseFilePath(newFile.path));
+						const newAttachmentFolderPath = this.getAttachmentFolderOfMdNote(Utils.parseFilePath(newFile.path));
 
 						const oldPath = oldAttachmentFolderPath;
 						const newPath = newAttachmentFolderPath;
@@ -447,59 +450,95 @@ export default class ImportAttachments extends Plugin {
 				}
 			})
 		);
+	   
+        // Add delete menu in context menu
+	    this.addDeleteMenu(this.settings.showDeleteMenu);
 	
-		if (Platform.isDesktopApp) {
-			this.registerEvent(
-				this.app.workspace.on("file-menu", (menu: Menu, file: TAbstractFile) => {
-					if (file instanceof TFile) {
-						// if (!file.path.endsWith(".md")) return;
-                        // const fileExplorer = this.app.internalPlugins.getPluginById('file-explorer');
-                        const fileManager = this.app.fileManager;  // Get the actual file manager instance
+		console.log('Loaded plugin Import Attachments+');
+	}
 
-                        // Bind the correct context to promptForDeletion
-                        const promptForDeletion = fileManager.promptForDeletion.bind(fileManager);
+	onunload() {
+		// unpatch openFile
+		unpatchOpenFile();
+		removeKeyListeners();
+
+		// unpatch fileManager
+		unpatchFilemanager();
+
+		// unpatch Vault
+		unpatchImportFunctions();
+
+		// unpatch file-explorer plugin
+		unpatchFileExplorer();
+
+		// unpatch console
+		unpatchConsole();
+
+        // remove delete menu
+        this.addDeleteMenu(false);
+	}
+
+    addDeleteMenu(status:boolean) {
+        if(status && !this.file_menu_cb) {
+
+            this.file_menu_cb = (menu: Menu, file: TAbstractFile) => {
+                if (file instanceof TFile) {
+                    // const fileExplorer = this.app.internalPlugins.getPluginById('file-explorer');
+                    const fileManager = this.app.fileManager;  // Get the actual file manager instance
+
+                    // Bind the correct context to promptForDeletion
+                    const promptForDeletion = fileManager.promptForDeletion.bind(fileManager);
 
 
-                        // Inspect the currently available menu items
-                        let first_action_menu: MenuItem | null = null;
-                        let renameMenu: MenuItem | null = null;
-                        let deleteMenu: MenuItem | null = null;
-                        for (const item of menu.items) {
-                            if(first_action_menu === null && item.section==='action') {
-                                first_action_menu = item
-                            }
-                            if (
-                                renameMenu === null
-                                && `${item.callback}`.contains('promptForFileRename')
-                                // && item.dom.innerText === "Rename..."  // we avoid using this condition because it relies on English language
-                               ) {
-                                renameMenu = item;
-                            }
-                            if (
-                                deleteMenu === null
-                                && `${item.callback}`.contains('promptForFileDeletion')
-                                // && item.dom.innerText === "Delete file"  // we avoid using this condition because it relies on English language
-                               ) {
-                                deleteMenu = item;
-                            }
+                    // Inspect the currently available menu items
+                    let first_action_menu: MenuItem | null = null;
+                    let renameMenu: MenuItem | null = null;
+                    let deleteMenu: MenuItem | null = null;
+                    for (const item of menu.items) {
+                        const callback_str = `${item.callback}`;
+
+                        if(first_action_menu === null && item.section==='action') {
+                            first_action_menu = item
                         }
-                        if(renameMenu === null) renameMenu = first_action_menu;
-                        
-                        if(deleteMenu) {
-                            // we do nothing if the delete menu is already present
-                            return;
+                        if (
+                            renameMenu === null
+                            && callback_str.contains('promptForFileRename')
+                            // && item.dom.innerText === "Rename..."  // we avoid using this condition because it relies on English language
+                           ) {
+                            renameMenu = item;
                         }
+                        if (
+                            deleteMenu === null
+                            && callback_str.contains('promptForFileDeletion') // when right clicking on the note title
+                            // && item.dom.innerText === "Delete file"  // we avoid using this condition because it relies on English language
+                           ) {
+                            deleteMenu = item;
+                        }
+                        if (
+                            deleteMenu === null
+                            && callback_str.contains('promptForDeletion') // when right clicking on a file in the navigation pane
+                            // && item.dom.innerText === "Delete"  // we avoid using this condition because it relies on English language
+                           ) {
+                            deleteMenu = item;
+                        }
+                    }
+                    if(renameMenu === null) renameMenu = first_action_menu;
+                    
+                    if(deleteMenu) {
+                        // we do nothing if the delete menu is already present
+                        return;
+                    }
 
-                        // Add "Delete" menu item
-                        let newDeleteMenu: MenuItem | null = null; 
-                        menu.addItem((item: MenuItem) => {
-                            newDeleteMenu = item;
-                            item
-                            .setTitle("Delete link and file")
-                            .setIcon("lucide-delete")
-                            .setSection("danger")
-                            .onClick(async () => {
-                                await promptForDeletion(file);
+                    // Add "Delete" menu item
+                    let newDeleteMenu: MenuItem | null = null; 
+                    menu.addItem((item: MenuItem) => {
+                        newDeleteMenu = item;
+                        item
+                        .setTitle("Delete link and file")
+                        .setIcon("lucide-trash-2")
+                        .setSection("danger")
+                        .onClick(async () => {
+                            if(this.settings.removeWikilinkOnFileDeletion) {
                                 const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
                                 const editor = markdownView?.editor;
                                 if (editor) {
@@ -535,51 +574,40 @@ export default class ImportAttachments extends Plugin {
                                         }
                                     }
                                 }
-                            });
+                            }
+                            // TODO: check whether the user cancel the deletion operation
+                            // and if so, then avoid deleting the wikilink
+                            await promptForDeletion(file);
                         });
+                    });
 
-                        const moveDeleteOptionNextToRename = false;
-                        if(moveDeleteOptionNextToRename) {
-                            if(renameMenu && newDeleteMenu) { // if we found the rename menu
-                                const items = menu.items;
+                    const moveDeleteOptionNextToRename = false;
+                    if(moveDeleteOptionNextToRename) {
+                        if(renameMenu && newDeleteMenu) { // if we found the rename menu
+                            const items = menu.items;
 
-                                // Find the index of renameMenu and deleteMenu
-                                const renameMenuIndex = items.indexOf(renameMenu);
-                                const deleteMenuIndex = items.indexOf(newDeleteMenu);
+                            // Find the index of renameMenu and deleteMenu
+                            const renameMenuIndex = items.indexOf(renameMenu);
+                            const deleteMenuIndex = items.indexOf(newDeleteMenu);
 
-                                if (renameMenuIndex !== -1 && deleteMenuIndex !== -1) {
-                                    // Remove deleteMenu from its current position
-                                    const [removedDeleteMenu] = items.splice(deleteMenuIndex, 1);
-                                    // Insert deleteMenu right after renameMenu
-                                    items.splice(renameMenuIndex + 1, 0, removedDeleteMenu);
-                                }
+                            if (renameMenuIndex !== -1 && deleteMenuIndex !== -1) {
+                                // Remove deleteMenu from its current position
+                                const [removedDeleteMenu] = items.splice(deleteMenuIndex, 1);
+                                // Insert deleteMenu right after renameMenu
+                                items.splice(renameMenuIndex + 1, 0, removedDeleteMenu);
                             }
                         }
-					}
-				})
-			);
-		}
-
-		console.log('Loaded plugin Import Attachments+');
-	}
-
-	onunload() {
-		// unpatch openFile
-		unpatchOpenFile();
-		removeKeyListeners();
-
-		// unpatch fileManager
-		unpatchFilemanager();
-
-		// unpatch Vault
-		unpatchImportFunctions();
-
-		// unpatch file-explorer plugin
-		unpatchFileExplorer();
-
-		// unpatch console
-		unpatchConsole();
-	}
+                    }
+                }
+            };
+            this.app.workspace.on("file-menu", this.file_menu_cb);
+        } else {
+            if(this.file_menu_cb) {
+                this.app.workspace.off("file-menu", this.file_menu_cb);
+                this.file_menu_cb = null;
+            }
+        }
+    }
 
 	async loadSettings() {
 
@@ -619,14 +647,13 @@ export default class ImportAttachments extends Plugin {
 				return getSettingsFromData(newSettings);
 			}
 		}
-		
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, getSettingsFromData(await this.loadData()));
 		delete this.settings.logs;
 		this.parseAttachmentFolderPath();
 	}
 
 	async saveSettings() {
-		await this.saveData(this.settings);
+        await this.saveData(this.settings);
 	}
 
 	// Function to rename files using fs.rename
@@ -646,11 +673,10 @@ export default class ImportAttachments extends Plugin {
 		}
 	}
 
-	async trashFile(filePath: string): Promise<void> {
+	async trashFile(file: TAbstractFile): Promise<void> {
 		try {
-			const file = this.app.vault.getAbstractFileByPath(filePath);
 			if (file instanceof TAbstractFile) {
-				await this.app.vault.adapter.trashSystem(filePath);
+				await this.app.vault.adapter.trashSystem(file.path);
 				if(Platform.isDesktop) {
 					new Notice('Attachment folder moved to the system trash successfully.');
 				} else {
@@ -733,7 +759,7 @@ export default class ImportAttachments extends Plugin {
 	}
 
 	// Get attachment folder path based on current note
-	getFullAttachmentFolder(md_file?: ParsedPath | undefined): string {	
+	getAttachmentFolderOfMdNote(md_file?: ParsedPath | undefined): string {	
 		// Get the current active note if md_file is not provided
 		if (md_file===undefined) {
 			const md_active_file = this.app.workspace.getActiveFile();
@@ -749,8 +775,6 @@ export default class ImportAttachments extends Plugin {
 		
 		const currentNoteFolderPath = md_file.dir;
 		const notename = md_file.filename;
-
-		this.settingsTab.cleanUpAttachmentFolderSettings();
 
 		const folderPath = this.settings.attachmentFolderPath.replace(/\$\{notename\}/g, notename);
 
@@ -800,7 +824,7 @@ export default class ImportAttachments extends Plugin {
 		// add the extension
 		attachmentName += originalFilePath_parsed.ext;
 
-		const attachmentsFolderPath = this.getFullAttachmentFolder(md_file);
+		const attachmentsFolderPath = this.getAttachmentFolderOfMdNote(md_file);
 		
 		// Ensure the directory exists before moving the file
 		await Utils.createFolderIfNotExists(this.app.vault,attachmentsFolderPath);
@@ -973,7 +997,7 @@ export default class ImportAttachments extends Plugin {
 			return;
 		}
 
-		const attachmentsFolderPath = this.getFullAttachmentFolder(Utils.parseFilePath(md_active_file.path));
+		const attachmentsFolderPath = this.getAttachmentFolderOfMdNote(Utils.parseFilePath(md_active_file.path));
 		
 		if (!Utils.doesFolderExist(this.app.vault,attachmentsFolderPath)) {
 			const modal = new CreateAttachmentFolderModal(this, attachmentsFolderPath);
@@ -1163,7 +1187,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 								if (value != ImportActionType.ASK_USER) {
 									this.plugin.settings.lastActionDroppedFilesOnImport = value as ImportActionType;
 								}
-								await this.debouncedSaveSettings();
+								this.debouncedSaveSettings();
 							} else {
 								console.error('Invalid import action type:', value);
 							}
@@ -1184,7 +1208,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 								if (value != ImportActionType.ASK_USER) {
 									this.plugin.settings.lastActionPastedFilesOnImport = value as ImportActionType;
 								}
-								await this.debouncedSaveSettings();
+								this.debouncedSaveSettings();
 							} else {
 								console.error('Invalid import action type:', value);
 							}
@@ -1193,7 +1217,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 
 			new Setting(containerEl)
 				.setName('Embed imported documents:')
-				.setDesc('If this option is enabled, the files are imported as an embedded document; if it is deactivated, they are imported as a linked document.  By holding the shift key ⇧ pressed, you will be shown the import panel, however you configured this option.')
+				.setDesc('With this option enabled, the files are imported as an embedded document; if it is deactivated, they are imported as a linked document.  By holding the shift key ⇧ pressed, you will be shown the import panel, however you configured this option.')
 				.addDropdown(dropdown => {
 					dropdown.addOption(YesNoTypes.ASK_USER, 'Ask each time');
 					dropdown.addOption(YesNoTypes.YES, 'Yes');
@@ -1205,7 +1229,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 								if (value != YesNoTypes.ASK_USER) {
 									this.plugin.settings.lastEmbedFilesOnImport = value as YesNoTypes;
 								}
-								await this.debouncedSaveSettings();
+								this.debouncedSaveSettings();
 							} else {
 								console.error('Invalid option selection:', value);
 							}
@@ -1223,7 +1247,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 						.onChange(async (value: string) => {
 							if (Object.values(MultipleFilesImportTypes).includes(value as MultipleFilesImportTypes)) {
 								this.plugin.settings.multipleFilesImportType = value as MultipleFilesImportTypes;
-								await this.debouncedSaveSettings();
+								this.debouncedSaveSettings();
 							} else {
 								console.error('Invalid option selection:', value);
 							}
@@ -1232,12 +1256,12 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 
 			new Setting(containerEl)
 				.setName('Use the filename for the displayed text:')
-				.setDesc('If this option is enabled, the filename of the imported document is used as the display text.')
+				.setDesc('With this option enabled, the filename of the imported document is used as the display text.')
 				.addToggle(toggle => toggle
 					.setValue(this.plugin.settings.customDisplayText)
 					.onChange(async (value: boolean) => {
 						this.plugin.settings.customDisplayText = value;
-						await this.debouncedSaveSettings(); // Update visibility based on the toggle
+						this.debouncedSaveSettings(); // Update visibility based on the toggle
 					}));
 
 			const wikilinksSetting = new Setting(containerEl)
@@ -1314,7 +1338,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 
 			const external_toggle = new Setting(containerEl)
 				.setName('Open attachments with default external application:')
-				.setDesc(`If this option is enabled, when you open an attachment by holding ${key}, the attachment opens in default external application.`);
+				.setDesc(`With this option enabled, when you open an attachment by holding ${key}, the attachment opens in default external application.`);
 
 			const external_exclude_ext = new Setting(containerEl)
 				.setName('Exclude the following extensions:')
@@ -1324,7 +1348,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 					text.setValue(this.plugin.settings.openAttachmentExternalExtExcluded);
 					text.onChange(async (value: string) => {
 						this.plugin.settings.openAttachmentExternalExtExcluded = validate_exts(text, value);
-						await this.debouncedSaveSettings();
+						this.debouncedSaveSettings();
 					});
 					// Event when the text field loses focus
 					text.inputEl.onblur = async () => {
@@ -1341,7 +1365,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 				.onChange(async (value: boolean) => {
 					// Hide external_exclude_ext if the toggle is off
 					this.plugin.settings.openAttachmentExternal = value;
-					await this.debouncedSaveSettings();
+					this.debouncedSaveSettings();
 					external_exclude_ext.settingEl.style.display = value ? "" : "none"; // Update visibility based on the toggle
 				}));
 
@@ -1353,7 +1377,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 
 			const reveal_toggle = new Setting(containerEl)
 				.setName("Reveal attachments in system's file manager:")
-				.setDesc(`If this option is enabled, when you open an attachment by holding ${key}, the attachment is shown in the system's file manager.`);
+				.setDesc(`With this option enabled, when you open an attachment by holding ${key}, the attachment is shown in the system's file manager.`);
 
 			const reveal_exclude_ext = new Setting(containerEl)
 				.setName('Exclude the following extensions:')
@@ -1363,7 +1387,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 					text.setValue(this.plugin.settings.revealAttachmentExtExcluded);
 					text.onChange(async (value: string) => {
 						this.plugin.settings.revealAttachmentExtExcluded = validate_exts(text, value);
-						await this.debouncedSaveSettings();
+						this.debouncedSaveSettings();
 					});
 					// Event when the text field loses focus
 					text.inputEl.onblur = async () => {
@@ -1380,27 +1404,75 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 				.onChange(async (value: boolean) => {
 					// Hide reveal_exclude_ext if the toggle is off
 					this.plugin.settings.revealAttachment = value;
-					await this.debouncedSaveSettings();
+					this.debouncedSaveSettings();
 					reveal_exclude_ext.settingEl.style.display = value ? "" : "none";  // Update visibility based on the toggle
 				}));
 		}
 
 		new Setting(containerEl).setName('Managing').setHeading();
 
+        const delete_menu_setting = new Setting(containerEl)
+            .setName('Show option in context menu to delete attachment files:')
+            .setDesc("With this option enabled, when you right click on a Wikilink in your note, a menu 'Delete file' \
+                will be shown in the context menu.");
+            
+        const remove_wikilink_setting = new Setting(containerEl)
+            .setName('Remove Wikilink when deleting an attachment file:')
+            .setDesc("With this option enabled, when you right click on a Wikilink in your note to delete the attachment, \
+                not only the attachment will be deleted, but also the Wikilink will be removed from your note.")
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.removeWikilinkOnFileDeletion)
+                .onChange(async (value: boolean) => {
+                    this.plugin.settings.removeWikilinkOnFileDeletion = value;
+                    this.debouncedSaveSettings();
+                }));
+
+        const update_visibilty_remove_wikilink = (status:boolean) => {
+            if(status) {
+                remove_wikilink_setting.settingEl.style.display='';
+            } else {
+                remove_wikilink_setting.settingEl.style.display='none';
+            }
+        }
+
+        update_visibilty_remove_wikilink(this.plugin.settings.showDeleteMenu);
+        
+        delete_menu_setting.addToggle(toggle => {
+            toggle
+            .setValue(this.plugin.settings.showDeleteMenu)
+            .onChange(async (value: boolean) => {
+                this.plugin.settings.showDeleteMenu = value;
+                this.plugin.addDeleteMenu(value);
+                update_visibilty_remove_wikilink(value);
+                this.debouncedSaveSettings();
+            })
+        });
+
+        new Setting(containerEl)
+            .setName('Automatically remove attachment folders when empty:')
+            .setDesc("With this option enabled, after deleting an attachment, the plugin will check if the attachments folder \
+                is now empty, and if it is, it will delete the attachments folder as well.")
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.deleteAttachmentFolderWhenEmpty)
+                .onChange(async (value: boolean) => {
+                    this.plugin.settings.deleteAttachmentFolderWhenEmpty = value;
+                    this.debouncedSaveSettings();
+                }));
+
 		new Setting(containerEl)
 			.setName('Rename the attachment folder automatically and update all links correspondingly:')
-			.setDesc('If this option is enabled, when you rename/move an note, if the renamed note has an attachment folder connected to it, \
+			.setDesc('With this option enabled, when you rename/move an note, if the renamed note has an attachment folder connected to it, \
 				its attachment folder is renamed/moved to a new name/location corresponding to the new name of the note.')
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.autoRenameAttachmentFolder)
 				.onChange(async (value: boolean) => {
 					this.plugin.settings.autoRenameAttachmentFolder = value;
-					await this.debouncedSaveSettings();
+					this.debouncedSaveSettings();
 				}));
 
 		new Setting(containerEl)
 			.setName('Delete the attachment folder automatically when the corresponding note is deleted:')
-			.setDesc('If this option is enabled, when you delete a note, if the deleted note has an attachment folder connected to it, \
+			.setDesc('With this option enabled, when you delete a note, if the deleted note has an attachment folder connected to it, \
 				its attachment folder will be deleted as well. \
 				Note: automatic deletion only works when the name of the attachment folder contains ${notename}.')
 			.addToggle(toggle => toggle
@@ -1428,7 +1500,7 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('Hide attachment folders:')
-			.setDesc('If this option is enabled, the attachment folders will not be shown.')
+			.setDesc('With this option enabled, the attachment folders will not be shown.')
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.hideAttachmentFolders)
 				.onChange(async (value: boolean) => {

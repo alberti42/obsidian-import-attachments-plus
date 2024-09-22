@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-inferrable-types */
 // ImportAttachmentsModal.ts
-import { Modal, Platform } from 'obsidian';
+import { Modal, Platform, TFolder } from 'obsidian';
 import {
 		ImportActionType,
 		ImportActionChoiceResult,
@@ -14,6 +14,8 @@ import {
 	} from './types';
 import * as Utils from "utils";
 import type ImportAttachments from 'main'; // Import the type of your plugin class if needed for type hinting
+
+const MODAL_TITLE_HTML_EL='h4';
 
 export class ImportActionTypeModal extends Modal {
 	promise: Promise<ImportActionChoiceResult>;
@@ -75,7 +77,7 @@ export class ImportActionTypeModal extends Modal {
 
 		const container = contentEl.createDiv({ cls: 'import-plugin' });
 
-		container.createEl('h2', { text: 'Import files' });
+		container.createEl(MODAL_TITLE_HTML_EL, { text: 'Import files' });
 		container.createEl('p', { text: 'Configure the import options and then press either enter or the import button.' });
 
 		const table = container.createEl('table');
@@ -199,7 +201,7 @@ export class OverwriteChoiceModal extends Modal {
 
 		const container = contentEl.createDiv({ cls: 'import-plugin' });
 
-		container.createEl('h2', { text: 'Import files' });
+		container.createEl(MODAL_TITLE_HTML_EL, { text: 'Import files' });
 		const paragraph = container.createEl('p');
 		paragraph.append('You are trying to copy the file ');
 		
@@ -279,7 +281,10 @@ export class DeleteAttachmentFolderModal extends Modal {
 	promise: Promise<boolean>;
 	private resolveChoice: (result: boolean) => void = () => {};  // To resolve the promise. Initialize with a no-op function
 	
-	constructor(private plugin: ImportAttachments, private attachmentFolderPath: string) {
+	constructor(private plugin: ImportAttachments,
+            private attachmentFolder: TFolder, 
+            private preDescription?:HTMLElement,
+            private postDescription?:HTMLElement) {
 		// use TypeScript `parameter properties` to initialize `plugin`.
 		super(plugin.app);
 		this.promise = new Promise<boolean>((resolve) => {
@@ -289,30 +294,31 @@ export class DeleteAttachmentFolderModal extends Modal {
 
 	onOpen() {
 
-		const attachmentFolderPath_parsed = Utils.parseFilePath(this.attachmentFolderPath);
-
 		const { contentEl } = this;
 
 		const container = contentEl.createDiv({ cls: 'import-plugin' });
 
-		container.createEl('h2', { text: 'Import files' });
+		container.createEl(MODAL_TITLE_HTML_EL, { text: 'Delete the attachment folder?' });
+
+        if(this.preDescription) container.appendChild(this.preDescription);
+
 		const paragraph = container.createEl('p');
 		paragraph.append('Do you want to ' + (Platform.isDesktop ? 'move' : 'delete') + ' the attachment folder ');
 		
 		if(Platform.isDesktopApp) {
 			// Create a hyperlink for the filename
 			const fileLink = paragraph.createEl('a', {
-				text: attachmentFolderPath_parsed.filename,
+				text: this.attachmentFolder.name,
 				href: '#',
 			});
 			fileLink.addEventListener('click', (e) => {
 				e.preventDefault(); // Prevent the default anchor behavior
 				// Open the folder in the system's default file explorer
 				// window.require('electron').remote.shell.showItemInFolder(this.attachmentFolderPath);
-				window.require('electron').remote.shell.openPath(Utils.makePosixPathOScompatible(Utils.joinPaths(this.plugin.vaultPath,this.attachmentFolderPath)));
+				window.require('electron').remote.shell.openPath(Utils.makePosixPathOScompatible(Utils.joinPaths(this.plugin.vaultPath,this.attachmentFolder.path)));
 			});
 		} else {
-			paragraph.createEl('strong', {text: attachmentFolderPath_parsed.filename});
+			paragraph.createEl('strong', {text: this.attachmentFolder.name});
 		}		
 
 		if(Platform.isDesktopApp) {
@@ -320,6 +326,8 @@ export class DeleteAttachmentFolderModal extends Modal {
 		} else {
 			paragraph.append('?');
 		}
+
+        if(this.postDescription) container.appendChild(this.postDescription);
 		
 		const buttonContainer = container.createDiv({cls:'import-buttons'});
 		const deleteButton = buttonContainer.createEl('button', {
@@ -372,7 +380,7 @@ export class ImportFromVaultChoiceModal extends Modal {
 
 		const container = contentEl.createDiv({ cls: 'import-plugin' });
 
-		container.createEl('h2', { text: 'Import files' });
+		container.createEl(MODAL_TITLE_HTML_EL, { text: 'Import files' });
 		const paragraph = container.createEl('p');
 		paragraph.append('The file you are trying to import ');
 		
@@ -464,7 +472,7 @@ export class FolderImportErrorModal extends Modal {
 
         const container = contentEl.createDiv({ cls: 'import-plugin' });
 
-        container.createEl('h2', { text: 'Import files' });
+        container.createEl(MODAL_TITLE_HTML_EL, { text: 'Import files' });
         const paragraph = container.createEl('p');
         paragraph.append('Importing folders is not supported in Obsidian. The following folders will not be imported:');
         
@@ -530,7 +538,7 @@ export class CreateAttachmentFolderModal extends Modal {
 
         const attachmentFolderPath_parsed = Utils.parseFilePath(this.attachmentFolderPath);
 
-        container.createEl('h2', { text: 'Create an empty attachment folder?' });
+        container.createEl(MODAL_TITLE_HTML_EL, { text: 'Create an empty attachment folder?' });
         const paragraph = container.createEl('p');
         paragraph.append('The attachment folder ');
 

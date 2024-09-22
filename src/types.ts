@@ -46,6 +46,9 @@ export interface ImportAttachmentsSettings {
 	attachmentName: string;
 	autoRenameAttachmentFolder: boolean;
 	autoDeleteAttachmentFolder: boolean;
+    deleteAttachmentFolderWhenEmpty: boolean;
+    showDeleteMenu: boolean;
+    removeWikilinkOnFileDeletion: boolean;
 	confirmDeleteAttachmentFolder: boolean;
 	hideAttachmentFolders: boolean;
 	revealAttachment: boolean;
@@ -57,10 +60,10 @@ export interface ImportAttachmentsSettings {
 }
 
 export function isSettingsLatestFormat(s:unknown): s is ImportAttachmentsSettings {
-	if (typeof s !== 'object' || s === null) {
+    if (typeof s !== 'object' || s === null) {
 		return false;
 	}
-	return 'folderPath' in s && 'compatibility' in s && s.compatibility === DEFAULT_SETTINGS.compatibility;
+    return 'compatibility' in s && s.compatibility === DEFAULT_SETTINGS.compatibility;
 }
 
 export interface ParsedPath {
