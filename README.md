@@ -14,24 +14,25 @@ Features include:
 
 Search for "Import Attachments+" in the Community plugins pane in Obsidian and click on the Install button. 
 
-## Manual installation
-1. **Download the Plugin:**
-   - Clone the plugin files from the [GitHub repository](https://github.com/alberti42/obsidian-import-attachments-plus).
+### Manual Installation
 
-2. **Install Dependencies:**
-   - Run `npm install` to install the required dependencies.
+#### Option 1: Download Pre-Built Files
 
-3. **Build the Plugin:**
-   - Run `npm run build` to compile the plugin code.
-   - The compiled code will be placed in the `dist` subfolder.
+1. Download the latest release from the [GitHub releases page](https://github.com/alberti42/obsidian-import-attachments-plus/releases).
+2. In the release, you'll find the `main.js`, `manifest.json` and `styles.css` files.
+3. Copy these three files to a new folder in your vault's `.obsidian/plugins/` directory (e.g., `.obsidian/plugins/import-attachments-plus`).
+4. Enable the plugin `Import Attachments+` in Obsidian via `Settings` > `Community Plugins`.
 
-4. **Copy to Obsidian Plugins Directory:**
-   - Copy the contents of the dist folder into your vault's `.obsidian/plugins/import-attachments-plus` directory.
+#### Option 2: Build from Source
 
-5. **Enable the Plugin:**
-   - Open Obsidian and go to **Settings > Community Plugins**.
-   - Enable **Import Attachments+**.
+1. Clone this repository or download the source code from the [GitHub repository](https://github.com/alberti42/obsidian-import-attachments-plus).
+2. Run the following commands to install the necessary dependencies and build the plugin. The build process will generate the `main.js` and `manifest.json` files inside the `/dist` subfolder within the repository directory:
 
+	```bash
+   npm install
+   npm run build
+	```
+ 
 ## Usage
 Once enabled, the plugin will work automatically based on your configured preferences. You can adjust these settings through the plugin's settings tab under **Settings > Import Attachments+**.
 
