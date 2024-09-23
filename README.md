@@ -20,6 +20,8 @@ The plugin offers a comprehensive set of options for managing attachments.
     <img src="docs/images/screenshot.png" width=600 alt="Screenshot settings"/>
 </div>
 
+#### Key settings
+
 1. **Import Options:**
    - Move or copy files on drag-and-drop or copy-and-paste.
    - Embed or link imported attachments.
