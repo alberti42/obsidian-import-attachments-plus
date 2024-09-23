@@ -10,6 +10,36 @@ Features include:
 - Customizable naming conventions for imported files.
 - Management tools for attachment folders.
 
+## Usage
+Once enabled, the plugin will work automatically based on your configured preferences. You can adjust these settings through the plugin's settings tab under **Settings > Import Attachments+**.
+
+### Settings
+The plugin offers a comprehensive set of options for managing attachments.
+
+<div align="left">
+    <img src="docs/images/screenshot.png" width=600 alt="Screenshot settings"/>
+</div>
+
+1. **Import Options:**
+   - Move or copy files on drag-and-drop or copy-and-paste.
+   - Embed or link imported attachments.
+   - Import multiple files as a list or inline.
+
+2. **Attachment Folder Configuration:**
+   - Set the default location for new attachments.
+   - Define folder paths relative to the note's location.
+   - Customize attachment file names and date formats.
+
+3. **Attachment Opening:**
+   - Open attachments with the default external application or reveal them in the system's file manager.
+
+4. **Attachment Management:**
+   - Rename and delete attachment folders automatically.
+   - Confirm before deleting attachment folders.
+
+5. **Display of Attachment Folders:**
+   - Toggle the visibility of attachment folders in the file explorer.
+
 ## Recommended installation
 
 Search for "Import Attachments+" in the Community plugins pane in Obsidian and click on the Install button. 
@@ -33,42 +63,6 @@ Search for "Import Attachments+" in the Community plugins pane in Obsidian and c
    npm run build
 	```
  
-## Usage
-Once enabled, the plugin will work automatically based on your configured preferences. You can adjust these settings through the plugin's settings tab under **Settings > Import Attachments+**.
-
-## Settings
-The plugin offers a comprehensive set of options for managing attachments.
-
-### Key Settings
-
-1. **Import Options:**
-   - Move or copy files on drag-and-drop or copy-and-paste.
-   - Embed or link imported attachments.
-   - Import multiple files as a list or inline.
-
-2. **Attachment Folder Configuration:**
-   - Set the default location for new attachments.
-   - Define folder paths relative to the note's location.
-   - Customize attachment file names and date formats.
-
-3. **Attachment Opening:**
-   - Open attachments with the default external application or reveal them in the system's file manager.
-
-4. **Attachment Management:**
-   - Rename and delete attachment folders automatically.
-   - Confirm before deleting attachment folders.
-
-5. **Display of Attachment Folders:**
-   - Toggle the visibility of attachment folders in the file explorer.
-
-### Screenshot
-
-Below is a screenshot of the settings tab:
-
-<div align="left">
-    <img src="docs/images/screenshot.png" width=600 alt="Screenshot settings"/>
-</div>
-
 ## Donations
 I would be grateful for any donation to support the development of this plugin.
 
