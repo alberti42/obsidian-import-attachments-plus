@@ -343,7 +343,6 @@ export default class ImportAttachments extends Plugin {
 
     addDeleteMenu(status:boolean) {
         if(status && !this.file_menu_cb) {
-
             this.file_menu_cb = (menu: Menu, file: TAbstractFile) => {
                 if (file instanceof TFile) {
                     // const fileExplorer = this.app.internalPlugins.getPluginById('file-explorer');
@@ -438,8 +437,7 @@ export default class ImportAttachments extends Plugin {
                                     }
                                 }
                             }
-                            // TODO: check whether the user cancel the deletion operation
-                            // and if so, then avoid deleting the wikilink
+                            // TODO: check whether the user cancel the deletion operation and if so, then avoid deleting the wikilink
                             await promptForDeletion(file);
                         });
                     });
@@ -663,9 +661,9 @@ export default class ImportAttachments extends Plugin {
             
             // Get the current selection
             const user_selection = editor.cm.state.selection;
+            // const user_selection_alt = codemirror.viewState.state.selection;
             const user_selection_main = user_selection.main;
-            // const selection_alt = codemirror.viewState.state.selection.main;
-
+            
              // Check if there is selected text
             const isTextSelected = !user_selection_main.empty;
             const selectionStart = user_selection_main.from;
@@ -961,7 +959,7 @@ export default class ImportAttachments extends Plugin {
 		let counter = 0;
 		results.forEach((importedFilePath: (string | null)) => {
 			if (importedFilePath) {
-				this.insertLinkToEditor(importedFilePath, editor, md_file.path, importSettings, multipleFiles ? ++counter : 0);
+				this.insertLinkToEditor(importedFilePath, editor, md_file.path, importSettings, multipleFiles ? ++counter : undefined);
 			}
 		});
 
@@ -1010,7 +1008,7 @@ export default class ImportAttachments extends Plugin {
 	}
 
 	// Function to insert links to the imported files in the editor
-	insertLinkToEditor(importedFilePath: string, editor: Editor, md_file: string, importSettings: ImportSettingsInterface, counter: number) {
+	insertLinkToEditor(importedFilePath: string, editor: Editor, md_file: string, importSettings: ImportSettingsInterface, counter?: number) {
 
 		/*
 		let relativePath;
@@ -1027,7 +1025,8 @@ export default class ImportAttachments extends Plugin {
 
 		let prefix = '';
 		let postfix = '';
-		if (counter > 0) {
+		if (counter) {
+            // if multiple files are imported
 			switch (this.settings.multipleFilesImportType) {
 				case MultipleFilesImportTypes.BULLETED:
 					prefix = '- ';
@@ -1046,10 +1045,30 @@ export default class ImportAttachments extends Plugin {
 			}
 		}
 
-		const file = Utils.createMockTFile(this.app.vault,importedFilePath);
-		
+        // Get the current selection
+        const main_selection = editor.cm.state.selection.main;
+        
+    	const file = Utils.createMockTFile(this.app.vault,importedFilePath);
 		const filename = file.name;
-		const customDisplayText = (this.settings.customDisplayText) ? filename : "";
+		const customDisplayText = (():string=>{
+            let text="";
+            if(this.settings.customDisplayText) {
+                text = filename;
+            }
+            // if a single file is imported
+            if(!counter)
+            {
+                if(this.settings.useSelectionForDisplayText) {
+                    // Extract the selected text
+                    // const selectedText_alt = editor.getSelection();
+                    const selectedText = editor.cm.state.doc.sliceString(main_selection.from, main_selection.to);
+                    
+                    // If the user has selected some text, this will be used for the display text 
+                    if(selectedText.length>0) text = selectedText;
+                }
+            }
+            return text;
+        })();
 		
 		const generatedLink = this.app.fileManager.generateMarkdownLink(file,md_file,undefined,(this.settings.customDisplayText) ? customDisplayText : undefined);
 
@@ -1091,20 +1110,21 @@ export default class ImportAttachments extends Plugin {
 
 		const linkText = prefix + processedLink + postfix;
 
-		const cursor = editor.getCursor();  // Get the current cursor position before insertion
-
-		// Insert the link text at the current cursor position
-		editor.replaceRange(linkText, cursor);
+		const cursor_from = editor.getCursor("from");  // Get the current cursor position before insertion
+        const cursor_to = editor.getCursor("to");  // Get the current cursor position before insertion
+        
+        // Insert the link text at the current cursor position
+		editor.replaceRange(linkText, cursor_from, cursor_to);
 
 		if (counter == 0) {
 			if (selectDisplayedText) {
 				// Define the start and end positions for selecting 'baseName' within the inserted link
 				const startCursorPos = {
-					line: cursor.line,
-					ch: cursor.ch + offset + prefix.length,
+					line: cursor_to.line,
+					ch: cursor_to.ch + offset + prefix.length,
 				};
 				const endCursorPos = {
-					line: cursor.line,
+					line: cursor_to.line,
 					ch: startCursorPos.ch + customDisplayText.length,
 				};
 				
@@ -1112,8 +1132,8 @@ export default class ImportAttachments extends Plugin {
 				editor.setSelection(startCursorPos, endCursorPos);
 			} else {
 				const newCursorPos = {
-					line: cursor.line,
-					ch: cursor.ch + linkText.length
+					line: cursor_to.line,
+					ch: cursor_to.ch + linkText.length
 				};
 
 				// Move cursor to the position right after the link
@@ -1121,8 +1141,8 @@ export default class ImportAttachments extends Plugin {
 			}
 		} else {
 			const newCursorPos = {
-				line: cursor.line,
-				ch: cursor.ch + linkText.length
+				line: cursor_from.line,
+				ch: cursor_from.ch + linkText.length
 			};
 
 			// Move cursor to the position right after the link
@@ -1258,6 +1278,18 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 						this.plugin.settings.customDisplayText = value;
 						this.debouncedSaveSettings(); // Update visibility based on the toggle
 					}));
+
+            new Setting(containerEl)
+                .setName('Use the selected text for the displayed text:')
+                .setDesc('With this option enabled, the selected text is replaced by the link to the imported document \
+                    and the same selected text is automatically used as the display text for the link. This option \
+                    takes priority over the filename as displayed text. Moreover, this option is ignored for multiple imported attachments.')
+                .addToggle(toggle => toggle
+                    .setValue(this.plugin.settings.useSelectionForDisplayText)
+                    .onChange(async (value: boolean) => {
+                        this.plugin.settings.useSelectionForDisplayText = value;
+                        this.debouncedSaveSettings(); // Update visibility based on the toggle
+                    }));
 
 			const wikilinksSetting = new Setting(containerEl)
 				.setName('Use [[Wikilinks]]:')

@@ -40,6 +40,7 @@ export interface ImportAttachmentsSettings {
 	lastEmbedFilesOnImport: YesNoTypes;
 	multipleFilesImportType: MultipleFilesImportTypes;
 	customDisplayText: boolean;
+    useSelectionForDisplayText: boolean;
 	attachmentFolderLocation: AttachmentFolderLocationType;
 	attachmentFolderPath: string;
 	dateFormat: string;

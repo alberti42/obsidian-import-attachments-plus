@@ -111,8 +111,8 @@ function patchFilemanager(plugin: ImportAttachments) {
                             const attachmentFolder = plugin.app.vault.getAbstractFileByPath(plugin.getAttachmentFolderOfMdNote(file_parsed));
                             if(attachmentFolder instanceof TFolder) {
                                 const postDescription_text = attachmentFolder.children.length > 0 ?
-                                    `Please note that the folder that is associated with the MarkDown note you \
-                                        have just deleted is not empty. It still contains ${attachmentFolder.children.length} files.` 
+                                    `Note that the folder associated with the MarkDown note you have \
+                                        just deleted is not empty and still contains ${attachmentFolder.children.length} files.` 
                                     : "The attachment folder is empty, and it should be safe to delete it.";
                                 const postDescription = createEl('p', {text:postDescription_text});
                                 await deleteAttachmentFolderAssociatedWithMdFile(plugin, attachmentFolder, undefined, postDescription);

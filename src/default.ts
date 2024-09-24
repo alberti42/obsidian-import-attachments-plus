@@ -16,6 +16,7 @@ export const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 	attachmentName: '${original}', // Default to the original name of the attachment
 	dateFormat: 'YYYY_MM_DDTHH_mm_ss',
 	customDisplayText: true,
+    useSelectionForDisplayText: true,
 	autoRenameAttachmentFolder: true,
 	autoDeleteAttachmentFolder: true,
     deleteAttachmentFolderWhenEmpty: true,
