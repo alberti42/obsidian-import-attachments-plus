@@ -57,22 +57,25 @@ function patchFilemanager(plugin: ImportAttachments) {
 								throw new Error('Failed to correctly identify the "Cancel" button.');
 							}
 
+                            debugger
 							deleteButton.addEventListener('click', () => {
+                                debugger
 								userInitiatedDelete = true;
-								// console.log("Delete button clicked");
+								console.log("Delete button clicked");
 							});
 						
 							cancelButton.addEventListener('click', () => {
+                                debugger
 								userInitiatedDelete = false;
-								// console.log("Cancel button clicked");
+								console.log("Cancel button clicked");
 							});
 						
 							// Watch for the modal being removed from the DOM (clicked outside or closed)
-							const modalRemovedObserver = new MutationObserver((modalMutations) => {
-								for (const modalMutation of modalMutations) {
+							const modalRemovedObserver = new MutationObserver((modalMutations:MutationRecord[], innerObserver:MutationObserver) => {
+                                for (const modalMutation of modalMutations) {
 									if (Array.from(modalMutation.removedNodes).includes(modal)) {
-										modalRemovedObserver.disconnect();
-										// console.log("Modal closed without action");
+										innerObserver.disconnect();
+										console.log("Modal closed without action");
 										break;
 									}
 								}
@@ -100,7 +103,6 @@ function patchFilemanager(plugin: ImportAttachments) {
             const parent = file.parent; // store the parent element
             await originalPromptForDeletion.call(this, file);
 			if(userInitiatedDelete) {
-
                 // In case the deleted file is a .md note, delete the attachment folder
                 if (plugin.settings.autoDeleteAttachmentFolder) {
                     // Automatic deletion only works when the attachment name contains ${notename}
@@ -131,7 +133,6 @@ function patchFilemanager(plugin: ImportAttachments) {
                                 // plugin.app.vault.delete(parent,recursive);
                                 const postDescription = createEl('p',{text: "The attachment folder is now empty, and it should be safe to delete it."});
                                 await deleteAttachmentFolderAssociatedWithMdFile(plugin, parent, undefined, postDescription);
-                                
                             }
                         }
                     }

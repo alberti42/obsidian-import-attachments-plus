@@ -66,11 +66,11 @@ export default class ImportAttachments extends Plugin {
 	vaultPath: string;
 	private settingsTab: ImportAttachmentsSettingTab;
 	public matchAttachmentFolder: ((str:string)=>boolean) = (_:string) => true;
-    private file_menu_cb: ((menu: Menu, file: TAbstractFile) => void) | null = null;
-    
+
     // mechanism to prevent calling the callback multiple times when renaming attachments associated with a markdown note
     private renameCallbackEnabled: boolean = true;
-
+    private file_menu_cb_registered: boolean = false;
+    
 	constructor(app: App, manifest: PluginManifest) {
 		super(app, manifest);
 
@@ -82,10 +82,12 @@ export default class ImportAttachments extends Plugin {
 		this.settingsTab = new ImportAttachmentsSettingTab(this.app, this);
 
         // Bind the callback functions
+        this.file_menu_cb = this.file_menu_cb.bind(this);
         this.editor_drop_cb = this.editor_drop_cb.bind(this);
         this.editor_paste_cb = this.editor_paste_cb.bind(this);
         this.editor_rename_cb = this.editor_rename_cb.bind(this);
-
+        this.context_menu_cb = this.context_menu_cb.bind(this);
+        
 		// Store the path to the vault
 		if (Platform.isDesktopApp) {
 			// store the vault path
@@ -213,7 +215,6 @@ export default class ImportAttachments extends Plugin {
 		return [beforeFirst, afterLast];
 	}
 
-
 	// Load plugin settings
 	async onload() {
 		// Load and add settings tab
@@ -260,6 +261,10 @@ export default class ImportAttachments extends Plugin {
 				this.app.workspace.on('editor-paste', this.editor_paste_cb)
 			);
 		}
+
+        // Register context menu using obsidian function. It takes care of removing the event listener
+        // and register the event listener for each new document created
+        this.registerDomEvent(document, 'contextmenu', this.context_menu_cb);
 
 		this.registerEvent(
 			this.app.vault.on('rename', this.editor_rename_cb)
@@ -342,142 +347,149 @@ export default class ImportAttachments extends Plugin {
 	}
 
     addDeleteMenu(status:boolean) {
-        if(status && !this.file_menu_cb) {
-            this.file_menu_cb = (menu: Menu, file: TAbstractFile) => {
-                if (file instanceof TFile) {
-                    // const fileExplorer = this.app.internalPlugins.getPluginById('file-explorer');
-                    const fileManager = this.app.fileManager;  // Get the actual file manager instance
-
-                    // Bind the correct context to promptForDeletion
-                    const promptForDeletion = fileManager.promptForDeletion.bind(fileManager);
-
-
-                    // Inspect the currently available menu items
-                    let first_action_menu: MenuItem | null = null;
-                    let renameMenu: MenuItem | null = null;
-                    let deleteMenu: MenuItem | null = null;
-                    for (const item of menu.items) {
-                        const callback_str = `${item.callback}`;
-
-                        if(first_action_menu === null && item.section==='action') {
-                            first_action_menu = item
-                        }
-                        if (
-                            renameMenu === null
-                            && callback_str.contains('promptForFileRename')
-                            // && item.dom.innerText === "Rename..."  // we avoid using this condition because it relies on English language
-                           ) {
-                            renameMenu = item;
-                        }
-                        if (
-                            deleteMenu === null
-                            && callback_str.contains('promptForFileDeletion') // when right clicking on the note title
-                            // && item.dom.innerText === "Delete file"  // we avoid using this condition because it relies on English language
-                           ) {
-                            deleteMenu = item;
-                        }
-                        if (
-                            deleteMenu === null
-                            && callback_str.contains('promptForDeletion') // when right clicking on a file in the navigation pane
-                            // && item.dom.innerText === "Delete"  // we avoid using this condition because it relies on English language
-                           ) {
-                            deleteMenu = item;
-                        }
-                    }
-                    if(renameMenu === null) renameMenu = first_action_menu;
-                    
-                    if(deleteMenu) {
-                        // we do nothing if the delete menu is already present
-                        return;
-                    }
-
-                    // Add "Delete" menu item
-                    let newDeleteMenu: MenuItem | null = null; 
-                    menu.addItem((item: MenuItem) => {
-                        newDeleteMenu = item;
-                        item
-                        .setTitle("Delete link and file")
-                        .setIcon("lucide-trash-2")
-                        .setSection("danger")
-                        .onClick(async () => {
-                            if(this.settings.removeWikilinkOnFileDeletion) {
-                                const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-                                const editor = markdownView?.editor;
-                                if (editor) {
-                                    // Get the file name without the extension
-                                    const fileNameWithoutExtension = file.path;
-
-                                    // Get the cursor position
-                                    const cursor = editor.getCursor();
-
-                                    // Get the content of the line where the cursor is located
-                                    const lineContent = editor.getLine(cursor.line);
-
-                                    // Search to the left of the cursor for '[['
-                                    const leftPart = lineContent.slice(0, cursor.ch);
-                                    const {leftIndex,isEmbedded} = (() => {
-                                            let index = leftPart.lastIndexOf('[[');
-                                            let embedded = false;
-                                            // if it is preceeded by `!`
-                                            if (index >= 1 && leftPart.slice(index - 1, index) === '!') {
-                                                index--;
-                                                embedded=true;
-                                            }
-                                            return {leftIndex:index,isEmbedded:embedded};
-                                        })();
-
-                                    // Search to the right of the cursor for ']]'
-                                    const rightPart = lineContent.slice(cursor.ch);
-                                    const rightIndex = rightPart.indexOf(']]');
-
-                                    // Check if both '[[' and ']]' are found, and make sure they are in the correct order
-                                    if (leftIndex !== -1 && rightIndex !== -1) {
-                                        // Extract the content between [[ and ]]
-                                        const wikiLinkText = lineContent.slice(leftIndex + 2 + (isEmbedded? 1:0), cursor.ch + rightIndex).trimLeft();
-
-                                        // Check if the Wiki link matches the file being deleted
-                                        if (wikiLinkText.startsWith(fileNameWithoutExtension)) {
-                                            // Remove the entire Wiki link from the line
-                                            const updatedLineContent = lineContent.slice(0, leftIndex) + lineContent.slice(cursor.ch + rightIndex + 2);
-
-                                            // Update the editor with the modified line
-                                            editor.replaceRange(updatedLineContent, { line: cursor.line, ch: 0 }, { line: cursor.line, ch: lineContent.length });
-                                        }
-                                    }
-                                }
-                            }
-                            // TODO: check whether the user cancel the deletion operation and if so, then avoid deleting the wikilink
-                            await promptForDeletion(file);
-                        });
-                    });
-
-                    const moveDeleteOptionNextToRename = false;
-                    if(moveDeleteOptionNextToRename) {
-                        if(renameMenu && newDeleteMenu) { // if we found the rename menu
-                            const items = menu.items;
-
-                            // Find the index of renameMenu and deleteMenu
-                            const renameMenuIndex = items.indexOf(renameMenu);
-                            const deleteMenuIndex = items.indexOf(newDeleteMenu);
-
-                            if (renameMenuIndex !== -1 && deleteMenuIndex !== -1) {
-                                // Remove deleteMenu from its current position
-                                const [removedDeleteMenu] = items.splice(deleteMenuIndex, 1);
-                                // Insert deleteMenu right after renameMenu
-                                items.splice(renameMenuIndex + 1, 0, removedDeleteMenu);
-                            }
-                        }
-                    }
-                }
-            };
+        if(status && !this.file_menu_cb_registered) {
             this.app.workspace.on("file-menu", this.file_menu_cb);
+            this.file_menu_cb_registered = true;
         } else {
-            if(this.file_menu_cb) {
+            if(this.file_menu_cb_registered) {
                 this.app.workspace.off("file-menu", this.file_menu_cb);
-                this.file_menu_cb = null;
+                this.file_menu_cb_registered = false;
             }
         }
     }
+
+    file_menu_cb(menu: Menu, file: TAbstractFile) {
+        if (file instanceof TFile) {
+            // Inspect the currently available menu items
+            let first_action_menu: MenuItem | null = null;
+            let renameMenu: MenuItem | null = null;
+            let deleteMenu: MenuItem | null = null;
+            for (const item of menu.items) {
+                const callback_str = `${item.callback}`;
+
+                if(first_action_menu === null && item.section==='action') {
+                    first_action_menu = item
+                }
+                if (
+                    renameMenu === null
+                    && callback_str.contains('promptForFileRename')
+                    // && item.dom.innerText === "Rename..."  // we avoid using this condition because it relies on English language
+                   ) {
+                    renameMenu = item;
+                }
+                if (
+                    deleteMenu === null
+                    && callback_str.contains('promptForFileDeletion') // when right clicking on the note title
+                    // && item.dom.innerText === "Delete file"  // we avoid using this condition because it relies on English language
+                   ) {
+                    deleteMenu = item;
+                }
+                if (
+                    deleteMenu === null
+                    && callback_str.contains('promptForDeletion') // when right clicking on a file in the navigation pane
+                    // && item.dom.innerText === "Delete"  // we avoid using this condition because it relies on English language
+                   ) {
+                    deleteMenu = item;
+                }
+            }
+            if(renameMenu === null) renameMenu = first_action_menu;
+            
+            if(deleteMenu) {
+                // we do nothing if the delete menu is already present
+                return;
+            }
+
+            // Add "Delete" menu item
+            let newDeleteMenu: MenuItem | null = null; 
+            menu.addItem((item: MenuItem) => {
+                newDeleteMenu = item;
+                item
+                .setTitle("Delete link and file")
+                .setIcon("lucide-trash-2")
+                .setSection("danger")
+                .onClick((_:MouseEvent | KeyboardEvent)=> {
+                    this.delete_file_cb(file);
+                });
+            });
+
+            const moveDeleteOptionNextToRename = false;
+            if(moveDeleteOptionNextToRename) {
+                if(renameMenu && newDeleteMenu) { // if we found the rename menu
+                    const items = menu.items;
+
+                    // Find the index of renameMenu and deleteMenu
+                    const renameMenuIndex = items.indexOf(renameMenu);
+                    const deleteMenuIndex = items.indexOf(newDeleteMenu);
+
+                    if (renameMenuIndex !== -1 && deleteMenuIndex !== -1) {
+                        // Remove deleteMenu from its current position
+                        const [removedDeleteMenu] = items.splice(deleteMenuIndex, 1);
+                        // Insert deleteMenu right after renameMenu
+                        items.splice(renameMenuIndex + 1, 0, removedDeleteMenu);
+                    }
+                }
+            }
+        }
+    }
+
+    async delete_file_cb(file:TFile) {
+        if(this.settings.removeWikilinkOnFileDeletion) {
+            const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+            const editor = markdownView?.editor;
+            if (editor) {
+                // Get the file name without the extension
+                const fileNameWithoutExtension = file.path;
+
+                // Get the cursor position
+                const cursor = editor.getCursor();
+
+                // Get the content of the line where the cursor is located
+                const lineContent = editor.getLine(cursor.line);
+
+                // Search to the left of the cursor for '[['
+                const leftPart = lineContent.slice(0, cursor.ch);
+                const {leftIndex,isEmbedded} = (() => {
+                        let index = leftPart.lastIndexOf('[[');
+                        let embedded = false;
+                        // if it is preceeded by `!`
+                        if (index >= 1 && leftPart.slice(index - 1, index) === '!') {
+                            index--;
+                            embedded=true;
+                        }
+                        return {leftIndex:index,isEmbedded:embedded};
+                    })();
+
+                // Search to the right of the cursor for ']]'
+                const rightPart = lineContent.slice(cursor.ch);
+                const rightIndex = rightPart.indexOf(']]');
+
+                // Check if both '[[' and ']]' are found, and make sure they are in the correct order
+                if (leftIndex !== -1 && rightIndex !== -1) {
+                    // Extract the content between [[ and ]]
+                    const wikiLinkText = lineContent.slice(leftIndex + 2 + (isEmbedded? 1:0), cursor.ch + rightIndex).trimLeft();
+
+                    // Check if the Wiki link matches the file being deleted
+                    if (wikiLinkText.startsWith(fileNameWithoutExtension)) {
+                        // Remove the entire Wiki link from the line
+                        const updatedLineContent = lineContent.slice(0, leftIndex) + lineContent.slice(cursor.ch + rightIndex + 2);
+
+                        // Update the editor with the modified line
+                        editor.replaceRange(updatedLineContent, { line: cursor.line, ch: 0 }, { line: cursor.line, ch: lineContent.length });
+                    }
+                }
+            }
+        }
+        
+        // const fileExplorer = this.app.internalPlugins.getPluginById('file-explorer');
+        const fileManager = this.app.fileManager;  // Get the actual file manager instance
+
+        // Bind the correct context to promptForDeletion
+        const promptForDeletion = fileManager.promptForDeletion.bind(fileManager);
+
+        // TODO: check whether the user cancel the deletion operation and if so, then avoid deleting the wikilink
+        await promptForDeletion(file);
+    }
+
 
 	async loadSettings() {
 
@@ -562,6 +574,43 @@ export default class ImportAttachments extends Plugin {
 			new Notice(msg + '.');
 		}
 	}
+
+    context_menu_cb(evt: MouseEvent) {
+        console.log("CALLED");
+        const target = evt.target as HTMLElement;
+
+        // Check if the right-clicked element is an image
+        if (target.tagName === 'IMG') {
+            const parent = target.parentElement;
+            if(!parent) return;
+
+            evt.preventDefault(); // Prevent the default context menu
+
+            // Create a new Menu instance
+            const menu = new Menu();
+
+            // Add options to the menu
+            menu.addItem((item) => {
+                item.setTitle("Delete image")
+                    .setIcon("trash-2")
+                    .setSection("danger")
+                    .onClick(() => {
+                        console.log(target.getAttribute("src"));
+                        console.log(target);
+                        console.log(parent.getAttribute("src"));
+
+                            // navigator.clipboard.writeText(imageSrc);
+                            // new Notice("Image link copied!");
+                        
+                    });
+            });
+
+            // Add more context menu items as needed
+
+            // Show the context menu at the mouse position
+            menu.showAtMouseEvent(evt);
+        }
+    }
 
     async editor_rename_cb(newFile: TAbstractFile, oldPath: string) {
         if (!this.settings.autoRenameAttachmentFolder) { return }
