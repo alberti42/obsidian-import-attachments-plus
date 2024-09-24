@@ -446,7 +446,7 @@ export default class ImportAttachments extends Plugin {
         }
     }
 
-    async delete_file_cb(file_src:TFile,cursorCoordinates?:Coordinates) {
+    async delete_file_cb(file_src:TFile,target?:HTMLElement) {
         // Find the current Markdown editor where the click happened
         const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
         if(!activeView) return;
@@ -461,10 +461,8 @@ export default class ImportAttachments extends Plugin {
         // Get the position at the mouse event's coordinates or at the current cursor
         const cursorIdx = (():number|null => {
             let pos:number|null
-            if(cursorCoordinates) {
-                pos = codemirror.posAtCoords(cursorCoordinates);
-                // it is important to advance by an extra char to make sure we are right inside the link
-                if(pos !== null) pos++;
+            if(target) {
+                pos = codemirror.posAtDOM(target);
             } else {
                 pos = selection.head;  // equivalent to editorView.getCursor()
             }
@@ -476,6 +474,8 @@ export default class ImportAttachments extends Plugin {
 
         if(!cursorIdx) return;
 
+        console.log("POSITION:",cursorIdx);
+
         const line = doc.lineAt(cursorIdx);
         const lineContent = line.text;
         
@@ -485,10 +485,10 @@ export default class ImportAttachments extends Plugin {
         };
         
         // Regular expression to match Markdown image/external links
-        const regex = /\!?\!\[\[\s*(.*?)\s*(?:\|.*?)?\]\]|\!?\[.*?\]\(([^\s]+)\)/g;
+        const regex = /\!?\[\[\s*(.*?)\s*(?:\|.*?)?\]\]|\!?\[.*?\]\(([^\s]+)\)/g;
         let match;
         let found = false;
-        debugger
+
         // Loop through all matches in the line
         while ((match = regex.exec(lineContent)) !== null) {
             
@@ -544,7 +544,7 @@ export default class ImportAttachments extends Plugin {
 
         if(!fileToBeDeleted) return;
 
-        this.delete_file_cb(fileToBeDeleted,evt);
+        this.delete_file_cb(fileToBeDeleted,target);
     }
 
 	async loadSettings() {
