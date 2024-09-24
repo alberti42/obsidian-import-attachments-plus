@@ -53,14 +53,13 @@ import { promises as fs } from 'fs';  // This imports the promises API from fs
 import { patchOpenFile, unpatchOpenFile, addKeyListeners, removeKeyListeners } from 'patchOpenFile';
 import { patchFilemanager, unpatchFilemanager } from 'patchFileManager';
 
-import { EditorSelection } from '@codemirror/state';
-
 import { patchImportFunctions, unpatchImportFunctions } from "patchImportFunctions";
 import { patchFileExplorer, unpatchFileExplorer, updateVisibilityAttachmentFolders } from "patchFileExplorer";
 import { monkeyPatchConsole, unpatchConsole } from "patchConsole";
 
 import { DEFAULT_SETTINGS, DEFAULT_SETTINGS_1_3_0 } from "default";
 import { debug } from "console";
+import { getImportSelection } from "utils";
 
 function escapeRegex(string:string) {
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
@@ -348,20 +347,12 @@ export default class ImportAttachments extends Plugin {
 					if(!files) return;
 
 					if (files.length > 0) {
-						const codemirror = editor.cm; // Access the CodeMirror instance
-						const dropPos = codemirror.posAtCoords({ x: evt.clientX, y: evt.clientY });
-						
-						if (dropPos!==null) {
-							// Use dispatch to set the cursor position
-							codemirror.dispatch({
-								selection: EditorSelection.single(dropPos)
-							});
+                        const dropPos = editor.cm.posAtCoords({ x: evt.clientX, y: evt.clientY });
+						const selection = getImportSelection(editor,dropPos);
 
-							// Handle the files as per your existing logic
-							await this.handleFiles(Array.from(files), editor, view, doForceAsking, ImportOperationType.DRAG_AND_DROP);
-						} else {
-							console.error('Unable to determine drop position');
-						}
+						// Handle the files as per your existing logic
+						await this.handleFiles(Array.from(files), editor, view, doForceAsking, ImportOperationType.DRAG_AND_DROP);
+					
 					} else {
 						console.error('No files dropped');
 					}
@@ -693,7 +684,6 @@ export default class ImportAttachments extends Plugin {
 		}
 	}
 
-	
 	async handleFiles(files: File[], editor: Editor, view: MarkdownView, doForceAsking: boolean, importType: ImportOperationType) {
 
 		const {nonFolderFilesArray, foldersArray} = await Utils.filterOutFolders(Array.from(files));
@@ -842,6 +832,8 @@ export default class ImportAttachments extends Plugin {
 			new Notice(msg);
 			return;
 		}
+
+
 
 		const input = document.createElement("input");
 		input.type = "file";
