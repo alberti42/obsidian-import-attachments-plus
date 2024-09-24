@@ -8,8 +8,6 @@ import { Vault, normalizePath, TAbstractFile, TFile, TFolder, Editor } from 'obs
 import { ParsedPath as ParsedFilePath, ParsedFolderPath } from 'types';
 import * as path from 'path';
 
-import { EditorSelection } from '@codemirror/state';
-
 // Joins multiple path segments into a single normalized path.
 export function joinPaths(...paths: string[]): string {
 	return paths.join('/');
@@ -93,35 +91,6 @@ function formatDateTime(dateFormat:string):string {
 		return 'DATE_ERROR';
 	}
 }
-
-export function getImportSelection(editor:Editor,dropPos:number|null) {
-    if(dropPos===null) {
-        console.error('Unable to determine drop position');
-        return;
-    }
-    
-    // Get the current selection
-    const user_selection = editor.cm.state.selection;
-    const user_selection_main = user_selection.main;
-    // const selection_alt = codemirror.viewState.state.selection.main;
-
-     // Check if there is selected text
-    const isTextSelected = !user_selection_main.empty;
-    const selectionStart = user_selection_main.from;
-    const selectionEnd = user_selection_main.to;
-    
-    // Check if the drop position is within the selected text range
-    const isDropWithinSelection = isTextSelected && dropPos >= selectionStart && dropPos <= selectionEnd;
-
-    const import_selection = isDropWithinSelection ? user_selection : EditorSelection.single(dropPos);
-
-    editor.cm.dispatch({
-         selection: import_selection
-    });
-
-    return import_selection;
-}
-
 
 /*
 // Function to get the available path for attachments from Obsidian

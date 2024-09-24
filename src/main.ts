@@ -18,9 +18,7 @@ import {
 	normalizePath,
     Menu,
     TFile,
-    FileManager,
     MenuItem,
-    ToggleComponent,
 } from "obsidian";
 
 // Import utility and modal components
@@ -58,8 +56,9 @@ import { patchFileExplorer, unpatchFileExplorer, updateVisibilityAttachmentFolde
 import { monkeyPatchConsole, unpatchConsole } from "patchConsole";
 
 import { DEFAULT_SETTINGS, DEFAULT_SETTINGS_1_3_0 } from "default";
-import { debug } from "console";
-import { getImportSelection } from "utils";
+// import { debug } from "console";
+
+import { EditorSelection } from '@codemirror/state';
 
 // Main plugin class
 export default class ImportAttachments extends Plugin {
@@ -67,8 +66,10 @@ export default class ImportAttachments extends Plugin {
 	vaultPath: string;
 	private settingsTab: ImportAttachmentsSettingTab;
 	public matchAttachmentFolder: ((str:string)=>boolean) = (_:string) => true;
-
     private file_menu_cb: ((menu: Menu, file: TAbstractFile) => void) | null = null;
+    
+    // mechanism to prevent calling the callback multiple times when renaming attachments associated with a markdown note
+    private renameCallbackEnabled: boolean = true;
 
 	constructor(app: App, manifest: PluginManifest) {
 		super(app, manifest);
@@ -79,6 +80,11 @@ export default class ImportAttachments extends Plugin {
 		}
 
 		this.settingsTab = new ImportAttachmentsSettingTab(this.app, this);
+
+        // Bind the callback functions
+        this.editor_drop_cb = this.editor_drop_cb.bind(this);
+        this.editor_paste_cb = this.editor_paste_cb.bind(this);
+        this.editor_rename_cb = this.editor_rename_cb.bind(this);
 
 		// Store the path to the vault
 		if (Platform.isDesktopApp) {
@@ -239,197 +245,24 @@ export default class ImportAttachments extends Plugin {
 
 		// Commands for moving or copying files to the vault
 		if (Platform.isDesktopApp) {
-			// Command for importing as a standard link
-			this.addCommand({
-				id: "move-file-to-vault-link",
-				name: "Move file to vault as linked attachment",
-				callback: () => this.chooseFileToImport({
-					embed: false,
-					action: ImportActionType.MOVE,
-				}),
-			});
-
-			// Command for importing as an embedded image/link
-			this.addCommand({
-				id: "move-file-to-vault-embed",
-				name: "Move file to vault as embedded attachment",
-				callback: () => this.chooseFileToImport({
-					embed: true,
-					action: ImportActionType.MOVE,
-				}),
-			});
-
-			// Command for importing as a standard link
-			this.addCommand({
-				id: "copy-file-to-vault-link",
-				name: "Copy file to vault as linked attachment",
-				callback: () => this.chooseFileToImport({
-					embed: false,
-					action: ImportActionType.COPY,
-				}),
-			});
-
-			// Command for importing as an embedded image/link
-			this.addCommand({
-				id: "copy-file-to-vault-embed",
-				name: "Copy file to vault as embedded attachment",
-				callback: () => this.chooseFileToImport({
-					embed: true,
-					action: ImportActionType.COPY,
-				}),
-			});
-
-			// Register the command to open the attachments folder
-			this.addCommand({
-				id: "open-attachments-folder",
-				name: "Open attachments folder",
-				callback: () => this.openAttachmentsFolder(),
-			});
+			this.addCommands();
 		}
-
-		/*
-		// The code below handles `drop` events manually
-		//
-		// Set up the event listener
-		const dropHandler = (event: DragEvent) => {
-			event.preventDefault();
-			event.stopPropagation();
-
-			const files = event?.dataTransfer?.files;
-			if (files && files.length > 0) {
-				// this.handleFiles(files);
-			} else {
-				new Notice('No files dropped');
-			}
-		};
-		// Add the event listener to the document body
-		document.body.addEventListener('drop', dropHandler);
-		// Ensure the event listener is removed when the plugin is unloaded
-		this.register(() => document.body.removeEventListener('drop', dropHandler));
-		*/
 
 		// Register event handlers for drag-and-drop and paste events
 		if (Platform.isDesktopApp) {
 			this.registerEvent( // check obsidian.d.ts for other types of events
-				this.app.workspace.on('editor-drop', async (evt: DragEvent, editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
-
-					// Check if the event has already been handled
-					if (evt.defaultPrevented) return;
-
-					if (!(view instanceof MarkdownView)) {
-						console.error('No view provided')
-						return;
-					}
-
-					const altKeyPressed = evt.altKey; // Check if Alt was pressed
-					if (altKeyPressed) {
-						// Follow standard behavior where a link to the external file is created
-						return;
-					} else {
-						// Prevent other handlers from executing
-						evt.preventDefault();
-					}
-
-					const doForceAsking = evt.shiftKey; // Check if Shift was pressed
-
-					// Handle the dropped files
-					const files = evt?.dataTransfer?.files;
-					if(!files) return;
-
-					if (files.length > 0) {
-                        const dropPos = editor.cm.posAtCoords({ x: evt.clientX, y: evt.clientY });
-						const selection = getImportSelection(editor,dropPos);
-
-						// Handle the files as per your existing logic
-						await this.handleFiles(Array.from(files), editor, view, doForceAsking, ImportOperationType.DRAG_AND_DROP);
-					
-					} else {
-						console.error('No files dropped');
-					}
-				})
-			);
+				this.app.workspace.on('editor-drop', this.editor_drop_cb)
+            );
 		}
 
 		if (Platform.isDesktopApp) {
 			this.registerEvent(
-				// check obsidian.d.ts for other types of events
-				this.app.workspace.on('editor-paste', async (evt: ClipboardEvent, editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
-					// Check if the event has already been handled
-					if (evt.defaultPrevented) return;
-
-					if (!(view instanceof MarkdownView)) {
-						console.error('No view provided')
-						return;
-					}
-
-					const clipboardData = evt.clipboardData;
-					if (clipboardData) {
-						const files = clipboardData.files;
-						// const items = clipboardData.items;
-
-						if (files && files.length > 0) {
-
-							// Check if all files have a non-empty 'path' property
-							const filesArray = Array.from(files);
-							const allFilesHavePath = filesArray.every(file => file.path && file.path !== "");
-							if(allFilesHavePath) {
-								evt.preventDefault();
-
-								const doToggleEmbedPreference = false; // Pretend shift was not pressed
-								await this.handleFiles(filesArray, editor, view, doToggleEmbedPreference, ImportOperationType.PASTE);
-							} else {
-								// TODO Process images from clipboard
-								//
-								// const t = Array.from(files);
-								// console.log(t);
-								// console.log(clipboardData);
-								// console.log(clipboardData.dropEffect);
-								// console.log(clipboardData.files);
-								// console.log(clipboardData.items);
-								// console.log(clipboardData.types);
-								// const arrayBuffer = await t[0].arrayBuffer();
-								// fs.appendFile("/Users/andrea/Downloads/tst.png", Buffer.from(arrayBuffer));
-							}
-						}
-						// console.error("No files detected in paste data.");
-					}
-				})
+				this.app.workspace.on('editor-paste', this.editor_paste_cb)
 			);
 		}
 
-		let renameCallbackEnabled: boolean = true;
 		this.registerEvent(
-			this.app.vault.on('rename', async (newFile: TAbstractFile, oldPath: string) => {
-				if (!this.settings.autoRenameAttachmentFolder) { return }
-
-				if (renameCallbackEnabled) {
-					const oldPath_parsed = Utils.parseFilePath(oldPath);
-					if (oldPath_parsed.ext !== ".md") { return }
-
-					const oldAttachmentFolderPath = this.getAttachmentFolderOfMdNote(oldPath_parsed);
-					if (!oldAttachmentFolderPath) { return }
-					if (Utils.doesFolderExist(this.app.vault,oldAttachmentFolderPath)) {
-						const newAttachmentFolderPath = this.getAttachmentFolderOfMdNote(Utils.parseFilePath(newFile.path));
-
-						const oldPath = oldAttachmentFolderPath;
-						const newPath = newAttachmentFolderPath;
-						
-						try {
-							renameCallbackEnabled = false;
-							await this.renameFile(oldPath, newPath);
-						} catch (error: unknown) {
-							const msg = 'Failed to rename the attachment folder';
-							console.error(msg);
-							console.error("Original attachment folder:", oldPath);
-							console.error("New attachment folder:", newPath);
-							console.error("Error msg:", error);
-							new Notice(msg + '.');
-						} finally {
-							renameCallbackEnabled = true;
-						}
-					}
-				}
-			})
+			this.app.vault.on('rename', this.editor_rename_cb)
 		);
 	   
         // Add delete menu in context menu
@@ -437,6 +270,55 @@ export default class ImportAttachments extends Plugin {
 	
 		console.log('Loaded plugin Import Attachments+');
 	}
+
+    addCommands() {
+        // Command for importing as a standard link
+        this.addCommand({
+            id: "move-file-to-vault-link",
+            name: "Move file to vault as linked attachment",
+            callback: () => this.chooseFileToImport({
+                embed: false,
+                action: ImportActionType.MOVE,
+            }),
+        });
+
+        // Command for importing as an embedded image/link
+        this.addCommand({
+            id: "move-file-to-vault-embed",
+            name: "Move file to vault as embedded attachment",
+            callback: () => this.chooseFileToImport({
+                embed: true,
+                action: ImportActionType.MOVE,
+            }),
+        });
+
+        // Command for importing as a standard link
+        this.addCommand({
+            id: "copy-file-to-vault-link",
+            name: "Copy file to vault as linked attachment",
+            callback: () => this.chooseFileToImport({
+                embed: false,
+                action: ImportActionType.COPY,
+            }),
+        });
+
+        // Command for importing as an embedded image/link
+        this.addCommand({
+            id: "copy-file-to-vault-embed",
+            name: "Copy file to vault as embedded attachment",
+            callback: () => this.chooseFileToImport({
+                embed: true,
+                action: ImportActionType.COPY,
+            }),
+        });
+
+        // Register the command to open the attachments folder
+        this.addCommand({
+            id: "open-attachments-folder",
+            name: "Open attachments folder",
+            callback: () => this.openAttachmentsFolder(),
+        });
+    }
 
 	onunload() {
 		// unpatch openFile
@@ -674,6 +556,139 @@ export default class ImportAttachments extends Plugin {
 		}
 	}
 
+    async editor_rename_cb(newFile: TAbstractFile, oldPath: string) {
+        if (!this.settings.autoRenameAttachmentFolder) { return }
+
+            const oldPath_parsed = Utils.parseFilePath(oldPath);
+            if (oldPath_parsed.ext !== ".md") { return }
+
+            const oldAttachmentFolderPath = this.getAttachmentFolderOfMdNote(oldPath_parsed);
+            if (!oldAttachmentFolderPath) { return }
+            if (Utils.doesFolderExist(this.app.vault,oldAttachmentFolderPath)) {
+                const newAttachmentFolderPath = this.getAttachmentFolderOfMdNote(Utils.parseFilePath(newFile.path));
+
+                const oldPath = oldAttachmentFolderPath;
+                const newPath = newAttachmentFolderPath;
+                
+                try {
+                    this.renameCallbackEnabled = false;
+                    await this.renameFile(oldPath, newPath);
+                } catch (error: unknown) {
+                    const msg = 'Failed to rename the attachment folder';
+                    console.error(msg);
+                    console.error("Original attachment folder:", oldPath);
+                    console.error("New attachment folder:", newPath);
+                    console.error("Error msg:", error);
+                    new Notice(msg + '.');
+                } finally {
+                    this.renameCallbackEnabled = true;
+                }
+            }
+        
+    }
+
+    async editor_paste_cb(evt: ClipboardEvent, editor: Editor, view: MarkdownView | MarkdownFileInfo) {
+        // Check if the event has already been handled
+        if (evt.defaultPrevented) return;
+
+        if (!(view instanceof MarkdownView)) {
+            console.error('No view provided')
+            return;
+        }
+
+        const clipboardData = evt.clipboardData;
+        if (clipboardData) {
+            const files = clipboardData.files;
+            // const items = clipboardData.items;
+
+            if (files && files.length > 0) {
+
+                // Check if all files have a non-empty 'path' property
+                const filesArray = Array.from(files);
+                const allFilesHavePath = filesArray.every(file => file.path && file.path !== "");
+                if(allFilesHavePath) {
+                    evt.preventDefault();
+
+                    const doToggleEmbedPreference = false; // Pretend shift was not pressed
+                    this.handleFiles(filesArray, editor, view, doToggleEmbedPreference, ImportOperationType.PASTE);
+                } else {
+                    // TODO Process images from clipboard
+                    //
+                    // const t = Array.from(files);
+                    // console.log(t);
+                    // console.log(clipboardData);
+                    // console.log(clipboardData.dropEffect);
+                    // console.log(clipboardData.files);
+                    // console.log(clipboardData.items);
+                    // console.log(clipboardData.types);
+                    // const arrayBuffer = await t[0].arrayBuffer();
+                    // fs.appendFile("/Users/andrea/Downloads/tst.png", Buffer.from(arrayBuffer));
+                }
+            }
+            // console.error("No files detected in paste data.");
+        }
+    }
+
+    async editor_drop_cb(evt: DragEvent, editor: Editor, view: MarkdownView | MarkdownFileInfo) {
+        // Check if the event has already been handled
+        if (evt.defaultPrevented) return;
+
+        if (!(view instanceof MarkdownView)) {
+            console.error('No view provided')
+            return;
+        }
+
+        const altKeyPressed = evt.altKey; // Check if Alt was pressed
+        if (altKeyPressed) {
+            // Follow standard behavior where a link to the external file is created
+            return;
+        } else {
+            // Prevent other handlers from executing
+            evt.preventDefault();
+        }
+
+        const doForceAsking = evt.shiftKey; // Check if Shift was pressed
+
+        // Handle the dropped files
+        const files = evt?.dataTransfer?.files;
+        if(!files) return;
+
+        if (files.length > 0) {
+            const dropPos = editor.cm.posAtCoords({ x: evt.clientX, y: evt.clientY });
+            
+            if(dropPos===null) {
+                console.error('Unable to determine drop position');
+                return;
+            }
+            
+            // Get the current selection
+            const user_selection = editor.cm.state.selection;
+            const user_selection_main = user_selection.main;
+            // const selection_alt = codemirror.viewState.state.selection.main;
+
+             // Check if there is selected text
+            const isTextSelected = !user_selection_main.empty;
+            const selectionStart = user_selection_main.from;
+            const selectionEnd = user_selection_main.to;
+            
+            // Check if the drop position is within the selected text range
+            const isDropWithinSelection = isTextSelected && dropPos >= selectionStart && dropPos <= selectionEnd;
+
+            if(!isDropWithinSelection) {
+                // If the drop position is not in the current selection, we redefine the current selection to the new drop position
+                editor.cm.dispatch({
+                    selection: EditorSelection.single(dropPos)
+                });
+            }
+            
+            // Handle the files as per your existing logic
+            this.handleFiles(Array.from(files), editor, view, doForceAsking, ImportOperationType.DRAG_AND_DROP);
+        
+        } else {
+            console.error('No files dropped');
+        }
+    }
+
 	async handleFiles(files: File[], editor: Editor, view: MarkdownView, doForceAsking: boolean, importType: ImportOperationType) {
 
 		const {nonFolderFilesArray, foldersArray} = await Utils.filterOutFolders(Array.from(files));
@@ -725,7 +740,7 @@ export default class ImportAttachments extends Plugin {
 				this.settings.embedFilesOnImport = embedOption;
 			}
 			this.settings.lastEmbedFilesOnImport = embedOption;
-			await this.settingsTab.debouncedSaveSettings();
+			this.settingsTab.debouncedSaveSettings();
 		}
 
 		const doEmbed = (embedOption == YesNoTypes.YES);
@@ -822,8 +837,6 @@ export default class ImportAttachments extends Plugin {
 			new Notice(msg);
 			return;
 		}
-
-
 
 		const input = document.createElement("input");
 		input.type = "file";
