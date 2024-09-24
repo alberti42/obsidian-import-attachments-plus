@@ -49,7 +49,7 @@ import { sep, posix } from 'path';
 import { promises as fs } from 'fs';  // This imports the promises API from fs
 
 import { patchOpenFile, unpatchOpenFile, addKeyListeners, removeKeyListeners } from 'patchOpenFile';
-import { patchFilemanager, unpatchFilemanager } from 'patchFileManager';
+import { callPromptForDeletion, patchFilemanager, unpatchFilemanager } from 'patchFileManager';
 
 import { patchImportFunctions, unpatchImportFunctions } from "patchImportFunctions";
 import { patchFileExplorer, unpatchFileExplorer, updateVisibilityAttachmentFolders } from "patchFileExplorer";
@@ -70,6 +70,7 @@ export default class ImportAttachments extends Plugin {
     // mechanism to prevent calling the callback multiple times when renaming attachments associated with a markdown note
     private renameCallbackEnabled: boolean = true;
     private file_menu_cb_registered: boolean = false;
+    private file_menu_embedded_cb_registered: boolean = false;
     
 	constructor(app: App, manifest: PluginManifest) {
 		super(app, manifest);
@@ -262,17 +263,16 @@ export default class ImportAttachments extends Plugin {
 			);
 		}
 
-        // Register context menu using obsidian function. It takes care of removing the event listener
-        // and register the event listener for each new document created
-        this.registerDomEvent(document, 'contextmenu', this.context_menu_cb);
-
 		this.registerEvent(
 			this.app.vault.on('rename', this.editor_rename_cb)
 		);
 	   
-        // Add delete menu in context menu
-	    this.addDeleteMenu(this.settings.showDeleteMenu);
-	
+        // Add delete menu in context menu of links
+	    this.addDeleteMenuForLinks(this.settings.showDeleteMenu);
+
+        // Add delete menu in context menu of embedded images
+        this.addDeleteMenuForEmbeddedImages(this.settings.showDeleteMenuForEmbedded);
+
 		console.log('Loaded plugin Import Attachments+');
 	}
 
@@ -343,10 +343,13 @@ export default class ImportAttachments extends Plugin {
 		unpatchConsole();
 
         // remove delete menu
-        this.addDeleteMenu(false);
+        this.addDeleteMenuForLinks(false);
+
+        // remove delete menu for embedded graphics
+        this.addDeleteMenuForEmbeddedImages(false);
 	}
 
-    addDeleteMenu(status:boolean) {
+    addDeleteMenuForLinks(status:boolean) {
         if(status && !this.file_menu_cb_registered) {
             this.app.workspace.on("file-menu", this.file_menu_cb);
             this.file_menu_cb_registered = true;
@@ -354,6 +357,19 @@ export default class ImportAttachments extends Plugin {
             if(this.file_menu_cb_registered) {
                 this.app.workspace.off("file-menu", this.file_menu_cb);
                 this.file_menu_cb_registered = false;
+            }
+        }
+    }
+
+    addDeleteMenuForEmbeddedImages(status:boolean) {
+        if(status && !this.file_menu_embedded_cb_registered) {
+            // Register context menu for embedded graphics
+            document.addEventListener("contextmenu", this.context_menu_cb);
+            this.file_menu_embedded_cb_registered = true;
+        } else {
+            if(this.file_menu_embedded_cb_registered) {
+                document.removeEventListener("contextmenu", this.context_menu_cb);
+                this.file_menu_embedded_cb_registered = false;
             }
         }
     }
@@ -433,7 +449,10 @@ export default class ImportAttachments extends Plugin {
     }
 
     async delete_file_cb(file:TFile) {
-        if(this.settings.removeWikilinkOnFileDeletion) {
+        
+        const wasDeleted = await callPromptForDeletion(file);
+
+        if(wasDeleted && this.settings.removeWikilinkOnFileDeletion) {
             const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
             const editor = markdownView?.editor;
             if (editor) {
@@ -442,7 +461,7 @@ export default class ImportAttachments extends Plugin {
 
                 // Get the cursor position
                 const cursor = editor.getCursor();
-
+                
                 // Get the content of the line where the cursor is located
                 const lineContent = editor.getLine(cursor.line);
 
@@ -479,15 +498,6 @@ export default class ImportAttachments extends Plugin {
                 }
             }
         }
-        
-        // const fileExplorer = this.app.internalPlugins.getPluginById('file-explorer');
-        const fileManager = this.app.fileManager;  // Get the actual file manager instance
-
-        // Bind the correct context to promptForDeletion
-        const promptForDeletion = fileManager.promptForDeletion.bind(fileManager);
-
-        // TODO: check whether the user cancel the deletion operation and if so, then avoid deleting the wikilink
-        await promptForDeletion(file);
     }
 
 
@@ -576,8 +586,8 @@ export default class ImportAttachments extends Plugin {
 	}
 
     context_menu_cb(evt: MouseEvent) {
-        console.log("CALLED");
-        const target = evt.target as HTMLElement;
+        if(!(evt.target instanceof HTMLElement)) return;
+        const target:HTMLElement = evt.target;
 
         // Check if the right-clicked element is an image
         if (target.tagName === 'IMG') {
@@ -595,13 +605,7 @@ export default class ImportAttachments extends Plugin {
                     .setIcon("trash-2")
                     .setSection("danger")
                     .onClick(() => {
-                        console.log(target.getAttribute("src"));
-                        console.log(target);
-                        console.log(parent.getAttribute("src"));
-
-                            // navigator.clipboard.writeText(imageSrc);
-                            // new Notice("Image link copied!");
-                        
+                        this.delete_img_cb(evt,target);
                     });
             });
 
@@ -609,6 +613,90 @@ export default class ImportAttachments extends Plugin {
 
             // Show the context menu at the mouse position
             menu.showAtMouseEvent(evt);
+        }
+    }
+
+    async delete_img_cb(evt: MouseEvent, target:HTMLElement) {
+        const file_src = (():TFile|null=>{
+            const parent = target.parentElement;
+            if(!parent) return null;
+            const src = parent.getAttribute("src");
+            if(!src) return null;
+            const fileInVault = this.app.vault.getFileByPath(src);
+            return fileInVault;
+        })();
+
+        if(!file_src) return;
+
+        // Find the current editor where the click happened
+        const activeLeaf = this.app.workspace.activeLeaf;
+        const editorView = activeLeaf?.view instanceof MarkdownView ? activeLeaf.view.editor : null;
+
+        if (editorView) {
+            // Get the CodeMirror instance
+            const codemirror = editorView.cm;
+
+            // Get the position at the mouse event's coordinates
+            const linkPos = (():number|null => {
+                let pos = codemirror.posAtCoords({ x: evt.clientX, y: evt.clientY });
+                // it is important to advance by an extra char to make sure we are right inside the link
+                if(pos !== null) pos++;
+                return pos;
+            })();
+
+            if (linkPos) {
+                // linkPos is the character position
+                const line = codemirror.state.doc.lineAt(linkPos);
+                const line_text = line.text;
+
+                // Calculate the character offset within the line
+                const linkPosInLine = linkPos - line.from;
+
+                // Regular expression to match Markdown image/external links
+                // const regex = /\!\[.*?\]\(([^\s]+)\)/g;
+                const regex = /\!\[\[\s*(.*?)\s*(?:\|.*?)?\]\]|\!\[.*?\]\(([^\s]+)\)/g;
+                let match;
+                let found = false;
+                
+                // Loop through all matches in the line
+                while ((match = regex.exec(line_text)) !== null) {
+                    
+                    const startIdx = match.index;
+                    const endIdx = startIdx + match[0].length;
+                    
+                    // Check if the link encompasses the current position in the line
+                    // It is certain that that linkPosInLine will be somewhere inside the
+                    // the link but it is not always at the beginning. So, we can be sure
+                    // only the link on which we clicked will be removed.
+                    if (linkPosInLine >= startIdx && linkPosInLine <= endIdx) {
+                        const fileInVault = (():TFile|null=>{
+                            let file_path:string;
+                            if (match[1]) {
+                                // Wiki link `![[...]]` was matched
+                                file_path = match[1];
+                            } else { // match[2]
+                                // Wiki link `![...](...)` was matched
+                                file_path = decodeURIComponent(match[2]);
+                            }
+                            return this.app.vault.getFileByPath(file_path);
+
+                        })();
+
+                        if (fileInVault && fileInVault === file_src) {
+                            const wasDeleted = await callPromptForDeletion(file_src);
+                            if(wasDeleted && this.settings.removeWikilinkOnFileDeletion) {
+                                // Replace the range corresponding to the found link
+                                editorView.replaceRange('', { line: line.number - 1, ch: startIdx }, { line: line.number - 1, ch: endIdx });
+                            }
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                if (!found) {
+                    console.error("No matching link found at the click position.");
+                }
+            }
         }
     }
 
@@ -1496,10 +1584,33 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl).setName('Managing').setHeading();
 
+         const embedded_delete_menu_setting = new Setting(containerEl)
+            .setName('Show option in context menu of embedded images to delete them:')
+            .setDesc("With this option enabled, when you right click on an embedded image in your note, an option 'Delete image' \
+                will be shown in the context menu.")
+            .addToggle(toggle => {
+                toggle
+                .setValue(this.plugin.settings.showDeleteMenuForEmbedded)
+                .onChange(async (value: boolean) => {
+                    this.plugin.settings.showDeleteMenuForEmbedded = value;
+                    this.plugin.addDeleteMenuForEmbeddedImages(value);
+                    this.debouncedSaveSettings();
+                })
+            });
+
         const delete_menu_setting = new Setting(containerEl)
             .setName('Show option in context menu to delete attachment files:')
-            .setDesc("With this option enabled, when you right click on a Wikilink in your note, a menu 'Delete file' \
-                will be shown in the context menu.");
+            .setDesc("With this option enabled, when you right click on a Wikilink in your note, an 'Delete file' \
+                will be shown in the context menu.")
+            .addToggle(toggle => {
+                toggle
+                .setValue(this.plugin.settings.showDeleteMenu)
+                .onChange(async (value: boolean) => {
+                    this.plugin.settings.showDeleteMenu = value;
+                    this.plugin.addDeleteMenuForLinks(value);
+                    this.debouncedSaveSettings();
+                })
+            });
             
         const remove_wikilink_setting = new Setting(containerEl)
             .setName('Remove Wikilink when deleting an attachment file:')
@@ -1512,26 +1623,16 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
                     this.debouncedSaveSettings();
                 }));
 
-        const update_visibilty_remove_wikilink = (status:boolean) => {
-            if(status) {
-                remove_wikilink_setting.settingEl.style.display='';
-            } else {
-                remove_wikilink_setting.settingEl.style.display='none';
-            }
-        }
-
-        update_visibilty_remove_wikilink(this.plugin.settings.showDeleteMenu);
-        
-        delete_menu_setting.addToggle(toggle => {
-            toggle
-            .setValue(this.plugin.settings.showDeleteMenu)
-            .onChange(async (value: boolean) => {
-                this.plugin.settings.showDeleteMenu = value;
-                this.plugin.addDeleteMenu(value);
-                update_visibilty_remove_wikilink(value);
-                this.debouncedSaveSettings();
-            })
-        });
+        // const update_visibilty_remove_wikilink = (status:boolean) => {
+        //     if(status) {
+        //         remove_wikilink_setting.settingEl.style.display='';
+        //     } else {
+        //         remove_wikilink_setting.settingEl.style.display='none';
+        //     }
+        // }
+        // 
+        // update_visibilty_remove_wikilink(this.plugin.settings.showDeleteMenu);
+    
 
         new Setting(containerEl)
             .setName('Automatically remove attachment folders when empty:')

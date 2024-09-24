@@ -21,6 +21,7 @@ export const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 	autoDeleteAttachmentFolder: true,
     deleteAttachmentFolderWhenEmpty: true,
     showDeleteMenu: true,
+    showDeleteMenuForEmbedded: true,
     removeWikilinkOnFileDeletion: true,
 	confirmDeleteAttachmentFolder: true,
 	hideAttachmentFolders: true,

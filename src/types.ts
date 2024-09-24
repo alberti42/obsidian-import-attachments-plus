@@ -49,6 +49,7 @@ export interface ImportAttachmentsSettings {
 	autoDeleteAttachmentFolder: boolean;
     deleteAttachmentFolderWhenEmpty: boolean;
     showDeleteMenu: boolean;
+    showDeleteMenuForEmbedded: boolean;
     removeWikilinkOnFileDeletion: boolean;
 	confirmDeleteAttachmentFolder: boolean;
 	hideAttachmentFolders: boolean;
