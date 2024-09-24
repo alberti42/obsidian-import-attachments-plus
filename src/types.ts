@@ -68,6 +68,11 @@ export function isSettingsLatestFormat(s:unknown): s is ImportAttachmentsSetting
     return 'compatibility' in s && s.compatibility === DEFAULT_SETTINGS.compatibility;
 }
 
+export interface Coordinates {
+    x: number;
+    y: number;
+}
+
 export interface ParsedPath {
 	dir: string,
 	base: string,

@@ -19,6 +19,7 @@ import {
     Menu,
     TFile,
     MenuItem,
+    EditorPosition,
 } from "obsidian";
 
 // Import utility and modal components
@@ -41,6 +42,7 @@ import {
 	isSettingsLatestFormat,
 	isSettingsFormat_1_3_0,
 	ImportAttachmentsSettings_1_3_0,
+    Coordinates,
 } from './types';
 import * as Utils from "utils";
 
@@ -58,7 +60,7 @@ import { monkeyPatchConsole, unpatchConsole } from "patchConsole";
 import { DEFAULT_SETTINGS, DEFAULT_SETTINGS_1_3_0 } from "default";
 // import { debug } from "console";
 
-import { EditorSelection } from '@codemirror/state';
+import { EditorSelection, Line } from '@codemirror/state';
 
 // Main plugin class
 export default class ImportAttachments extends Plugin {
@@ -448,58 +450,107 @@ export default class ImportAttachments extends Plugin {
         }
     }
 
-    async delete_file_cb(file:TFile) {
+    async delete_file_cb(file_src:TFile,cursorCoordinates?:Coordinates) {
+        // Find the current Markdown editor where the click happened
+        const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if(!activeView) return;
+        const editorView = activeView.editor;
+        if(!editorView) return;
+
+        // Get the CodeMirror instance
+        const codemirror = editorView.cm
+        const selection = codemirror.state.selection.main;
+        const doc = codemirror.state.doc;
+
+        // Get the position at the mouse event's coordinates or at the current cursor
+        const cursorIdx = (():number|null => {
+            let pos:number|null
+            if(cursorCoordinates) {
+                pos = codemirror.posAtCoords(cursorCoordinates);
+                // it is important to advance by an extra char to make sure we are right inside the link
+                if(pos !== null) pos++;
+            } else {
+                pos = selection.head;  // equivalent to editorView.getCursor()
+            }
+            if(pos!==null) {
+                pos = Math.clamp(pos,0,doc.length);
+            }
+            return pos;
+        })();
+
+        if(!cursorIdx) return;
+
+        const line = doc.lineAt(cursorIdx);
+        const lineContent = line.text;
         
-        const wasDeleted = await callPromptForDeletion(file);
-
-        if(wasDeleted && this.settings.removeWikilinkOnFileDeletion) {
-            const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-            const editor = markdownView?.editor;
-            if (editor) {
-                // Get the file name without the extension
-                const fileNameWithoutExtension = file.path;
-
-                // Get the cursor position
-                const cursor = editor.getCursor();
-                
-                // Get the content of the line where the cursor is located
-                const lineContent = editor.getLine(cursor.line);
-
-                // Search to the left of the cursor for '[['
-                const leftPart = lineContent.slice(0, cursor.ch);
-                const {leftIndex,isEmbedded} = (() => {
-                        let index = leftPart.lastIndexOf('[[');
-                        let embedded = false;
-                        // if it is preceeded by `!`
-                        if (index >= 1 && leftPart.slice(index - 1, index) === '!') {
-                            index--;
-                            embedded=true;
-                        }
-                        return {leftIndex:index,isEmbedded:embedded};
-                    })();
-
-                // Search to the right of the cursor for ']]'
-                const rightPart = lineContent.slice(cursor.ch);
-                const rightIndex = rightPart.indexOf(']]');
-
-                // Check if both '[[' and ']]' are found, and make sure they are in the correct order
-                if (leftIndex !== -1 && rightIndex !== -1) {
-                    // Extract the content between [[ and ]]
-                    const wikiLinkText = lineContent.slice(leftIndex + 2 + (isEmbedded? 1:0), cursor.ch + rightIndex).trimLeft();
-
-                    // Check if the Wiki link matches the file being deleted
-                    if (wikiLinkText.startsWith(fileNameWithoutExtension)) {
-                        // Remove the entire Wiki link from the line
-                        const updatedLineContent = lineContent.slice(0, leftIndex) + lineContent.slice(cursor.ch + rightIndex + 2);
-
-                        // Update the editor with the modified line
-                        editor.replaceRange(updatedLineContent, { line: cursor.line, ch: 0 }, { line: cursor.line, ch: lineContent.length });
+        const position:EditorPosition = {
+            line: line.number - 1,
+            ch: cursorIdx - line.from
+        };
+        
+        // Regular expression to match Markdown image/external links
+        // const regex = /\!\[.*?\]\(([^\s]+)\)/g;
+        const regex = /\!?\!\[\[\s*(.*?)\s*(?:\|.*?)?\]\]|\!?\[.*?\]\(([^\s]+)\)/g;
+        let match;
+        let found = false;
+        debugger
+        // Loop through all matches in the line
+        while ((match = regex.exec(lineContent)) !== null) {
+            
+            const startIdx = match.index;
+            const endIdx = startIdx + match[0].length;
+            
+            // Check if the link encompasses the current position in the line
+            // It is certain that that linkPosInLine will be somewhere inside the
+            // the link but it is not always at the beginning. So, we can be sure
+            // only the link on which we clicked will be removed.
+            if (position.ch >= startIdx && position.ch <= endIdx) {
+                const fileInVault = (():TFile|null=>{
+                    let file_path:string;
+                    if (match[1]) {
+                        // Wiki link `![[...]]` was matched
+                        file_path = match[1];
+                    } else { // match[2]
+                        // Wiki link `![...](...)` was matched
+                        file_path = decodeURIComponent(match[2]);
                     }
+                    return this.app.vault.getFileByPath(file_path);
+
+                })();
+
+                if (fileInVault && fileInVault === file_src) {
+                    // Delete the file with user prompt
+                    const wasDeleted = await callPromptForDeletion(file_src);
+                    
+                    if(wasDeleted && this.settings.removeWikilinkOnFileDeletion) {
+                        // Replace the range corresponding to the found link
+                        editorView.replaceRange('', { line: line.number - 1, ch: startIdx }, { line: line.number - 1, ch: endIdx });
+                    }
+                    found = true;
+                    break;
                 }
             }
         }
+        if (!found) {
+            console.error("No matching link found at the click position.");
+        }
     }
 
+    async delete_img_cb(evt: MouseEvent, target:HTMLElement) {
+        // Get a TFile reference from the clicked HTML element 
+        const fileToBeDeleted:TFile|null = (():TFile|null=>{
+            const parent = target.parentElement;
+            if(!parent) return null;
+            const src = parent.getAttribute("src");
+            if(!src) return null;
+            const fileInVault = this.app.vault.getFileByPath(src);
+            return fileInVault;
+        })();
+
+        if(!fileToBeDeleted) return;
+
+        this.delete_file_cb(fileToBeDeleted,evt);
+    }
 
 	async loadSettings() {
 
@@ -613,90 +664,6 @@ export default class ImportAttachments extends Plugin {
 
             // Show the context menu at the mouse position
             menu.showAtMouseEvent(evt);
-        }
-    }
-
-    async delete_img_cb(evt: MouseEvent, target:HTMLElement) {
-        const file_src = (():TFile|null=>{
-            const parent = target.parentElement;
-            if(!parent) return null;
-            const src = parent.getAttribute("src");
-            if(!src) return null;
-            const fileInVault = this.app.vault.getFileByPath(src);
-            return fileInVault;
-        })();
-
-        if(!file_src) return;
-
-        // Find the current editor where the click happened
-        const activeLeaf = this.app.workspace.activeLeaf;
-        const editorView = activeLeaf?.view instanceof MarkdownView ? activeLeaf.view.editor : null;
-
-        if (editorView) {
-            // Get the CodeMirror instance
-            const codemirror = editorView.cm;
-
-            // Get the position at the mouse event's coordinates
-            const linkPos = (():number|null => {
-                let pos = codemirror.posAtCoords({ x: evt.clientX, y: evt.clientY });
-                // it is important to advance by an extra char to make sure we are right inside the link
-                if(pos !== null) pos++;
-                return pos;
-            })();
-
-            if (linkPos) {
-                // linkPos is the character position
-                const line = codemirror.state.doc.lineAt(linkPos);
-                const line_text = line.text;
-
-                // Calculate the character offset within the line
-                const linkPosInLine = linkPos - line.from;
-
-                // Regular expression to match Markdown image/external links
-                // const regex = /\!\[.*?\]\(([^\s]+)\)/g;
-                const regex = /\!\[\[\s*(.*?)\s*(?:\|.*?)?\]\]|\!\[.*?\]\(([^\s]+)\)/g;
-                let match;
-                let found = false;
-                
-                // Loop through all matches in the line
-                while ((match = regex.exec(line_text)) !== null) {
-                    
-                    const startIdx = match.index;
-                    const endIdx = startIdx + match[0].length;
-                    
-                    // Check if the link encompasses the current position in the line
-                    // It is certain that that linkPosInLine will be somewhere inside the
-                    // the link but it is not always at the beginning. So, we can be sure
-                    // only the link on which we clicked will be removed.
-                    if (linkPosInLine >= startIdx && linkPosInLine <= endIdx) {
-                        const fileInVault = (():TFile|null=>{
-                            let file_path:string;
-                            if (match[1]) {
-                                // Wiki link `![[...]]` was matched
-                                file_path = match[1];
-                            } else { // match[2]
-                                // Wiki link `![...](...)` was matched
-                                file_path = decodeURIComponent(match[2]);
-                            }
-                            return this.app.vault.getFileByPath(file_path);
-
-                        })();
-
-                        if (fileInVault && fileInVault === file_src) {
-                            const wasDeleted = await callPromptForDeletion(file_src);
-                            if(wasDeleted && this.settings.removeWikilinkOnFileDeletion) {
-                                // Replace the range corresponding to the found link
-                                editorView.replaceRange('', { line: line.number - 1, ch: startIdx }, { line: line.number - 1, ch: endIdx });
-                            }
-                            found = true;
-                            break;
-                        }
-                    }
-                }
-                if (!found) {
-                    console.error("No matching link found at the click position.");
-                }
-            }
         }
     }
 
@@ -1614,8 +1581,8 @@ class ImportAttachmentsSettingTab extends PluginSettingTab {
             
         const remove_wikilink_setting = new Setting(containerEl)
             .setName('Remove Wikilink when deleting an attachment file:')
-            .setDesc("With this option enabled, when you right click on a Wikilink in your note to delete the attachment, \
-                not only the attachment will be deleted, but also the Wikilink will be removed from your note.")
+            .setDesc("With this option enabled, when you right click on a Wikilink or MarkDown link in your note to delete the attachment, \
+                not only the attachment will be deleted, but also the Wikilink or MarkDown link, respectively, will be removed from your note.")
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.removeWikilinkOnFileDeletion)
                 .onChange(async (value: boolean) => {
