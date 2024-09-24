@@ -415,7 +415,16 @@ export default class ImportAttachments extends Plugin {
 
                                     // Search to the left of the cursor for '[['
                                     const leftPart = lineContent.slice(0, cursor.ch);
-                                    const leftIndex = leftPart.lastIndexOf('[[');
+                                    const {leftIndex,isEmbedded} = (() => {
+                                            let index = leftPart.lastIndexOf('[[');
+                                            let embedded = false;
+                                            // if it is preceeded by `!`
+                                            if (index >= 1 && leftPart.slice(index - 1, index) === '!') {
+                                                index--;
+                                                embedded=true;
+                                            }
+                                            return {leftIndex:index,isEmbedded:embedded};
+                                        })();
 
                                     // Search to the right of the cursor for ']]'
                                     const rightPart = lineContent.slice(cursor.ch);
@@ -424,7 +433,7 @@ export default class ImportAttachments extends Plugin {
                                     // Check if both '[[' and ']]' are found, and make sure they are in the correct order
                                     if (leftIndex !== -1 && rightIndex !== -1) {
                                         // Extract the content between [[ and ]]
-                                        const wikiLinkText = lineContent.slice(leftIndex + 2, cursor.ch + rightIndex).trimLeft();
+                                        const wikiLinkText = lineContent.slice(leftIndex + 2 + (isEmbedded? 1:0), cursor.ch + rightIndex).trimLeft();
 
                                         // Check if the Wiki link matches the file being deleted
                                         if (wikiLinkText.startsWith(fileNameWithoutExtension)) {
