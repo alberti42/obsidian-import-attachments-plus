@@ -36,7 +36,8 @@ import {
 	isSettingsLatestFormat,
 	isSettingsFormat_1_3_0,
 	ImportAttachmentsSettings_1_3_0,
-    Coordinates,
+    isSupportedMediaTag,
+    MediaLabels,
 } from './types';
 import * as Utils from "utils";
 
@@ -474,8 +475,6 @@ export default class ImportAttachments extends Plugin {
 
         if(!cursorIdx) return;
 
-        console.log("POSITION:",cursorIdx);
-
         const line = doc.lineAt(cursorIdx);
         const lineContent = line.text;
         
@@ -709,9 +708,10 @@ export default class ImportAttachments extends Plugin {
     context_menu_cb(evt: MouseEvent) {
         if(!(evt.target instanceof HTMLElement)) return;
         const target:HTMLElement = evt.target;
+        const tagName:string = target.tagName;
 
         // Check if the right-clicked element is an image
-        if (target.tagName === 'IMG') {
+        if (isSupportedMediaTag(tagName)) {
             const parent = target.parentElement;
             if(!parent) return;
 
@@ -722,7 +722,7 @@ export default class ImportAttachments extends Plugin {
 
             // Add options to the menu
             menu.addItem((item) => {
-                item.setTitle("Delete image")
+                item.setTitle(`Delete ${MediaLabels[tagName]}`)
                     .setIcon("trash-2")
                     .setSection("danger")
                     .onClick(() => {

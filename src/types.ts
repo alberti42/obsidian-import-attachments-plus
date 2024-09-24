@@ -31,6 +31,19 @@ export enum RelativeLocation {
 	VAULT='VAULT', // Vault folder
 }
 
+export const MediaLabels = {
+    IMG: "image file",
+    AUDIO: "audio file",
+    VIDEO: "video file",
+} as const;
+
+export type SupportedMediaTag = keyof typeof MediaLabels;
+
+// Type guard to check if the tagName is a valid key in MediaLabels
+export function isSupportedMediaTag(tagName: string): tagName is SupportedMediaTag {
+    return tagName in MediaLabels;
+}
+
 export interface ImportAttachmentsSettings {
 	actionDroppedFilesOnImport: ImportActionType;
 	lastActionDroppedFilesOnImport: ImportActionType;
