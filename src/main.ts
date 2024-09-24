@@ -279,7 +279,7 @@ export default class ImportAttachments extends Plugin {
         this.addCommand({
             id: "move-file-to-vault-link",
             name: "Move file to vault as linked attachment",
-            callback: () => this.chooseFileToImport({
+            callback: () => this.choose_file_to_import_cb({
                 embed: false,
                 action: ImportActionType.MOVE,
             }),
@@ -289,7 +289,7 @@ export default class ImportAttachments extends Plugin {
         this.addCommand({
             id: "move-file-to-vault-embed",
             name: "Move file to vault as embedded attachment",
-            callback: () => this.chooseFileToImport({
+            callback: () => this.choose_file_to_import_cb({
                 embed: true,
                 action: ImportActionType.MOVE,
             }),
@@ -299,7 +299,7 @@ export default class ImportAttachments extends Plugin {
         this.addCommand({
             id: "copy-file-to-vault-link",
             name: "Copy file to vault as linked attachment",
-            callback: () => this.chooseFileToImport({
+            callback: () => this.choose_file_to_import_cb({
                 embed: false,
                 action: ImportActionType.COPY,
             }),
@@ -309,7 +309,7 @@ export default class ImportAttachments extends Plugin {
         this.addCommand({
             id: "copy-file-to-vault-embed",
             name: "Copy file to vault as embedded attachment",
-            callback: () => this.chooseFileToImport({
+            callback: () => this.choose_file_to_import_cb({
                 embed: true,
                 action: ImportActionType.COPY,
             }),
@@ -319,7 +319,7 @@ export default class ImportAttachments extends Plugin {
         this.addCommand({
             id: "open-attachments-folder",
             name: "Open attachments folder",
-            callback: () => this.openAttachmentsFolder(),
+            callback: () => this.open_attachments_folder_cb(),
         });
     }
 
@@ -631,6 +631,81 @@ export default class ImportAttachments extends Plugin {
 		}
 	}
 
+
+    // Get attachment folder path based on current note
+    getAttachmentFolderOfMdNote(md_file?: ParsedPath | undefined): string { 
+        // Get the current active note if md_file is not provided
+        if (md_file===undefined) {
+            const md_active_file = this.app.workspace.getActiveFile();
+            if (md_active_file === null) {
+                throw new Error("The active note could not be determined.");
+            }
+            md_file = Utils.parseFilePath(md_active_file.path);
+        }
+
+        if (md_file.ext !== ".md") {
+            throw new Error("No Markdown file was provided.");
+        }
+        
+        const currentNoteFolderPath = md_file.dir;
+        const notename = md_file.filename;
+
+        const folderPath = this.settings.attachmentFolderPath.replace(/\$\{notename\}/g, notename);
+
+        let attachmentsFolderPath;
+        switch(this.settings.attachmentFolderLocation) {
+        case AttachmentFolderLocationType.CURRENT:
+            attachmentsFolderPath = currentNoteFolderPath;
+            break;
+        case AttachmentFolderLocationType.SUBFOLDER:
+            attachmentsFolderPath = Utils.joinPaths(currentNoteFolderPath, folderPath)
+            break;
+        case AttachmentFolderLocationType.ROOT:
+            attachmentsFolderPath = '/';
+            break;
+        case AttachmentFolderLocationType.FOLDER:
+            attachmentsFolderPath = folderPath
+            break;
+        }
+
+        attachmentsFolderPath = normalizePath(attachmentsFolderPath);
+
+        return attachmentsFolderPath;           
+    }
+
+    async createAttachmentName(originalFilePath:string, data: File | ArrayBuffer, md_file?: ParsedPath | undefined): Promise<string> {
+
+        const originalFilePath_parsed = Utils.parseFilePath(originalFilePath);
+        const namePattern = this.settings.attachmentName;
+        const dateFormat = this.settings.dateFormat;
+        
+        const fileToImportName = originalFilePath_parsed.filename;
+        
+        let attachmentName = namePattern.replace(/\$\{original\}/g, fileToImportName)
+                                        .replace(/\$\{uuid\}/g, Utils.uuidv4())
+                                        .replace(/\$\{date\}/g, Utils.formatDateTime(dateFormat));
+
+        if(namePattern.includes('${md5}')) {
+            let hash = ''
+            try {
+                hash = await Utils.hashFile(originalFilePath);
+            } catch (err: unknown) {
+                console.error('Error hashing the file:', err);
+            }
+            attachmentName = attachmentName.replace(/\$\{md5\}/g, hash);
+        }
+
+        // add the extension
+        attachmentName += originalFilePath_parsed.ext;
+
+        const attachmentsFolderPath = this.getAttachmentFolderOfMdNote(md_file);
+        
+        // Ensure the directory exists before moving the file
+        await Utils.createFolderIfNotExists(this.app.vault,attachmentsFolderPath);
+
+        return Utils.joinPaths(attachmentsFolderPath,attachmentName);
+    }
+
     context_menu_cb(evt: MouseEvent) {
         if(!(evt.target instanceof HTMLElement)) return;
         const target:HTMLElement = evt.target;
@@ -733,6 +808,37 @@ export default class ImportAttachments extends Plugin {
             }
             // console.error("No files detected in paste data.");
         }
+    }
+
+    async choose_file_to_import_cb(importSettings: ImportSettingsInterface) {
+        const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+        const editor = markdownView?.editor;
+
+        if (!editor) {
+            const msg = "No active markdown editor found.";
+            console.error(msg);
+            new Notice(msg);
+            return;
+        }
+
+        const input = document.createElement("input");
+        input.type = "file";
+        input.multiple = true; // Allow selection of multiple files
+
+        input.onchange = async (e: Event) => {
+            const target = e.target as HTMLInputElement;
+            const files = target.files; // This is already a FileList
+
+            if (files && files.length > 0) {
+                // Directly pass the FileList to the processing function
+                await this.moveFileToAttachmentsFolder(Array.from(files), editor, markdownView, importSettings);
+            } else {
+                const msg = "No files selected or file access error.";
+                console.error(msg);
+                new Notice(msg);
+            }
+        };
+        input.click(); // Trigger the file input dialog
     }
 
     async editor_drop_cb(evt: DragEvent, editor: Editor, view: MarkdownView | MarkdownFileInfo) {
@@ -859,111 +965,6 @@ export default class ImportAttachments extends Plugin {
 		this.moveFileToAttachmentsFolder(nonFolderFilesArray, editor, view, importSettings);
 	}
 
-	// Get attachment folder path based on current note
-	getAttachmentFolderOfMdNote(md_file?: ParsedPath | undefined): string {	
-		// Get the current active note if md_file is not provided
-		if (md_file===undefined) {
-			const md_active_file = this.app.workspace.getActiveFile();
-			if (md_active_file === null) {
-				throw new Error("The active note could not be determined.");
-			}
-			md_file = Utils.parseFilePath(md_active_file.path);
-		}
-
-		if (md_file.ext !== ".md") {
-			throw new Error("No Markdown file was provided.");
-		}
-		
-		const currentNoteFolderPath = md_file.dir;
-		const notename = md_file.filename;
-
-		const folderPath = this.settings.attachmentFolderPath.replace(/\$\{notename\}/g, notename);
-
-		let attachmentsFolderPath;
-		switch(this.settings.attachmentFolderLocation) {
-		case AttachmentFolderLocationType.CURRENT:
-			attachmentsFolderPath = currentNoteFolderPath;
-			break;
-		case AttachmentFolderLocationType.SUBFOLDER:
-			attachmentsFolderPath = Utils.joinPaths(currentNoteFolderPath, folderPath)
-			break;
-		case AttachmentFolderLocationType.ROOT:
-			attachmentsFolderPath = '/';
-			break;
-		case AttachmentFolderLocationType.FOLDER:
-			attachmentsFolderPath = folderPath
-			break;
-		}
-
-		attachmentsFolderPath = normalizePath(attachmentsFolderPath);
-
-		return attachmentsFolderPath;			
-	}
-
-	async createAttachmentName(originalFilePath:string, data: File | ArrayBuffer, md_file?: ParsedPath | undefined): Promise<string> {
-
-		const originalFilePath_parsed = Utils.parseFilePath(originalFilePath);
-		const namePattern = this.settings.attachmentName;
-		const dateFormat = this.settings.dateFormat;
-		
-		const fileToImportName = originalFilePath_parsed.filename;
-		
-		let attachmentName = namePattern.replace(/\$\{original\}/g, fileToImportName)
-										.replace(/\$\{uuid\}/g, Utils.uuidv4())
-										.replace(/\$\{date\}/g, Utils.formatDateTime(dateFormat));
-
-		if(namePattern.includes('${md5}')) {
-			let hash = ''
-			try {
-				hash = await Utils.hashFile(originalFilePath);
-			} catch (err: unknown) {
-				console.error('Error hashing the file:', err);
-			}
-			attachmentName = attachmentName.replace(/\$\{md5\}/g, hash);
-		}
-
-		// add the extension
-		attachmentName += originalFilePath_parsed.ext;
-
-		const attachmentsFolderPath = this.getAttachmentFolderOfMdNote(md_file);
-		
-		// Ensure the directory exists before moving the file
-		await Utils.createFolderIfNotExists(this.app.vault,attachmentsFolderPath);
-
-		return Utils.joinPaths(attachmentsFolderPath,attachmentName);
-	}
-
-	async chooseFileToImport(importSettings: ImportSettingsInterface) {
-		const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-		const editor = markdownView?.editor;
-
-		if (!editor) {
-			const msg = "No active markdown editor found.";
-			console.error(msg);
-			new Notice(msg);
-			return;
-		}
-
-		const input = document.createElement("input");
-		input.type = "file";
-		input.multiple = true; // Allow selection of multiple files
-
-		input.onchange = async (e: Event) => {
-			const target = e.target as HTMLInputElement;
-			const files = target.files; // This is already a FileList
-
-			if (files && files.length > 0) {
-				// Directly pass the FileList to the processing function
-				await this.moveFileToAttachmentsFolder(Array.from(files), editor, markdownView, importSettings);
-			} else {
-				const msg = "No files selected or file access error.";
-				console.error(msg);
-				new Notice(msg);
-			}
-		};
-		input.click(); // Trigger the file input dialog
-	}
-
 	// Function to move files to the attachments folder using fs.rename
 	async moveFileToAttachmentsFolder(filesToImport: File[], editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface) {
 
@@ -1085,7 +1086,150 @@ export default class ImportAttachments extends Plugin {
 		}
 	}
 
-	async openAttachmentsFolder() {
+    // Function to insert links to the imported files in the editor
+    insertLinkToEditor(importedFilePath: string, editor: Editor, md_file: string, importSettings: ImportSettingsInterface, counter?: number) {
+
+        /*
+        let relativePath;
+        switch (this.settings.linkFormat) {
+            case LinkFormat.RELATIVE:
+                relativePath = relative(currentNoteFolderPath, importedFilePath);
+                break;
+            case LinkFormat.ABSOLUTE:
+            default:
+                relativePath = relative(this.vaultPath, importedFilePath);
+                break;
+        }
+        */
+
+        let prefix = '';
+        let postfix = '';
+        if (counter) {
+            // if multiple files are imported
+            switch (this.settings.multipleFilesImportType) {
+                case MultipleFilesImportTypes.BULLETED:
+                    prefix = '- ';
+                    postfix = '\n';
+                    break;
+                case MultipleFilesImportTypes.NUMBERED:
+                    prefix = `${counter}. `;
+                    postfix = '\n';
+                    break;
+                case MultipleFilesImportTypes.INLINE:
+                    if (counter > 1) {
+                        // if it is not the first item
+                        prefix = '\n\n';
+                    }
+                    break;
+            }
+        }
+
+        // Get the current selection
+        const main_selection = editor.cm.state.selection.main;
+        
+        const file = Utils.createMockTFile(this.app.vault,importedFilePath);
+        const filename = file.name;
+        const customDisplayText = (():string=>{
+            let text="";
+            if(this.settings.customDisplayText) {
+                text = filename;
+            }
+            // if a single file is imported
+            if(!counter)
+            {
+                if(this.settings.useSelectionForDisplayText) {
+                    // Extract the selected text
+                    // const selectedText_alt = editor.getSelection();
+                    const selectedText = editor.cm.state.doc.sliceString(main_selection.from, main_selection.to);
+                    
+                    // If the user has selected some text, this will be used for the display text 
+                    if(selectedText.length>0) text = selectedText;
+                }
+            }
+            return text;
+        })();
+        
+        const generatedLink = this.app.fileManager.generateMarkdownLink(file,md_file,undefined,(this.settings.customDisplayText) ? customDisplayText : undefined);
+
+        const MDLink_regex = new RegExp('^(!)?(\\[[^\\]]*\\])(.*)$');
+        const WikiLink_regex = new RegExp('^(!)?(.*?)(|[^|]*)?$');
+        
+        const useMarkdownLinks = this.app.vault.getConfig("useMarkdownLinks");
+
+        let offset;
+        let processedLink;
+        let selectDisplayedText = false;
+        if(useMarkdownLinks) { // MD links
+            // Perform the match
+            const match = generatedLink.match(MDLink_regex);
+
+            offset = generatedLink.length;
+            processedLink = generatedLink;
+            if(match) {
+                offset = 1;
+                processedLink = "[" + customDisplayText + "]" + match[3];
+                selectDisplayedText = true;
+            }
+        } else { // Wiki links
+            // Perform the match
+            const match = generatedLink.match(WikiLink_regex);
+
+            offset = generatedLink.length;
+            processedLink = generatedLink;
+            if(match) {
+                offset = match[2].length;
+                processedLink = match[2] + (match[3] ? match[3] : "");
+                selectDisplayedText = true;
+            }
+        }
+
+        if (importSettings.embed) {
+            prefix = prefix + '!';
+        }
+
+        const linkText = prefix + processedLink + postfix;
+
+        const cursor_from = editor.getCursor("from");  // Get the current cursor position before insertion
+        const cursor_to = editor.getCursor("to");  // Get the current cursor position before insertion
+        
+        // Insert the link text at the current cursor position
+        editor.replaceRange(linkText, cursor_from, cursor_to);
+
+        if (counter == 0) {
+            if (selectDisplayedText) {
+                // Define the start and end positions for selecting 'baseName' within the inserted link
+                const startCursorPos = {
+                    line: cursor_to.line,
+                    ch: cursor_to.ch + offset + prefix.length,
+                };
+                const endCursorPos = {
+                    line: cursor_to.line,
+                    ch: startCursorPos.ch + customDisplayText.length,
+                };
+                
+                // Set the selection range to highlight 'baseName'
+                editor.setSelection(startCursorPos, endCursorPos);
+            } else {
+                const newCursorPos = {
+                    line: cursor_to.line,
+                    ch: cursor_to.ch + linkText.length
+                };
+
+                // Move cursor to the position right after the link
+                editor.setCursor(newCursorPos);
+            }
+        } else {
+            const newCursorPos = {
+                line: cursor_from.line,
+                ch: cursor_from.ch + linkText.length
+            };
+
+            // Move cursor to the position right after the link
+            editor.setCursor(newCursorPos);
+        }
+    }
+
+	async open_attachments_folder_cb() {
 
 		// // Monkey-path file explorer to hide attachment folders
 		// patchFileExplorer(this);
@@ -1113,148 +1257,5 @@ export default class ImportAttachments extends Plugin {
 		// Open the folder in the system's default file explorer
 		// eslint-disable-next-line @typescript-eslint/no-var-requires
 		require('electron').remote.shell.openPath(Utils.makePosixPathOScompatible(absAttachmentsFolderPath));
-	}
-
-	// Function to insert links to the imported files in the editor
-	insertLinkToEditor(importedFilePath: string, editor: Editor, md_file: string, importSettings: ImportSettingsInterface, counter?: number) {
-
-		/*
-		let relativePath;
-		switch (this.settings.linkFormat) {
-			case LinkFormat.RELATIVE:
-				relativePath = relative(currentNoteFolderPath, importedFilePath);
-				break;
-			case LinkFormat.ABSOLUTE:
-			default:
-				relativePath = relative(this.vaultPath, importedFilePath);
-				break;
-		}
-		*/
-
-		let prefix = '';
-		let postfix = '';
-		if (counter) {
-            // if multiple files are imported
-			switch (this.settings.multipleFilesImportType) {
-				case MultipleFilesImportTypes.BULLETED:
-					prefix = '- ';
-					postfix = '\n';
-					break;
-				case MultipleFilesImportTypes.NUMBERED:
-					prefix = `${counter}. `;
-					postfix = '\n';
-					break;
-				case MultipleFilesImportTypes.INLINE:
-					if (counter > 1) {
-						// if it is not the first item
-						prefix = '\n\n';
-					}
-					break;
-			}
-		}
-
-        // Get the current selection
-        const main_selection = editor.cm.state.selection.main;
-        
-    	const file = Utils.createMockTFile(this.app.vault,importedFilePath);
-		const filename = file.name;
-		const customDisplayText = (():string=>{
-            let text="";
-            if(this.settings.customDisplayText) {
-                text = filename;
-            }
-            // if a single file is imported
-            if(!counter)
-            {
-                if(this.settings.useSelectionForDisplayText) {
-                    // Extract the selected text
-                    // const selectedText_alt = editor.getSelection();
-                    const selectedText = editor.cm.state.doc.sliceString(main_selection.from, main_selection.to);
-                    
-                    // If the user has selected some text, this will be used for the display text 
-                    if(selectedText.length>0) text = selectedText;
-                }
-            }
-            return text;
-        })();
-		
-		const generatedLink = this.app.fileManager.generateMarkdownLink(file,md_file,undefined,(this.settings.customDisplayText) ? customDisplayText : undefined);
-
-		const MDLink_regex = new RegExp('^(!)?(\\[[^\\]]*\\])(.*)$');
-		const WikiLink_regex = new RegExp('^(!)?(.*?)(|[^|]*)?$');
-		
-		const useMarkdownLinks = this.app.vault.getConfig("useMarkdownLinks");
-
-		let offset;
-		let processedLink;
-		let selectDisplayedText = false;
-		if(useMarkdownLinks) { // MD links
-			// Perform the match
-			const match = generatedLink.match(MDLink_regex);
-
-			offset = generatedLink.length;
-			processedLink = generatedLink;
-			if(match) {
-				offset = 1;
-				processedLink = "[" + customDisplayText + "]" + match[3];
-				selectDisplayedText = true;
-			}
-		} else { // Wiki links
-			// Perform the match
-			const match = generatedLink.match(WikiLink_regex);
-
-			offset = generatedLink.length;
-			processedLink = generatedLink;
-			if(match) {
-				offset = match[2].length;
-				processedLink = match[2] + (match[3] ? match[3] : "");
-				selectDisplayedText = true;
-			}
-		}
-
-		if (importSettings.embed) {
-			prefix = prefix + '!';
-		}
-
-		const linkText = prefix + processedLink + postfix;
-
-		const cursor_from = editor.getCursor("from");  // Get the current cursor position before insertion
-        const cursor_to = editor.getCursor("to");  // Get the current cursor position before insertion
-        
-        // Insert the link text at the current cursor position
-		editor.replaceRange(linkText, cursor_from, cursor_to);
-
-		if (counter == 0) {
-			if (selectDisplayedText) {
-				// Define the start and end positions for selecting 'baseName' within the inserted link
-				const startCursorPos = {
-					line: cursor_to.line,
-					ch: cursor_to.ch + offset + prefix.length,
-				};
-				const endCursorPos = {
-					line: cursor_to.line,
-					ch: startCursorPos.ch + customDisplayText.length,
-				};
-				
-				// Set the selection range to highlight 'baseName'
-				editor.setSelection(startCursorPos, endCursorPos);
-			} else {
-				const newCursorPos = {
-					line: cursor_to.line,
-					ch: cursor_to.ch + linkText.length
-				};
-
-				// Move cursor to the position right after the link
-				editor.setCursor(newCursorPos);
-			}
-		} else {
-			const newCursorPos = {
-				line: cursor_from.line,
-				ch: cursor_from.ch + linkText.length
-			};
-
-			// Move cursor to the position right after the link
-			editor.setCursor(newCursorPos);
-		}
 	}
 }
