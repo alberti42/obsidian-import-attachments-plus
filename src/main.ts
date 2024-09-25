@@ -557,7 +557,7 @@ export default class ImportAttachments extends Plugin {
             return pos;
         })();
 
-        if(!cursorIdx) return;
+        if(cursorIdx===null) return;
 
         const line = doc.lineAt(cursorIdx);
         const lineContent = line.text;
