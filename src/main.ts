@@ -17,6 +17,7 @@ import {
     TFile,
     MenuItem,
     EditorPosition,
+    WorkspaceWindow,
 } from "obsidian";
 
 // Import utility and modal components
@@ -69,7 +70,7 @@ export default class ImportAttachments extends Plugin {
     // mechanism to prevent calling the callback multiple times when renaming attachments associated with a markdown note
     private renameCallbackEnabled: boolean = true;
     private file_menu_cb_registered: boolean = false;
-    private file_menu_embedded_cb_registered: boolean = false;
+    private file_menu_embedded_cb_registered_docs:Map<Document, boolean> = new Map<Document, boolean>();;
     
 	constructor(app: App, manifest: PluginManifest) {
 		super(app, manifest);
@@ -269,11 +270,41 @@ export default class ImportAttachments extends Plugin {
         // Add delete menu in context menu of links
 	    this.addDeleteMenuForLinks(this.settings.showDeleteMenu);
 
-        // Add delete menu in context menu of embedded images
-        this.addDeleteMenuForEmbeddedImages(this.settings.showDeleteMenuForEmbedded);
+
+        // Register documents
+        this.registerDocuments();
 
 		console.log('Loaded plugin Import Attachments+');
 	}
+
+    registerDocuments() {
+        this.file_menu_embedded_cb_registered_docs.set(document,false); // we add the current document to the tracked docs by default as unregistered
+        if(this.settings.showDeleteMenuForEmbedded) {
+            this.addDeleteMenuForEmbeddedImages(document);
+        }
+
+        this.app.workspace.on("window-open", (_:WorkspaceWindow, window:Window) => {
+            const doc = window.document;
+            if(!this.file_menu_embedded_cb_registered_docs.has(doc)) {
+                // Add the doc to the tracked docs
+                this.file_menu_embedded_cb_registered_docs.set(doc,false); // we add it to the map by default as unregistered
+            }
+            if(this.settings.showDeleteMenuForEmbedded) {
+                // Add delete menu in context menu of embedded images
+                this.addDeleteMenuForEmbeddedImages(doc);    
+            }
+        });
+
+        this.app.workspace.on("window-close", (_:WorkspaceWindow, window:Window) => {
+            const doc = window.document;
+            if(this.file_menu_embedded_cb_registered_docs.has(doc)) {
+                // Remove delete menu in context menu of embedded images
+                this.removeDeleteMenuForEmbeddedImages(doc);
+                // Remove the doc from the tracked docs
+                this.file_menu_embedded_cb_registered_docs.delete(doc);
+            }
+        });
+    }
 
     addCommands() {
         // Command for importing as a standard link
@@ -345,7 +376,7 @@ export default class ImportAttachments extends Plugin {
         this.addDeleteMenuForLinks(false);
 
         // remove delete menu for embedded graphics
-        this.addDeleteMenuForEmbeddedImages(false);
+        this.removeDeleteMenuForEmbeddedImages("all");
 	}
 
     addDeleteMenuForLinks(status:boolean) {
@@ -360,15 +391,46 @@ export default class ImportAttachments extends Plugin {
         }
     }
 
-    addDeleteMenuForEmbeddedImages(status:boolean) {
-        if(status && !this.file_menu_embedded_cb_registered) {
-            // Register context menu for embedded graphics
-            document.addEventListener("contextmenu", this.context_menu_cb);
-            this.file_menu_embedded_cb_registered = true;
+    addDeleteMenuForEmbeddedImages(doc:Document | "all") {
+        const registerDoc = (d:Document) => {
+            d.addEventListener("contextmenu", this.context_menu_cb);
+            this.file_menu_embedded_cb_registered_docs.set(d,true);
+            // console.log("REGISTERED");
+            // console.log(d);
+        };
+
+        if(doc==="all") {
+            this.file_menu_embedded_cb_registered_docs.forEach((status:boolean, d:Document) => {
+                if(status===false) {  // then we register it
+                    registerDoc(d);
+                }
+            });
         } else {
-            if(this.file_menu_embedded_cb_registered) {
-                document.removeEventListener("contextmenu", this.context_menu_cb);
-                this.file_menu_embedded_cb_registered = false;
+            const status = this.file_menu_embedded_cb_registered_docs.get(doc);
+            if(status===undefined || status===false) { // then we register it
+                registerDoc(doc);
+            }
+        }
+    }
+
+    removeDeleteMenuForEmbeddedImages(doc:Document|"all") {
+        const unregisterDoc = (d:Document) => {
+            d.removeEventListener("contextmenu", this.context_menu_cb);
+            this.file_menu_embedded_cb_registered_docs.set(d,false);
+            // console.log("UNREGISTERED");
+            // console.log(d);
+        };
+
+        if(doc==="all") {
+            this.file_menu_embedded_cb_registered_docs.forEach((status:boolean, d:Document) => {
+                if(status===true) {  // then we register it
+                    unregisterDoc(d);
+                }
+            });
+        } else {
+            const status = this.file_menu_embedded_cb_registered_docs.get(doc);
+            if(status===true) {
+                unregisterDoc(doc);
             }
         }
     }

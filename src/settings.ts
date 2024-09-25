@@ -319,7 +319,12 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.showDeleteMenuForEmbedded)
                 .onChange(async (value: boolean) => {
                     this.plugin.settings.showDeleteMenuForEmbedded = value;
-                    this.plugin.addDeleteMenuForEmbeddedImages(value);
+                    if(value) {
+                        this.plugin.addDeleteMenuForEmbeddedImages("all");   
+                    } else {
+                        this.plugin.removeDeleteMenuForEmbeddedImages("all");
+                    }
+                    
                     this.debouncedSaveSettings();
                 })
             });
