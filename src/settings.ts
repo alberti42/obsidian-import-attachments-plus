@@ -471,56 +471,57 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                 });
         }
 
-        new Setting(containerEl).setName('Commands and hotkeys').setHeading();
+            if (Platform.isDesktopApp) {
 
-        new Setting(containerEl).setName(createFragment((frag:DocumentFragment) => {
-                frag.appendText("The plugin offers a range of commands to import attachments as well. \
-                    You can review the commands and customize them with hotkeys by visiting the ");
-                const em = createEl('em');
-                const link = frag.createEl('a', { href: '#', text: 'Hotkeys'});
-                link.onclick = () => {
+            new Setting(containerEl).setName('Commands and hotkeys').setHeading();
 
-                    // Create a MutationObserver to monitor changes in the settings container
-                    const observer = new MutationObserver((mutations: MutationRecord[], observer: MutationObserver) => {
-                        let doBreak = false;
-                        for (const mutation of mutations) {
-                            // Loop through added nodes to check if the desired element has been added
-                            mutation.addedNodes.forEach((node) => {
-                                if (!doBreak && node instanceof HTMLElement && node.querySelector('.search-input-container.mod-hotkey input')) {
-                                    const searchInput = node.querySelector('.search-input-container.mod-hotkey input') as HTMLInputElement;
-                                    if (searchInput) {
-                                        // Set the text to be passed to the input field
-                                        searchInput.value = 'import-attachments-plus';
+            new Setting(containerEl).setName(createFragment((frag:DocumentFragment) => {
+                    frag.appendText("The plugin offers a range of commands to import attachments as well. \
+                        You can review the commands and customize them with hotkeys by visiting the ");
+                    const em = createEl('em');
+                    const link = frag.createEl('a', { href: '#', text: 'Hotkeys'});
+                    link.onclick = () => {
 
-                                        // Trigger an input event to simulate the text being typed
-                                        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        // Create a MutationObserver to monitor changes in the settings container
+                        const observer = new MutationObserver((mutations: MutationRecord[], observer: MutationObserver) => {
+                            let doBreak = false;
+                            for (const mutation of mutations) {
+                                // Loop through added nodes to check if the desired element has been added
+                                mutation.addedNodes.forEach((node) => {
+                                    if (!doBreak && node instanceof HTMLElement && node.querySelector('.search-input-container.mod-hotkey input')) {
+                                        const searchInput = node.querySelector('.search-input-container.mod-hotkey input') as HTMLInputElement;
+                                        if (searchInput) {
+                                            // Set the text to be passed to the input field
+                                            searchInput.value = 'import-attachments-plus';
 
-                                        // Stop searching
-                                        doBreak = true;
+                                            // Trigger an input event to simulate the text being typed
+                                            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+                                            // Stop searching
+                                            doBreak = true;
+                                        }
                                     }
-                                }
-                            });
-                            if(doBreak) break;
-                        }
-                        // Stop observing
-                        observer.disconnect();
-                    });
+                                });
+                                if(doBreak) break;
+                            }
+                            // Stop observing
+                            observer.disconnect();
+                        });
 
-                    // Start observing the settings pane for child nodes being added
-                    observer.observe(this.app.setting.tabContentContainer, {
-                        childList: true,
-                        subtree: true
-                    });
+                        // Start observing the settings pane for child nodes being added
+                        observer.observe(this.app.setting.tabContentContainer, {
+                            childList: true,
+                            subtree: true
+                        });
 
-                    this.app.setting.openTabById('hotkeys');
-                };
+                        this.app.setting.openTabById('hotkeys');
+                    };
 
-                em.appendChild(link);
-                frag.appendChild(em);
-                frag.appendText(' configuration pane.');
-            }));
-
-
+                    em.appendChild(link);
+                    frag.appendChild(em);
+                    frag.appendText(' configuration pane.');
+                }));
+        }
     }
 
     cleanUpAttachmentFolderSettings(): void {
