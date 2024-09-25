@@ -532,85 +532,93 @@ export default class ImportAttachments extends Plugin {
     }
 
     async delete_file_cb(file_src:TFile,target?:HTMLElement) {
-        // Find the current Markdown editor where the click happened
-        const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-        if(!activeView) return;
-        const editorView = activeView.editor;
-        if(!editorView) return;
+        let wasCallPromptForDeletionReached = false;
+        try {
+            // Find the current Markdown editor where the click happened
+            const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+            if(!activeView) return;
+            const editorView = activeView.editor;
+            if(!editorView) return;
 
-        // Get the CodeMirror instance
-        const codemirror = editorView.cm
-        const selection = codemirror.state.selection.main;
-        const doc = codemirror.state.doc;
+            // Get the CodeMirror instance
+            const codemirror = editorView.cm
+            const selection = codemirror.state.selection.main;
+            const doc = codemirror.state.doc;
 
-        // Get the position at the mouse event's coordinates or at the current cursor
-        const cursorIdx = (():number|null => {
-            let pos:number|null
-            if(target) {
-                pos = codemirror.posAtDOM(target);
-            } else {
-                pos = selection.head;  // equivalent to editorView.getCursor()
-            }
-            if(pos!==null) {
-                pos = Math.clamp(pos,0,doc.length);
-            }
-            return pos;
-        })();
+            // Get the position at the mouse event's coordinates or at the current cursor
+            const cursorIdx = (():number|null => {
+                let pos:number|null
+                if(target) {
+                    pos = codemirror.posAtDOM(target);
+                } else {
+                    pos = selection.head;  // equivalent to editorView.getCursor()
+                }
+                if(pos!==null) {
+                    pos = Math.clamp(pos,0,doc.length);
+                }
+                return pos;
+            })();
 
-        if(cursorIdx===null) return;
+            if(cursorIdx===null) return;
 
-        const line = doc.lineAt(cursorIdx);
-        const lineContent = line.text;
-        
-        const position:EditorPosition = {
-            line: line.number - 1,
-            ch: cursorIdx - line.from
-        };
-        
-        // Regular expression to match Markdown image/external links
-        const regex = /\!?\[\[\s*(.*?)\s*(?:\|.*?)?\]\]|\!?\[.*?\]\(([^\s]+)\)/g;
-        let match;
-        let found = false;
-
-        // Loop through all matches in the line
-        while ((match = regex.exec(lineContent)) !== null) {
+            const line = doc.lineAt(cursorIdx);
+            const lineContent = line.text;
             
-            const startIdx = match.index;
-            const endIdx = startIdx + match[0].length;
+            const position:EditorPosition = {
+                line: line.number - 1,
+                ch: cursorIdx - line.from
+            };
             
-            // Check if the link encompasses the current position in the line
-            // It is certain that that linkPosInLine will be somewhere inside the
-            // the link but it is not always at the beginning. So, we can be sure
-            // only the link on which we clicked will be removed.
-            if (position.ch >= startIdx && position.ch <= endIdx) {
-                const fileInVault = (():TFile|null=>{
-                    let file_path:string;
-                    if (match[1]) {
-                        // Wiki link `![[...]]` was matched
-                        file_path = match[1];
-                    } else { // match[2]
-                        // Wiki link `![...](...)` was matched
-                        file_path = decodeURIComponent(match[2]);
-                    }
-                    return this.app.vault.getFileByPath(file_path);
+            // Regular expression to match Markdown image/external links
+            const regex = /\!?\[\[\s*(.*?)\s*(?:\|.*?)?\]\]|\!?\[.*?\]\(([^\s]+)\)/g;
+            let match;
+            
+            // Loop through all matches in the line
+            while ((match = regex.exec(lineContent)) !== null) {
+                
+                const startIdx = match.index;
+                const endIdx = startIdx + match[0].length;
+                
+                // Check if the link encompasses the current position in the line
+                // It is certain that that linkPosInLine will be somewhere inside the
+                // the link but it is not always at the beginning. So, we can be sure
+                // only the link on which we clicked will be removed.
+                if (position.ch >= startIdx && position.ch <= endIdx) {
+                    const fileInVault = (():TFile|null=>{
+                        let file_path:string;
+                        if (match[1]) {
+                            // Wiki link `![[...]]` was matched
+                            file_path = match[1];
+                        } else { // match[2]
+                            // Wiki link `![...](...)` was matched
+                            file_path = decodeURIComponent(match[2]);
+                        }
+                        return this.app.vault.getFileByPath(file_path);
 
-                })();
+                    })();
 
-                if (fileInVault && fileInVault === file_src) {
-                    // Delete the file with user prompt
-                    const wasDeleted = await callPromptForDeletion(file_src);
-                    
-                    if(wasDeleted && this.settings.removeWikilinkOnFileDeletion) {
-                        // Replace the range corresponding to the found link
-                        editorView.replaceRange('', { line: line.number - 1, ch: startIdx }, { line: line.number - 1, ch: endIdx });
+                    if (fileInVault && fileInVault === file_src) {
+                        wasCallPromptForDeletionReached = true;
+                        // Delete the file with user prompt
+                        const wasDeleted = await callPromptForDeletion(file_src);
+                        
+                        if(wasDeleted && this.settings.removeWikilinkOnFileDeletion) {
+                            // Replace the range corresponding to the found link
+                            editorView.replaceRange('', { line: line.number - 1, ch: startIdx }, { line: line.number - 1, ch: endIdx });
+                        }                        
+                        break;
                     }
-                    found = true;
-                    break;
                 }
             }
-        }
-        if (!found) {
-            console.error("No matching link found at the click position.");
+        } finally {
+            if(!wasCallPromptForDeletionReached) {
+                // something went wrong when trying to identify the position of the link in the note
+                // sometimes this happens because we are visualizing a Dataview content and there is no real link in the note to be deleted
+                console.error("No matching link found at the click position.");
+                
+                // let's continue with deleting the file 
+                const wasDeleted = await callPromptForDeletion(file_src);
+            }
         }
     }
 
