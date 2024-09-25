@@ -18,6 +18,7 @@ import {
     MenuItem,
     EditorPosition,
     WorkspaceWindow,
+    WorkspaceLeaf,
 } from "obsidian";
 
 // Import utility and modal components
@@ -270,19 +271,39 @@ export default class ImportAttachments extends Plugin {
         // Add delete menu in context menu of links
 	    this.addDeleteMenuForLinks(this.settings.showDeleteMenu);
 
-
         // Register documents
         this.registerDocuments();
 
 		console.log('Loaded plugin Import Attachments+');
 	}
 
-    registerDocuments() {
-        this.file_menu_embedded_cb_registered_docs.set(document,false); // we add the current document to the tracked docs by default as unregistered
-        if(this.settings.showDeleteMenuForEmbedded) {
-            this.addDeleteMenuForEmbeddedImages(document);
-        }
+    private iterateOverAllDocuments(fnc_cb:((doc:Document)=>void)) {
+        this.app.workspace.iterateAllLeaves((leaf:WorkspaceLeaf)=>{
+            const doc = leaf.view.containerEl.ownerDocument;
+            fnc_cb(doc);
+        });
+    }
 
+    private registerDocuments() {
+        // We first register the current document. It is important to do so
+        // because at the launch, there are no leaves yet.
+        this.addDeleteMenuForEmbeddedImages(document);
+
+        // We scan through all leaves and look for other open documents.
+        // This is important if the plugin is disabled and reenabled, and there multiple
+        // windows open.
+        this.iterateOverAllDocuments((doc:Document) => {
+            if(!this.file_menu_embedded_cb_registered_docs.has(doc)) {
+                // Add the doc to the tracked docs by default as unregistered
+                this.file_menu_embedded_cb_registered_docs.set(doc,false);
+                if(this.settings.showDeleteMenuForEmbedded) {
+                    // Add delete menu in context menu of embedded images
+                    this.addDeleteMenuForEmbeddedImages(doc);    
+                }
+            }
+        });
+
+        // Add handler to keep track of opened windows
         this.app.workspace.on("window-open", (_:WorkspaceWindow, window:Window) => {
             const doc = window.document;
             if(!this.file_menu_embedded_cb_registered_docs.has(doc)) {
@@ -295,6 +316,7 @@ export default class ImportAttachments extends Plugin {
             }
         });
 
+        // Add handler to keep track of opened windows
         this.app.workspace.on("window-close", (_:WorkspaceWindow, window:Window) => {
             const doc = window.document;
             if(this.file_menu_embedded_cb_registered_docs.has(doc)) {
