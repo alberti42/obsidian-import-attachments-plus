@@ -19,6 +19,7 @@ import {
     isLinkType,
     isAttachmentFolderLocationType,
     AttachmentFolderLocationType,
+    isHotkeysSettingTab,
 } from './types';
 
 import { updateVisibilityAttachmentFolders } from "patchFileExplorer";
@@ -481,40 +482,10 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                     const em = createEl('em');
                     const link = frag.createEl('a', { href: '#', text: 'Hotkeys'});
                     link.onclick = () => {
-
-                        // Create a MutationObserver to monitor changes in the settings container
-                        const observer = new MutationObserver((mutations: MutationRecord[], observer: MutationObserver) => {
-                            let doBreak = false;
-                            for (const mutation of mutations) {
-                                // Loop through added nodes to check if the desired element has been added
-                                mutation.addedNodes.forEach((node) => {
-                                    if (!doBreak && node instanceof HTMLElement && node.querySelector('.search-input-container.mod-hotkey input')) {
-                                        const searchInput = node.querySelector('.search-input-container.mod-hotkey input') as HTMLInputElement;
-                                        if (searchInput) {
-                                            // Set the text to be passed to the input field
-                                            searchInput.value = 'import-attachments-plus';
-
-                                            // Trigger an input event to simulate the text being typed
-                                            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-
-                                            // Stop searching
-                                            doBreak = true;
-                                        }
-                                    }
-                                });
-                                if(doBreak) break;
-                            }
-                            // Stop observing
-                            observer.disconnect();
-                        });
-
-                        // Start observing the settings pane for child nodes being added
-                        observer.observe(this.app.setting.tabContentContainer, {
-                            childList: true,
-                            subtree: true
-                        });
-
-                        this.app.setting.openTabById('hotkeys');
+                        const tab = this.app.setting.openTabById('hotkeys');
+                        if(isHotkeysSettingTab(tab)) {
+                            tab.setQuery(this.plugin.manifest.id)
+                        }
                     };
 
                     em.appendChild(link);

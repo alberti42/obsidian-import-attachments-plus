@@ -81,7 +81,15 @@ declare module 'obsidian' {
 	}
 
 	interface Setting {
-		openTabById(id: string): void;
+		openTabById(id: string): SettingTab;
         tabContentContainer:HTMLElement;
 	}
+    interface SettingTab {
+        id: string;
+        name: string;
+        navEl: HTMLElement;
+    }
+    interface HotkeysSettingTab extends SettingTab {
+        setQuery: (str: string) => void;
+    }
 }

@@ -1,6 +1,7 @@
 // types.ts
 
 import { DEFAULT_SETTINGS } from "default";
+import { HotkeysSettingTab } from "obsidian";
 
 export enum ImportActionType {
 	MOVE='MOVE',
@@ -194,4 +195,9 @@ export interface ImportAttachmentsSettings_1_3_0 extends Omit<ImportAttachmentsS
   relativeLocation: RelativeLocation;
   folderPath: string;
   linkFormat: LinkFormat_1_3_0;
+}
+
+export function isHotkeysSettingTab(obj: unknown): obj is HotkeysSettingTab {
+    // Check if `obj` is an object and has the `setQuery` method
+    return typeof obj === 'object' && obj !== null && 'setQuery' in obj && typeof (obj as HotkeysSettingTab).setQuery === 'function';
 }
