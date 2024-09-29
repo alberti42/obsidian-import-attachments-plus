@@ -61,6 +61,8 @@ import { EditorSelection } from '@codemirror/state';
 
 import { ImportAttachmentsSettingTab } from 'settings';
 
+class DeleteLinkError extends Error {}
+
 // Main plugin class
 export default class ImportAttachments extends Plugin {
 	settings: ImportAttachmentsSettings = { ...DEFAULT_SETTINGS };
@@ -531,18 +533,15 @@ export default class ImportAttachments extends Plugin {
         }
     }
 
-    async delete_file_cb(file_src:TFile,target?:HTMLElement) {
-        let wasCallPromptForDeletionReached = false;
+    async delete_file_cb(file_src:TFile,target?:HTMLElement):Promise<boolean> {
         try {
             // Find the current Markdown editor where the click happened
             const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-            if(!activeView) return;
+            if(activeView===null) throw new DeleteLinkError("not active view of type 'MarkdownView' was found");
             const editorView = activeView.editor;
-            if(!editorView) return;
-
+            
             // Get the CodeMirror instance
             const codemirror = editorView.cm
-            const selection = codemirror.state.selection.main;
             const doc = codemirror.state.doc;
 
             // Get the position at the mouse event's coordinates or at the current cursor
@@ -551,7 +550,7 @@ export default class ImportAttachments extends Plugin {
                 if(target) {
                     pos = codemirror.posAtDOM(target);
                 } else {
-                    pos = selection.head;  // equivalent to editorView.getCursor()
+                    pos = codemirror.state.selection.main.head;  // equivalent to editorView.getCursor()
                 }
                 if(pos!==null) {
                     pos = Math.clamp(pos,0,doc.length);
@@ -559,7 +558,7 @@ export default class ImportAttachments extends Plugin {
                 return pos;
             })();
 
-            if(cursorIdx===null) return;
+            if(cursorIdx===null) throw new DeleteLinkError("could not determine the link position in the MarkDown note");
 
             const line = doc.lineAt(cursorIdx);
             const lineContent = line.text;
@@ -568,12 +567,12 @@ export default class ImportAttachments extends Plugin {
                 line: line.number - 1,
                 ch: cursorIdx - line.from
             };
-            
+
             // Regular expression to match Markdown image/external links
             const regex = /\!?\[\[\s*(.*?)\s*(?:\|.*?)?\]\]|\!?\[.*?\]\(([^\s]+)\)/g;
             let match;
-            
-            // Loop through all matches in the line
+
+            // Loop through all links in the line
             while ((match = regex.exec(lineContent)) !== null) {
                 
                 const startIdx = match.index;
@@ -594,32 +593,41 @@ export default class ImportAttachments extends Plugin {
                             file_path = decodeURIComponent(match[2]);
                         }
                         return this.app.vault.getFileByPath(file_path);
-
                     })();
 
-                    if (fileInVault && fileInVault === file_src) {
-                        wasCallPromptForDeletionReached = true;
-                        // Delete the file with user prompt
-                        const wasDeleted = await callPromptForDeletion(file_src);
-                        
-                        if(wasDeleted && this.settings.removeWikilinkOnFileDeletion) {
-                            // Replace the range corresponding to the found link
-                            editorView.replaceRange('', { line: line.number - 1, ch: startIdx }, { line: line.number - 1, ch: endIdx });
-                        }                        
-                        break;
+                    if (fileInVault && fileInVault !== file_src) {
+                        throw new DeleteLinkError(`after parsing the link, file '${file_src.path}' was found in the vault, but does not match with clicked file '${file_src.path}'`);
                     }
+                
+                    // Delete the file with user prompt
+                    const wasDeleted = await callPromptForDeletion(file_src);
+                    
+                    // Remove the link only if the file was actually deleted by the user and
+                    // the user has chosen to remove the link once the file has been deleted
+                    if(wasDeleted && this.settings.removeWikilinkOnFileDeletion) {
+                        // Replace the range corresponding to the found link with empty string
+                        editorView.replaceRange('', { line: line.number - 1, ch: startIdx }, { line: line.number - 1, ch: endIdx });
+                    }          
+
+                    // Success              
+                    return true;
                 }
             }
-        } finally {
-            if(!wasCallPromptForDeletionReached) {
+            throw new DeleteLinkError(`no link was found at the line number ${line.number} containing: ${lineContent}`);
+        } catch(err) {
+            if(!(err instanceof DeleteLinkError)) {
+                // some major, unexpected error occurred
+                throw err;
+            } else {
                 // something went wrong when trying to identify the position of the link in the note
                 // sometimes this happens because we are visualizing a Dataview content and there is no real link in the note to be deleted
-                console.error("No matching link found at the click position.");
+                console.error(`No matching link found at the click position: ${err.message}`);
                 
-                // let's continue with deleting the file 
-                const wasDeleted = await callPromptForDeletion(file_src);
+                // let's finally delete the file despite the fact that we were not able to remove the link
+                await callPromptForDeletion(file_src);
             }
         }
+        return false;
     }
 
     async delete_img_cb(evt: MouseEvent, target:HTMLElement) {
