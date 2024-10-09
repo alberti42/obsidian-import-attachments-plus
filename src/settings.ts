@@ -435,10 +435,11 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                 .setDesc(createFragment((frag) => {
                     frag.appendText('Choose how to name the imported attachments, using the following variables as a placeholder:');
                     const ul = frag.createEl('ul');
-                    ul.createEl('li', { text: '${original} for the name of the original file' });
+                    ul.createEl('li', { text: '${original} for the original name (omitting file extension) of the imported attachment files' });
                     ul.createEl('li', { text: '${date} for the current date' })
                     ul.createEl('li', { text: '${uuid} for a 128-bit Universally Unique Identifier' })
                     ul.createEl('li', { text: '${md5} for a MD5 hash of the imported file' });
+                    frag.appendText('Note that the file extension of the imported attachments is preserved.')
                 }))
                 .addText(text => {
                     text.setPlaceholder('Enter attachment name');
@@ -530,7 +531,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
             .setDesc(createFragment((frag) => {
                 frag.appendText('Place newly created attachment files, such as images created via drag-and-drop or audio recordings, in this folder.  Use the following variables as a placeholder:');
                 const ul = frag.createEl('ul');
-                ul.createEl('li', { text: '${notename} for the name of the original file' });
+                ul.createEl('li', { text: '${notename} for the name of the MarkDown note into which the attachment files will be imported' });
             })).addText(text => {
                 text.setPlaceholder('Example: folder 1/folder');
                 text.setValue(this.plugin.settings.attachmentFolderPath);
