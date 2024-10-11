@@ -170,8 +170,8 @@ export default class ImportAttachments extends Plugin {
                     const match = foldername.match(regex);
 
                     if (match && match[1]) {
-                        const noteName = normalizePath(Utils.joinPaths(dir,match[1])+".md");
-                        return Utils.doesFileExist(this.app.vault,noteName);
+                        const noteName = normalizePath(Utils.joinPaths(dir,match[1]));
+                        return Utils.doesFileExist(this.app.vault,noteName+".md") || Utils.doesFileExist(this.app.vault,noteName+".canvas");
                     } else {
                         // No match found
                         return false;
@@ -742,7 +742,7 @@ export default class ImportAttachments extends Plugin {
             md_file = Utils.parseFilePath(md_active_file.path);
         }
 
-        if (md_file.ext !== ".md") {
+        if(md_file.ext !== ".md" && md_file.ext !== ".canvas") {
             throw new Error("No Markdown file was provided.");
         }
         
@@ -806,6 +806,7 @@ export default class ImportAttachments extends Plugin {
     }
 
     context_menu_cb(evt: MouseEvent) {
+        if(!(evt.view instanceof MarkdownView)) return;
         if(!(evt.target instanceof HTMLElement)) return;
         const target:HTMLElement = evt.target;
         const tagName:string = target.tagName;
@@ -841,7 +842,7 @@ export default class ImportAttachments extends Plugin {
         if (!this.settings.autoRenameAttachmentFolder) { return }
 
             const oldPath_parsed = Utils.parseFilePath(oldPath);
-            if (oldPath_parsed.ext !== ".md") { return }
+            if (oldPath_parsed.ext !== ".md" && oldPath_parsed.ext !== ".canvas") { return }
 
             const oldAttachmentFolderPath = this.getAttachmentFolderOfMdNote(oldPath_parsed);
             if (!oldAttachmentFolderPath) { return }

@@ -48,7 +48,7 @@ async function modifiedPromptForDeletion(this: FileManager, file: TAbstractFile)
             // In order to avoid deleting common attachment folders, shared between multiple notes
             if (plugin.settings.attachmentFolderPath.includes('${notename}')) {
                 const file_parsed = Utils.parseFilePath(file.path);
-                if (file_parsed.ext === ".md") {
+                if (file_parsed.ext === ".md" || file_parsed.ext === ".canvas") {
                     const attachmentFolder = plugin.app.vault.getAbstractFileByPath(plugin.getAttachmentFolderOfMdNote(file_parsed));
                     if(attachmentFolder instanceof TFolder) {
                         const postDescription_text = attachmentFolder.children.length > 0 ?
