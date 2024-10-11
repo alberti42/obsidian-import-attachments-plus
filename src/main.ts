@@ -511,6 +511,7 @@ export default class ImportAttachments extends Plugin {
                 .onClick((_:MouseEvent | KeyboardEvent)=> {
                     this.delete_file_cb(file);
                 });
+                item.dom.classList.add("is-warning");
             });
 
             const moveDeleteOptionNextToRename = false;
@@ -806,7 +807,12 @@ export default class ImportAttachments extends Plugin {
     }
 
     context_menu_cb(evt: MouseEvent) {
-        if(!(evt.view instanceof MarkdownView)) return;
+        const activeLeaf = this.app.workspace.activeLeaf;
+        if (activeLeaf) {
+            const view = activeLeaf.view;
+            const viewType = view.getViewType();
+            if(viewType != 'markdown') return;
+        }
         if(!(evt.target instanceof HTMLElement)) return;
         const target:HTMLElement = evt.target;
         const tagName:string = target.tagName;
@@ -829,6 +835,7 @@ export default class ImportAttachments extends Plugin {
                     .onClick(() => {
                         this.delete_img_cb(evt,target);
                     });
+                item.dom.classList.add("is-warning");
             });
 
             // Add more context menu items as needed
