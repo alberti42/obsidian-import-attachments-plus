@@ -77,6 +77,19 @@ export async function hashFile(filePath: string): Promise<string> {
 	}
 }
 
+export function hashArrayBuffer(buffer: ArrayBuffer): string {
+    const hash = crypto.createHash('md5');
+    
+    // Convert ArrayBuffer to Buffer, which can be used with crypto
+    const bufferData = Buffer.from(buffer);
+
+    // Update the hash with the buffer data
+    hash.update(bufferData);
+
+    // Return the hex digest of the hash
+    return hash.digest('hex');
+}
+
 function formatDateTime(dateFormat:string):string {
 	try {
 		// use of Moment.js to format the current date

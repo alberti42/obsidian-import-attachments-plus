@@ -255,15 +255,15 @@ export default class ImportAttachments extends Plugin {
 
 		// Register event handlers for drag-and-drop and paste events
 		if (Platform.isDesktopApp) {
-			this.registerEvent( // check obsidian.d.ts for other types of events
-				this.app.workspace.on('editor-drop', this.editor_drop_cb)
-            );
+			// this.registerEvent( // check obsidian.d.ts for other types of events
+			// 	this.app.workspace.on('editor-drop', this.editor_drop_cb)
+            // );
 		}
 
 		if (Platform.isDesktopApp) {
-			this.registerEvent(
-				this.app.workspace.on('editor-paste', this.editor_paste_cb)
-			);
+			// this.registerEvent(
+			// 	this.app.workspace.on('editor-paste', this.editor_paste_cb)
+			// );
 		}
 
 		this.registerEvent(
@@ -733,7 +733,7 @@ export default class ImportAttachments extends Plugin {
 
 
     // Get attachment folder path based on current note
-    getAttachmentFolderOfMdNote(md_file?: ParsedPath | undefined): string { 
+    getAttachmentFolderOfMdNote(md_file?: ParsedPath): string { 
         // Get the current active note if md_file is not provided
         if (md_file===undefined) {
             const md_active_file = this.app.workspace.getActiveFile();
@@ -773,7 +773,7 @@ export default class ImportAttachments extends Plugin {
         return attachmentsFolderPath;           
     }
 
-    async createAttachmentName(originalFilePath:string, data: File | ArrayBuffer, md_file?: ParsedPath | undefined): Promise<string> {
+    async createAttachmentName(originalFilePath:string, md_file?: ParsedPath, data?:ArrayBuffer): Promise<string> {
 
         const originalFilePath_parsed = Utils.parseFilePath(originalFilePath);
         const namePattern = this.settings.attachmentName;
@@ -785,10 +785,10 @@ export default class ImportAttachments extends Plugin {
                                         .replace(/\$\{uuid\}/g, Utils.uuidv4())
                                         .replace(/\$\{date\}/g, Utils.formatDateTime(dateFormat));
 
-        if(namePattern.includes('${md5}')) {
+        if(data && namePattern.includes('${md5}')) {
             let hash = ''
             try {
-                hash = await Utils.hashFile(originalFilePath);
+                hash = await Utils.hashArrayBuffer(data);
             } catch (err: unknown) {
                 console.error('Error hashing the file:', err);
             }
@@ -846,13 +846,13 @@ export default class ImportAttachments extends Plugin {
     }
 
     async editor_rename_cb(newFile: TAbstractFile, oldPath: string) {
-        if (!this.settings.autoRenameAttachmentFolder) { return }
+        if (!this.settings.autoRenameAttachmentFolder) return;
 
             const oldPath_parsed = Utils.parseFilePath(oldPath);
-            if (oldPath_parsed.ext !== ".md" && oldPath_parsed.ext !== ".canvas") { return }
+            if (oldPath_parsed.ext !== ".md" && oldPath_parsed.ext !== ".canvas") return;
 
             const oldAttachmentFolderPath = this.getAttachmentFolderOfMdNote(oldPath_parsed);
-            if (!oldAttachmentFolderPath) { return }
+            if (!oldAttachmentFolderPath) return;
             if (Utils.doesFolderExist(this.app.vault,oldAttachmentFolderPath)) {
                 const newAttachmentFolderPath = this.getAttachmentFolderOfMdNote(Utils.parseFilePath(newFile.path));
 
@@ -901,8 +901,9 @@ export default class ImportAttachments extends Plugin {
                     const doToggleEmbedPreference = false; // Pretend shift was not pressed
                     this.handleFiles(filesArray, editor, view, doToggleEmbedPreference, ImportOperationType.PASTE);
                 } else {
-                    // TODO Process images from clipboard
-                    //
+                    // Nothing to do, let Obsidian handle the case of pasted graphics.
+                    // The file name will be suggested through the monkey-patched function `getAvailablePathForAttachments`.
+
                     // const t = Array.from(files);
                     // console.log(t);
                     // console.log(clipboardData);
@@ -911,7 +912,7 @@ export default class ImportAttachments extends Plugin {
                     // console.log(clipboardData.items);
                     // console.log(clipboardData.types);
                     // const arrayBuffer = await t[0].arrayBuffer();
-                    // fs.appendFile("/Users/andrea/Downloads/tst.png", Buffer.from(arrayBuffer));
+                    // fs.appendFile("path/test.png", Buffer.from(arrayBuffer));
                 }
             }
             // console.error("No files detected in paste data.");
