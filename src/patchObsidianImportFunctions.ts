@@ -2,12 +2,12 @@
 
 /* eslint-disable @typescript-eslint/no-inferrable-types */
 
-import { App, Vault, Attachment, TFile, TFolder, DataWriteOptions, Platform, ClipboardManagerPrototypes, ClipboardManager, MarkdownFileInfo, MarkdownView } from 'obsidian';
+import { App, Vault, Attachment, TFile, TFolder, DataWriteOptions, Platform, ClipboardManagerPrototypes, ClipboardManager, MarkdownFileInfo, MarkdownView, DraggableObject, DraggableFile, DraggableFiles, DraggableLink, DraggableBookmarks, DraggableHeading, BookmarkItem, BookmarkFileItem } from 'obsidian';
 import ImportAttachments from 'main';
 
-import * as Utils from 'utils';
+import { EditorSelection } from '@codemirror/state';
+
 import * as fs from 'fs';  // This imports the promises API from fs
-import { getFips } from 'crypto';
 
 // Save a reference to the original method for the monkey patch
 let originalGetAvailablePathForAttachments: ((fileName: string, extension: string, currentFile: TFile | null, data?: ArrayBuffer) => Promise<string>) | null = null;
@@ -19,6 +19,7 @@ let originalInsertFiles:((files: Attachment[]) => Promise<void>) | null = null;
 let originalHandleDropIntoEditor:((event: DragEvent) => string | null) | null = null;
 let originalHandlePaste:((event: ClipboardEvent)=>boolean) | null = null;
 let originalHandleDataTransfer:((dataTransfer: DataTransfer | null) => string | null) | null = null;
+let originalHandleDrop:((event: DragEvent) => boolean) | null = null;
 
 let plugin: ImportAttachments;
 
@@ -88,6 +89,11 @@ function unpatchObsidianImportFunctions() {
     if(originalHandleDataTransfer) {
         clipboardManagerProto.handleDataTransfer = originalHandleDataTransfer;
         originalHandleDataTransfer = null;
+    }
+
+    if(originalHandleDrop) {
+        clipboardManagerProto.handleDrop = originalHandleDrop;
+        originalHandleDrop = null;
     }
 }
 
@@ -248,7 +254,7 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
         originalInsertFiles = clipboardManagerProto.insertFiles;
     }
 
-    clipboardManagerProto.insertFiles = async function (files: Attachment[]): Promise<void> {
+    clipboardManagerProto.insertFiles = async function (this:ClipboardManager, files: Attachment[]): Promise<void> {
         if (!originalInsertFiles) {
             throw new Error("Could not execute the original insertFiles function.");
         }
@@ -265,8 +271,8 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
             const isLastFile = t < files.length - 1;  // Check if this is the last file in the list
 
             // If the file has an existing path, resolve the file in the vault and embed it
-            if (filepath && plugin.app.vault.resolveFilePath(filepath)) {
-                const resolvedFile = plugin.app.vault.resolveFilePath(filepath);  // Resolve file in the vault
+            if (filepath && this.app.vault.resolveFilePath(filepath)) {
+                const resolvedFile = this.app.vault.resolveFilePath(filepath);  // Resolve file in the vault
                 this.insertAttachmentEmbed(resolvedFile, isLastFile);  // Embed the attachment in the editor
                 continue;  // Move to the next file
             }
@@ -513,11 +519,11 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
                 const filePath = droppedItems[i].filepath;
                 if (filePath) {
                     // Try to resolve the file path within the vault
-                    const resolvedFile = plugin.app.vault.resolveFilePath(filePath);
+                    const resolvedFile = this.app.vault.resolveFilePath(filePath);
                     
                     if (resolvedFile) {
                         // If the file exists in the vault, generate a markdown link for it
-                        fileLinks.push(plugin.app.fileManager.generateMarkdownLink(resolvedFile, this.info.file?.path || ""));
+                        fileLinks.push(this.app.fileManager.generateMarkdownLink(resolvedFile, this.getPath()));
                     } else {
                         // If the file is not in the vault, treat it as an external file and create a link
                         const filename = getBaseName(cleanUpPath(filePath));
@@ -550,6 +556,195 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
 
         return null; // No action taken
     };
+
+    function isDraggableFile(draggable:DraggableObject): draggable is DraggableFile {
+        if (typeof draggable !== 'object' || draggable === null) {
+            return false;
+        }
+        return draggable.type === "file";
+    }
+
+    function isDraggableFiles(draggable:DraggableObject): draggable is DraggableFiles {
+        if (typeof draggable !== 'object' || draggable === null) {
+            return false;
+        }
+        return draggable.type === "files";
+    }
+
+    function isDraggableLink(draggable:DraggableObject): draggable is DraggableLink {
+        if (typeof draggable !== 'object' || draggable === null) {
+            return false;
+        }
+        return draggable.type === "link";
+    }
+
+    function isDraggableBookmarks(draggable:DraggableObject): draggable is DraggableBookmarks {
+        if (typeof draggable !== 'object' || draggable === null) {
+            return false;
+        }
+        return draggable.type === "bookmarks";
+    }
+
+    function isDraggableHeading(draggable:DraggableObject): draggable is DraggableHeading {
+        if (typeof draggable !== 'object' || draggable === null) {
+            return false;
+        }
+        return draggable.type === "heading";
+    }
+
+    function isBookmarkFileItem(item:BookmarkItem): item is BookmarkFileItem {
+        if (typeof item !== 'object' || item === null) {
+            return false;
+        }
+        return item.type === "file";
+    }
+
+    const cleanHeading_regex = /([:#|^\\\r\n]|%%|\[\[|]])/g;
+
+    function cleanHeading(heading: string): string {
+        return heading.replace(cleanHeading_regex, " ").replace(/\s+/g, " ").trim();
+    }
+
+    function processPath(input: string): { path: string; subpath: string } {
+        // Define the regular expression to replace non-breaking spaces with a regular space
+        const nonbreaking_spaces = /\u00A0/g;
+
+        // Replace non-breaking spaces with a space and normalize the string to NFC
+        const normalizedInput = input.replace(nonbreaking_spaces, " ").normalize("NFC");
+
+        // Split the input by the first occurrence of "#", and take the part before the "#"
+        const path = normalizedInput.split("#")[0];
+        
+        // Get the subpath, which is the portion of the string after the main path
+        const subpath = normalizedInput.substr(path.length);
+
+        return {
+            path,
+            subpath
+        };
+    }
+
+    function generateMarkdownLinkForDraggedObjects(app: App, draggable: DraggableObject, path: string): string[] {
+        const fileManager = app.fileManager;
+        const vault = app.vault;
+
+        // Handle different draggable types
+        if (isDraggableFile(draggable)) {
+            return [fileManager.generateMarkdownLink(draggable.file, path)];
+        }
+
+        if (isDraggableFiles(draggable)) {
+            const links: string[] = [];
+            for (let file of draggable.files) {
+                if (file instanceof TFile) {
+                    links.push(fileManager.generateMarkdownLink(file, path));
+                }
+            }
+            return links;
+        }
+
+        if (isDraggableLink(draggable)) {
+            if (draggable.file) {
+                const subpath = processPath(draggable.linktext).subpath;
+                return [fileManager.generateMarkdownLink(draggable.file, path, subpath)];
+            }
+            return [draggable.linktext];
+        }
+
+        if (isDraggableHeading(draggable)) {
+            const headingSubpath = cleanHeading(draggable.heading.heading);
+            return [fileManager.generateMarkdownLink(draggable.file, path, "#" + headingSubpath)];
+        }
+
+        if (isDraggableBookmarks(draggable)) {
+            const links: string[] = [];
+            for (let itemWrapper of draggable.items) {
+                const item = itemWrapper.item;
+                if (isBookmarkFileItem(item)) {
+                    const subpath = item.subpath;
+                    const title = item.title;
+                    const file = vault.getAbstractFileByPath(item.path);
+                    if (file instanceof TFile) {
+                        links.push(fileManager.generateMarkdownLink(file, path, subpath, title));
+                    }
+                }
+            }
+            return links;
+        }
+
+        return [];
+    }
+
+    if(!originalHandleDrop) {
+        originalHandleDrop = clipboardManagerProto.handleDrop;
+    }
+
+    // Handles the drop event when files or other objects are dropped into the editor
+    clipboardManagerProto.handleDrop = function patchedHandleDrop(this: ClipboardManager, event: DragEvent): boolean {
+
+        if (!originalHandleDrop) {
+            throw new Error("Could not execute the original handleDrop function.");
+        }
+
+        // debugger
+        // return originalHandleDrop.call(this,event);
+
+        const app = this.app;
+        const info = this.info;
+        let contentToInsert: string | null = null;
+
+        const draggable = app.dragManager.draggable;
+
+        // Check if a draggable object exists
+        if (draggable) {
+            // If `info` is an instance of `EX` and the Shift (on macOS) or Alt key (on others) is pressed
+            if (info instanceof MarkdownView && (Platform.isMacOS ? event.shiftKey : event.altKey)) {
+                event.preventDefault(); // Prevent the default behavior
+                info.handleDrop(event, draggable, false);
+                return true; // Event handled
+            }
+
+            // Generate markdown links or other content based on the dragged object
+            contentToInsert = generateMarkdownLinkForDraggedObjects(app, draggable, this.getPath()).join("\n");
+        } else {
+            // Trigger an "editor-drop" event if not prevented and handle the drop event
+            if (event.defaultPrevented || this.app.workspace.trigger("editor-drop", event, this.info.editor, this.info), event.defaultPrevented) {
+                return true;
+            }
+
+            // Handle text or other content from the drop
+            if (!event.shiftKey) {
+                contentToInsert = this.handleDataTransfer(event.dataTransfer);
+            }
+
+            // If no content was extracted, attempt to handle it as an editor drop
+            if (!contentToInsert) {
+                contentToInsert = this.handleDropIntoEditor(event);
+            }
+        }
+
+        // Get the active editor and position the drop based on mouse coordinates
+        const editor = info.editor.activeCM;
+        const dropPos = editor.posAtCoords({
+                x: event.clientX,
+                y: event.clientY
+            });
+        if(!dropPos) return false;
+
+        editor.dispatch({
+            selection: EditorSelection.single(dropPos)
+        });
+
+        // If content is a string, insert it into the editor
+        if (typeof contentToInsert === 'string') {
+            editor.dispatch(editor.state.replaceSelection(contentToInsert)); // Insert content at the selection
+            editor.focus(); // Focus the editor after inserting content
+            event.preventDefault(); // Prevent default drop behavior
+            return true; // Event handled
+        }
+
+        return false; // Event not handled
+    }
 
     if (!originalHandlePaste) {
         originalHandlePaste = clipboardManagerProto.handlePaste;
@@ -597,14 +792,6 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
 
         return false; // Return false if no paste action was performed
     }
-
-    // function sanitizeHtmlContent(html: string): DocumentFragment {
-    //     // Assuming NM.sanitize sanitizes the HTML content and HM is the configuration object
-    //     // NM.sanitize is used to clean the HTML according to some sanitization rules (defined in HM)
-    //     // document.importNode is used to import the sanitized content as a DocumentFragment
-    // 
-    //     return document.importNode(NM.sanitize(html, HM), true);
-    // }
 
     if (!originalHandleDataTransfer) {
         originalHandleDataTransfer = clipboardManagerProto.handleDataTransfer;

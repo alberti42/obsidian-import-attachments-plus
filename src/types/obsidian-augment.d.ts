@@ -30,11 +30,12 @@ declare module 'obsidian' {
     // Define the interface for ClipboardManager
     interface ClipboardManager extends ClipboardManagerPrototypes {
         app: App;  // Obsidian App instance
-        info: MarkdownFileInfo;  // Information about the markdown file being edited
+        info: MarkdownView;  // Information about the markdown file being edited
     }
 
     interface MarkdownView {
         handlePaste(event: ClipboardEvent): boolean;
+        handleDrop(event: DragEvent, draggable:DraggableObject, flag:boolean): boolean;
     }
 
     interface ClipboardManagerPrototypes {
@@ -71,9 +72,48 @@ declare module 'obsidian' {
     interface DraggableObject {
         type: string;          // The type of the draggable item (in this case, 'file')
         icon: string;          // The icon associated with the draggable item (likely used for UI)
-        title: string;         // The name or title of the item being dragged
-        file: TFile;           // The actual file object being dragged
-        source?: string;       // The source of the drag (could be undefined or e.g. bookmarks)
+        title: string         // The name or title of the item being dragged
+    }
+
+    interface DraggableFile extends DraggableObject {
+        type: "file";
+        source?: string;
+        file: TFile;          // The actual file object being dragged
+    }
+
+    interface DraggableFiles extends DraggableObject {
+        type: "files";
+        files: TFile[];          // The actual file object being dragged
+        source?: string;
+    }
+
+    interface DraggableLink extends DraggableObject {
+        type: "link"
+        file?: TFile;          // The actual file object being dragged
+        linktext: string;
+    }
+
+    interface BookmarkItem {
+        type: string;
+        title: string;
+    }
+
+    interface BookmarkFileItem extends BookmarkItem {
+         subpath:string;
+         path:string;
+    }
+
+    interface DraggableBookmarks extends DraggableObject {
+        type: "bookmarks"
+        items: {item: BookmarkItem}[];     // The array of bookmarks
+        source: string;
+    }
+
+    interface DraggableHeading extends DraggableObject {
+        type: "heading";
+        heading: {heading:string,level:number,position:unknown}
+        source: string;
+        file: TFile;          // The actual file object being dragged
     }
 
     interface DragManager {
@@ -159,6 +199,7 @@ declare module 'obsidian' {
 
 	interface Editor {
 		cm: EditorView;
+        activeCM: EditorView;
 	}
 
 	interface FileExplorerItem {
