@@ -39,11 +39,11 @@ import { sep, posix } from 'path';
 import { patchOpenFile, unpatchOpenFile, addKeyListeners, removeKeyListeners } from 'patchOpenFile';
 import { callPromptForDeletion, patchFilemanager, unpatchFilemanager } from 'patchFileManager';
 
-import { patchObsidianImportFunctions, unpatchObsidianImportFunctions } from "patchObsidianImportFunctions";
 import { patchFileExplorer, unpatchFileExplorer } from "patchFileExplorer";
 import { monkeyPatchConsole, unpatchConsole } from "patchConsole";
 
 import * as importFunctions from "importFunctions"
+import * as patchObsidianImportFunctions from "patchObsidianImportFunctions"
 
 import { DEFAULT_SETTINGS, DEFAULT_SETTINGS_1_3_0 } from "default";
 // import { debug } from "console";
@@ -76,8 +76,11 @@ export default class ImportAttachments extends Plugin {
 			console.log("Import Attachments+: development mode including extra logging and debug features");
 		}
 
-        // Configure module import function
-        importFunctions.initialize(this);
+        // Configure module providing import function
+        importFunctions.setPlugin(this);
+
+        // Configure module patching Obisidan import function
+        patchObsidianImportFunctions.setPlugin(this);
 
         // Bind the callback functions
         this.file_menu_cb = this.file_menu_cb.bind(this);
@@ -243,7 +246,7 @@ export default class ImportAttachments extends Plugin {
 
 		// Monkey patches of the vault function
 		if (Platform.isDesktopApp) {
-			patchObsidianImportFunctions(this);
+			patchObsidianImportFunctions.patchObsidianImportFunctions(this);
 		}
 
 		// Monkey-patch file manager to handle the deletion of the attachment folder
@@ -393,7 +396,7 @@ export default class ImportAttachments extends Plugin {
 		unpatchFilemanager();
 
 		// unpatch Vault
-		unpatchObsidianImportFunctions();
+		patchObsidianImportFunctions.unpatchObsidianImportFunctions();
 
 		// unpatch file-explorer plugin
 		unpatchFileExplorer();

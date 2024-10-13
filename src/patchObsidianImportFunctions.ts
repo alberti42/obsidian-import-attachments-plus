@@ -2,7 +2,7 @@
 
 /* eslint-disable @typescript-eslint/no-inferrable-types */
 
-import { App, Vault, Attachment, TFile, TFolder, DataWriteOptions } from 'obsidian';
+import { App, Vault, Attachment, TFile, TFolder, DataWriteOptions, ClipboardManager } from 'obsidian';
 import ImportAttachments from 'main';
 
 import * as Utils from 'utils';
@@ -15,6 +15,30 @@ let originalSaveAttachment: ((fileName: string, fileExtension: string, fileData:
 let originalImportAttachments: ((attachments: Attachment[], targetFolder: TFolder | null) => Promise<TFile[]>) | null = null;
 let originalCreateBinary: ((path: string, data: ArrayBuffer, options?: DataWriteOptions) => Promise<TFile>) | null = null;
 let originalResolveFilePath: ((filepath: string) => TFile|null) | null = null;
+
+let plugin: ImportAttachments;
+
+let clipboardManagerProto: ClipboardManager;
+
+export function setPlugin(p:ImportAttachments) {
+    plugin = p;
+}
+
+function getClipboardManager() {
+    let editorManager = plugin.app.embedRegistry.embedByExtension.md({
+        app: plugin.app,
+        containerEl: createDiv(),
+        state: {}
+    }, null, "");
+    editorManager.load();
+    editorManager.editable = true;
+    editorManager.showEditor();
+
+    clipboardManagerProto = Object.getPrototypeOf(editorManager.editMode.clipboardManager);
+    editorManager.unload();
+
+    // console.log(clipboardManagerProto);
+}
 
 function unpatchObsidianImportFunctions() {
     if (originalResolveFilePath) {
@@ -44,6 +68,8 @@ function unpatchObsidianImportFunctions() {
 }
 
 function patchObsidianImportFunctions(plugin: ImportAttachments) {
+
+    getClipboardManager();
 
     if (!originalResolveFilePath) {
         originalResolveFilePath = Vault.prototype.resolveFilePath;
