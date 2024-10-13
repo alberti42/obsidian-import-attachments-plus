@@ -15,6 +15,7 @@ let originalSaveAttachment: ((fileName: string, fileExtension: string, fileData:
 let originalImportAttachments: ((attachments: Attachment[], targetFolder: TFolder | null) => Promise<TFile[]>) | null = null;
 let originalCreateBinary: ((path: string, data: ArrayBuffer, options?: DataWriteOptions) => Promise<TFile>) | null = null;
 let originalResolveFilePath: ((filepath: string) => TFile|null) | null = null;
+let originalInsertFiles:((files: Attachment[]) => Promise<void>) | null = null;
 
 let plugin: ImportAttachments;
 
@@ -64,6 +65,11 @@ function unpatchObsidianImportFunctions() {
     if(originalImportAttachments) {
         App.prototype.importAttachments = originalImportAttachments;
         originalImportAttachments = null;
+    }
+
+    if(originalInsertFiles) {
+        clipboardManagerProto.insertFiles = originalInsertFiles;
+        originalInsertFiles = null;
     }
 }
 
@@ -219,6 +225,46 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
 		// Return the created file
 		return attachmentName;
 	}
+
+    if (!originalInsertFiles) {
+        originalInsertFiles = clipboardManagerProto.insertFiles;
+    }
+
+    clipboardManagerProto.insertFiles = async function (files: Attachment[]): Promise<void> {
+        if (!originalInsertFiles) {
+            throw new Error("Could not execute the original insertFiles function.");
+        }
+
+        // await originalInsertFiles.apply(this,[files]);
+
+        // Loop through each file in the `files` array
+        for (let t = 0; t < files.length; t++) {
+            const file = files[t];
+            const name = file.name;           // Get the file name
+            const extension = file.extension; // Get the file extension
+            const filepath = file.filepath;   // Get the file path (if it exists)
+            let data = file.data;             // Get the file data (could be a promise with binary data)
+            const isLastFile = t < files.length - 1;  // Check if this is the last file in the list
+
+            // If the file has an existing path, resolve the file in the vault and embed it
+            if (filepath && plugin.app.vault.resolveFilePath(filepath)) {
+                const resolvedFile = plugin.app.vault.resolveFilePath(filepath);  // Resolve file in the vault
+                this.insertAttachmentEmbed(resolvedFile, isLastFile);  // Embed the attachment in the editor
+                continue;  // Move to the next file
+            }
+
+            // If the file doesn't have a path, process the data (await the promise if necessary)
+            if (data instanceof Promise) {
+                data = await data;  // Await the resolution of the promise (binary data)
+            }
+
+            // If data exists after the promise is resolved, save the attachment
+            if (data) {
+                await this.saveAttachment(name, extension, data, isLastFile);
+            }
+        }
+
+    }
 }
 
 export { patchObsidianImportFunctions, unpatchObsidianImportFunctions };

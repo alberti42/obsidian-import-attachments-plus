@@ -40,7 +40,7 @@ declare module 'obsidian' {
             data: ArrayBuffer | string, 
             isLastFile: boolean
         ): Promise<void>;  // Saves an attachment to the vault or editor
-        insertAttachmentEmbed(file: TFile, isLastFile: boolean): void;  // Inserts an attachment embed into the editor
+        insertAttachmentEmbed(file: TFile|null, isLastFile: boolean): void;  // Inserts an attachment embed into the editor
     }
 
     interface EmbedContainer {

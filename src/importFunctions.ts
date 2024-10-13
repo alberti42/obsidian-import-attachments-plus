@@ -16,11 +16,8 @@ export function setPlugin(p:ImportAttachments) {
     plugin = p;
 }
 
+// no longer used
 export async function editor_drop_cb(evt: DragEvent, editor: Editor, view: MarkdownView | MarkdownFileInfo) {
-
-}
-
-export async function editor_drop_cb1(evt: DragEvent, editor: Editor, view: MarkdownView | MarkdownFileInfo) {
 
     // Check if the event has already been handled
     if (evt.defaultPrevented) return;
@@ -83,10 +80,6 @@ export async function editor_drop_cb1(evt: DragEvent, editor: Editor, view: Mark
 }
 
 export async function editor_paste_cb(evt: ClipboardEvent, editor: Editor, view: MarkdownView | MarkdownFileInfo) {
-
-}
-
-export async function editor_paste_cb1(evt: ClipboardEvent, editor: Editor, view: MarkdownView | MarkdownFileInfo) {
 
     // Check if the event has already been handled
     if (evt.defaultPrevented) return;
