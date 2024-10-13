@@ -17,6 +17,8 @@ import {
     WorkspaceWindow,
     WorkspaceLeaf,
     Notice,
+    Editor,
+    MarkdownFileInfo,
 } from "obsidian";
 
 // Import utility and modal components
@@ -262,15 +264,18 @@ export default class ImportAttachments extends Plugin {
 		}
 
 		// Register event handlers for drag-and-drop and paste events
-		// if (Platform.isDesktopApp) {
-		// 	this.registerEvent( // check obsidian.d.ts for other types of events
-		// 		this.app.workspace.on('editor-drop', importFunctions.editor_drop_cb)
-        //     );
-		//
-        // 	this.registerEvent(
-		// 		this.app.workspace.on('editor-paste', importFunctions.editor_paste_cb)
-		// 	);
-		// }
+		if (Platform.isDesktopApp) {
+			this.registerEvent( // check obsidian.d.ts for other types of events
+				this.app.workspace.on('editor-drop', (evt: DragEvent, editor: Editor, view: MarkdownView | MarkdownFileInfo): void => {
+                    // console.log("VIEW");
+                    // console.log(view);
+                })
+            );
+		
+        	// this.registerEvent(
+			// 	this.app.workspace.on('editor-paste', importFunctions.editor_paste_cb)
+			// );
+		}
 
 		this.registerEvent(
 			this.app.vault.on('rename', this.editor_rename_cb)

@@ -22,11 +22,18 @@ declare module 'obsidian' {
         editMode: EditMode;
     }
 
+    // Define the interface for EditMode
     interface EditMode {
-        clipboardManager: ClipboardManager;
+        clipboardManager: ClipboardManager;  // ClipboardManager instance in EditMode
     }
 
-    interface ClipboardManager {
+    // Define the interface for ClipboardManager
+    interface ClipboardManager extends ClipboardManagerPrototypes {
+        app: App;  // Obsidian App instance
+        info: MarkdownFileInfo;  // Information about the markdown file being edited
+    }
+
+    interface ClipboardManagerPrototypes {
         getPath(): string;  // Retrieves the path associated with the clipboard manager
         handlePaste(event: ClipboardEvent): boolean;  // Handles paste events in the editor
         handleDragOver(event: DragEvent): void;  // Handles drag-over events in the editor
@@ -73,7 +80,7 @@ declare module 'obsidian' {
         name: string;        // The name of the attachment (e.g., "image.png")
         extension: string;   // The file extension (e.g., "png", "jpg")
         filepath?: string;   // The path of the file, if it already exists
-        data?: ArrayBuffer;  // The binary data of the attachment (if it's a new file)
+        data: Promise<ArrayBuffer|null> | (ArrayBuffer | null);  // The binary data of the attachment (if it's a new file)
     }
 
     interface TFolder {

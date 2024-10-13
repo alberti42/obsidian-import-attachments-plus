@@ -2,12 +2,12 @@
 
 /* eslint-disable @typescript-eslint/no-inferrable-types */
 
-import { App, Vault, Attachment, TFile, TFolder, DataWriteOptions, ClipboardManager } from 'obsidian';
+import { App, Vault, Attachment, TFile, TFolder, DataWriteOptions, Platform, ClipboardManagerPrototypes, ClipboardManager } from 'obsidian';
 import ImportAttachments from 'main';
 
 import * as Utils from 'utils';
-import { createAttachmentName } from 'importFunctions';
-import { resolve } from 'dns';
+import * as fs from 'fs';  // This imports the promises API from fs
+import { getFips } from 'crypto';
 
 // Save a reference to the original method for the monkey patch
 let originalGetAvailablePathForAttachments: ((fileName: string, extension: string, currentFile: TFile | null, data?: ArrayBuffer) => Promise<string>) | null = null;
@@ -16,10 +16,11 @@ let originalImportAttachments: ((attachments: Attachment[], targetFolder: TFolde
 let originalCreateBinary: ((path: string, data: ArrayBuffer, options?: DataWriteOptions) => Promise<TFile>) | null = null;
 let originalResolveFilePath: ((filepath: string) => TFile|null) | null = null;
 let originalInsertFiles:((files: Attachment[]) => Promise<void>) | null = null;
+let originalHandleDropIntoEditor:((event: DragEvent) => string | null) | null = null;
 
 let plugin: ImportAttachments;
 
-let clipboardManagerProto: ClipboardManager;
+let clipboardManagerProto: ClipboardManagerPrototypes;
 
 export function setPlugin(p:ImportAttachments) {
     plugin = p;
@@ -38,7 +39,7 @@ function getClipboardManager() {
     clipboardManagerProto = Object.getPrototypeOf(editorManager.editMode.clipboardManager);
     editorManager.unload();
 
-    // console.log(clipboardManagerProto);
+    console.log(clipboardManagerProto);
 }
 
 function unpatchObsidianImportFunctions() {
@@ -71,6 +72,11 @@ function unpatchObsidianImportFunctions() {
         clipboardManagerProto.insertFiles = originalInsertFiles;
         originalInsertFiles = null;
     }
+
+    if(originalHandleDropIntoEditor) {
+        clipboardManagerProto.handleDropIntoEditor = originalHandleDropIntoEditor;
+        originalHandleDropIntoEditor = null;
+    }
 }
 
 function patchObsidianImportFunctions(plugin: ImportAttachments) {
@@ -94,7 +100,7 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
         console.log("RESOLVED FILE");
         console.log(resolvedFile);
 
-        debugger
+        // debugger
         return resolvedFile;
     };
 
@@ -253,7 +259,7 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
                 continue;  // Move to the next file
             }
 
-            // If the file doesn't have a path, process the data (await the promise if necessary)
+            // If the file is not resolved in the vault, process the external data (await the promise if necessary)
             if (data instanceof Promise) {
                 data = await data;  // Await the resolution of the promise (binary data)
             }
@@ -263,8 +269,277 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
                 await this.saveAttachment(name, extension, data, isLastFile);
             }
         }
-
     }
+
+    function readFileFromFilepath(filePath: string): Promise<ArrayBuffer | null> {
+        return new Promise(async (resolve, reject) => {
+            try {
+                // Check if the 'fs' module is available and if the file exists
+                if (fs && fs.existsSync(filePath)) {
+                    // Read the file as a binary buffer using the promises API
+                    const data = await fs.promises.readFile(filePath);
+                    
+                    // Convert the buffer to an ArrayBuffer and resolve
+                    resolve(data.buffer);
+                } else {
+                    // If file doesn't exist, resolve with null
+                    resolve(null);
+                }
+            } catch (error) {
+                // In case of error, reject the promise
+                reject(error);
+            }
+        });
+    }
+
+    function readFileFromArrayBuffer(file: File): Promise<ArrayBuffer> {
+        return new Promise(async (resolve, reject) => {
+            // If the file object supports the arrayBuffer method (modern API)
+            if (file.arrayBuffer) {
+                try {
+                    const buffer = await file.arrayBuffer();  // Modern method to read the file
+                    resolve(buffer);
+                } catch (error) {
+                    reject(error);
+                }
+            } else {
+                // Fallback for older browsers using FileReader
+                const reader = new FileReader();
+
+                // Set up the onload event handler to resolve the promise with the ArrayBuffer
+                reader.onload = function(event: ProgressEvent<FileReader>) {
+                    if (event.target?.result) {
+                        resolve(event.target.result as ArrayBuffer);
+                    } else {
+                        reject(new Error('Failed to read file as ArrayBuffer'));
+                    }
+                };
+
+                // Set up error/abort handlers to reject the promise
+                reader.onabort = reader.onerror = function(event) {
+                    reject(event);
+                };
+
+                // Read the file as an ArrayBuffer
+                reader.readAsArrayBuffer(file);
+            }
+        });
+    }
+
+    function getBaseName(path: string): string {
+        const lastSlashIndex = path.lastIndexOf("/");
+        return lastSlashIndex === -1 ? path : path.slice(lastSlashIndex + 1);
+    }
+
+    function normalizePath(path: string): string {
+        return cleanUpPath(path).normalize("NFC");
+    }
+
+    function cleanUpPath(path: string): string {
+        // Replace multiple slashes with a single one and remove leading/trailing slashes
+        let cleanedPath = path.replace(/([\\/])+/g, "/").replace(/(^\/+|\/+$)/g, "");
+        
+        // If the resulting path is empty, return "/"
+        return cleanedPath === "" ? "/" : cleanedPath;
+    }
+
+    function extractArrayBuffer(typedArray: { buffer: ArrayBuffer; byteOffset: number; byteLength: number }): ArrayBuffer {
+        return typedArray.buffer.slice(typedArray.byteOffset, typedArray.byteOffset + typedArray.byteLength);
+    }
+
+    function getFileExtension(filename: string): string {
+        const lastDotIndex = filename.lastIndexOf(".");
+        return lastDotIndex === -1 || lastDotIndex === filename.length - 1 || lastDotIndex === 0 
+            ? "" 
+            : filename.substr(lastDotIndex + 1).toLowerCase();
+    }
+
+    function getFilenameRemovingExtension(filePath: string): string {
+        const baseName = getBaseName(filePath);  // Use the previously defined getBaseName function
+        const lastDotIndex = baseName.lastIndexOf(".");
+
+        return lastDotIndex === -1 || lastDotIndex === baseName.length - 1 || lastDotIndex === 0
+            ? baseName
+            : baseName.substr(0, lastDotIndex);  // Return the base name without the extension
+    }
+
+
+    function handleDataTransfer(dataTransfer: DataTransfer|null, sourceType: string, includeData: boolean, ): Attachment[] {
+        
+        if(!dataTransfer) return [] as Attachment[];
+
+        let attachments: Attachment[] = [];  // This will hold the resulting attachments
+
+        // Convert the items from the data transfer object into an array
+        let items = Array.from(dataTransfer.items);
+
+        // Iterate over each item in the data transfer object
+        for (let i = 0; i < items.length; i++) {
+            let file: File | null, item = items[i];
+
+            // If the item is a file
+            if (item.kind === "file") {
+                // Get the file object from the item
+                file = item.getAsFile();
+                if (file) {
+                    let filePath = (file as any).path || "";                  // Get the file path (or an empty string if none exists)
+                    let fileName = file.name;                                 // Get the file name
+                    let fileExtension = getFileExtension(fileName);           // Extract the file extension from the file name
+                    let baseName = (fileName);                                // Extract the base name (without extension)
+                    let fileData: Promise<ArrayBuffer | null> | null = null;  // Placeholder for the file's data (to be filled later)
+
+                    // If no file path exists, adjust the file extension and name based on the file type
+                    if (!filePath) {
+                        let fileType = file.type;
+                        if (fileType === "image/png") {
+                            fileExtension = "png";  // Set the extension to PNG
+                            baseName = "Pasted image";  // Rename it to "Pasted image"
+                        } else if (fileType === "image/jpeg") {
+                            fileExtension = "jpg";  // Set the extension to JPG
+                            baseName = "Pasted image";  // Rename it to "Pasted image"
+                        }
+                    }
+
+                    // If 'includeData' is true, prepare the file data
+                    if (includeData) {
+                        // If the file has a file path, load the data using `readFileFromFilepath`,
+                        // otherwise use `readFileFromArrayBuffer` to extract the binary data from the file object
+                        fileData = filePath ? readFileFromFilepath(filePath) : readFileFromArrayBuffer(file);
+                    }
+
+                    // Add the attachment to the array
+                    attachments.push({
+                        name: baseName,         // Base name of the file
+                        filepath: filePath,     // The file path (could be empty)
+                        extension: fileExtension,  // The file extension
+                        data: fileData          // Binary data or null
+                    });
+                }
+            }
+        }
+
+        // Handle special case for clipboard data on desktop apps (only if no files have been added)
+        if (sourceType === "clipboard" && attachments.length === 0 && Platform.isDesktopApp && !dataTransfer.getData("text/plain") /*&& !Ow.global.hasModifier("Shift")*/) {
+            // Special case: Handle pasting an image from the clipboard (for desktop apps)
+            let specialAttachment = (function() {
+                let electron = window.require('electron');
+                if (!electron) {
+                    return null;
+                }
+
+                let clipboard = electron.remote.clipboard;
+                let image = clipboard.readImage();
+
+                // If there's an image in the clipboard, convert it to PNG
+                if (image && !image.isEmpty()) {
+                    let pngData = extractArrayBuffer(image.toPNG());
+                    return {
+                        name: "Pasted image",       // Name it "Pasted image"
+                        extension: "png",           // Set extension to PNG
+                        data: Promise.resolve(pngData)  // Store the image data
+                    };
+                }
+
+                // Handle file paths from the clipboard (for Windows and macOS)
+                let filePath = "";
+                if (Platform.isWin) {
+                    filePath = clipboard.readBuffer("FileNameW").toString("ucs2").replace("\0", "");
+                } else if (Platform.isMacOS) {
+                    filePath = clipboard.read("public.file-url");
+                    if (filePath) {
+                        filePath = filePath.replace("file://", "");
+                        filePath = decodeURI(filePath);
+                    }
+                }
+
+                if (!filePath) {
+                    return null;
+                }
+
+                let baseName = getBaseName(normalizePath(filePath));   // Extract the file's base name
+                let fileExtension = getFileExtension(baseName);  // Get the file's extension
+
+                return {
+                    filepath: filePath,                                 // Store the full file path
+                    name: getFilenameRemovingExtension(baseName),       // Store the base name
+                    extension: fileExtension,                           // Store the file extension
+                    data: readFileFromFilepath(filePath)                // Read the binary data from the file
+                };
+            })();
+
+            // If a special attachment was created (e.g., image from clipboard), add it to the array
+            if (specialAttachment) {
+                attachments.push(specialAttachment);
+            }
+        }
+
+        return attachments;  // Return the array of attachments
+    }
+
+    if (!originalHandleDropIntoEditor) {
+        originalHandleDropIntoEditor = clipboardManagerProto.handleDropIntoEditor;
+    }
+
+    // Handles the drop event when files or objects are dropped into the editor, specifically within the editor content
+    clipboardManagerProto.handleDropIntoEditor = function(this: ClipboardManager, event: DragEvent): string | null {
+        if (!originalHandleDropIntoEditor) {
+            throw new Error("Could not execute the original handleDropIntoEditor function.");
+        }
+
+        // debugger
+        // return originalHandleDropIntoEditor.apply(this,[event]);
+        // debugger
+
+        // If the Alt key (on macOS) or Ctrl key (on other systems) is pressed, handle the drop in a specific way
+        if (Platform.isMacOS ? event.altKey : event.ctrlKey) {
+            const fileLinks = [];
+            const droppedItems = handleDataTransfer(event.dataTransfer, "drop", false); // Extract files from the drop data
+
+            // Loop through the dropped items to create links or embedded content
+            for (let i = 0; i < droppedItems.length; i++) {
+                const filePath = droppedItems[i].filepath;
+                if (filePath) {
+                    // Try to resolve the file path within the vault
+                    const resolvedFile = plugin.app.vault.resolveFilePath(filePath);
+                    
+                    if (resolvedFile) {
+                        // If the file exists in the vault, generate a markdown link for it
+                        fileLinks.push(plugin.app.fileManager.generateMarkdownLink(resolvedFile, this.info.file?.path || ""));
+                    } else {
+                        // If the file is not in the vault, treat it as an external file and create a link
+                        const filename = getBaseName(cleanUpPath(filePath));
+                        const fileExtension = getFileExtension(filename);
+                        const displayName = fileExtension === "md" ? getFilenameRemovingExtension(filename) : filename;
+                        const fileURL = "file:///" + filePath.replace(/^\/?/, "/"); // Convert path to file URL
+                        let markdownLink = `[${displayName}](${fileURL})`;
+
+                        // See https://help.obsidian.md/Files+and+folders/Accepted+file+formats
+                        const supported_image_extensions = ['bmp', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'avif'];
+
+                        // If the file is an image, prepend '!' for markdown image syntax
+                        if (supported_image_extensions.contains(fileExtension)) {
+                            markdownLink = "!" + markdownLink;
+                        }
+
+                        fileLinks.push(markdownLink); // Add the generated markdown link to the list
+                    }
+                }
+            }
+
+            // If no valid links were generated, return null; otherwise, return the links as a joined string
+            return fileLinks.length === 0 ? null : fileLinks.join("\n");
+        }
+
+        // If the Alt/Ctrl key is not pressed, handle regular file drops
+        const files = handleDataTransfer(event.dataTransfer, "drop", true); // Extract files from the drop data
+        if (files.length > 0) {
+            event.preventDefault(); // Prevent default behavior
+            this.insertFiles(files); // Insert the files into the editor
+            return null; // Event handled but no text to insert
+        }
+
+        return null; // No action taken
+    };
 }
 
 export { patchObsidianImportFunctions, unpatchObsidianImportFunctions };
