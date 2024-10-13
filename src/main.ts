@@ -245,8 +245,10 @@ export default class ImportAttachments extends Plugin {
 		// when the function promptForDeletion is triggered by the user
 		patchFilemanager(this);
 
-		// Monkey-path file explorer to hide attachment folders
-		patchFileExplorer(this);
+        this.app.workspace.onLayoutReady(() => {
+            // Monkey-path file explorer to hide attachment folders
+            patchFileExplorer(this);
+        });
 
 		// Commands for moving or copying files to the vault
 		if (Platform.isDesktopApp) {
