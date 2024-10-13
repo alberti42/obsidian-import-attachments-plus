@@ -2,10 +2,12 @@
 
 /* eslint-disable @typescript-eslint/no-inferrable-types */
 
-import { FileManager, TAbstractFile, Notice, TFolder } from 'obsidian';
+import { FileManager, TAbstractFile, Notice, TFolder, normalizePath } from 'obsidian';
 import ImportAttachments from 'main';
 import * as Utils from 'utils';
 import { DeleteAttachmentFolderModal } from './ImportAttachmentsModal';
+import { AttachmentFolderLocationType, ParsedPath } from 'types';
+import { getAttachmentFolderOfMdNote } from 'importFunctions';
 
 // Save a reference to the original method for the monkey patch
 let originalPromptForDeletion: ((file: TAbstractFile) => Promise<void>) | null = null;
@@ -35,6 +37,7 @@ async function patchedPromptForDeletion(this: FileManager, file: TAbstractFile):
     await modifiedPromptForDeletion.call(this,file);
 }
 
+
 async function modifiedPromptForDeletion(this: FileManager, file: TAbstractFile): Promise<boolean> {
     // Store the parent folder - IMPORTANT: we need to store it before the file is deleted with `callOriginalPromptForDeletion`
     const parent = file.parent;
@@ -49,7 +52,7 @@ async function modifiedPromptForDeletion(this: FileManager, file: TAbstractFile)
             if (plugin.settings.attachmentFolderPath.includes('${notename}')) {
                 const file_parsed = Utils.parseFilePath(file.path);
                 if (file_parsed.ext === ".md" || file_parsed.ext === ".canvas") {
-                    const attachmentFolder = plugin.app.vault.getAbstractFileByPath(plugin.getAttachmentFolderOfMdNote(file_parsed));
+                    const attachmentFolder = plugin.app.vault.getAbstractFileByPath(getAttachmentFolderOfMdNote(file_parsed));
                     if(attachmentFolder instanceof TFolder) {
                         const postDescription_text = attachmentFolder.children.length > 0 ?
                             `Note that the folder associated with the MarkDown note you have \

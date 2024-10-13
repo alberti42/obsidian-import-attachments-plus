@@ -4,9 +4,6 @@
 import {
 	App,
 	MarkdownView,
-	MarkdownFileInfo,
-	Editor,
-	Notice,
 	FileSystemAdapter,
 	Plugin,
 	TAbstractFile,
@@ -19,33 +16,25 @@ import {
     EditorPosition,
     WorkspaceWindow,
     WorkspaceLeaf,
+    Notice,
 } from "obsidian";
 
 // Import utility and modal components
-import { ImportActionTypeModal, OverwriteChoiceModal, ImportFromVaultChoiceModal, FolderImportErrorModal, CreateAttachmentFolderModal } from './ImportAttachmentsModal';
+import { CreateAttachmentFolderModal } from './ImportAttachmentsModal';
 import {
 	ImportActionType,
-	MultipleFilesImportTypes,
-	ImportOperationType,
 	ImportAttachmentsSettings,
-	ImportSettingsInterface,
-	OverwriteChoiceOptions,
-	ImportFromVaultOptions,
-	YesNoTypes,
-	RelativeLocation,
 	AttachmentFolderLocationType,
-	ParsedPath,
 	isSettingsLatestFormat,
 	isSettingsFormat_1_3_0,
 	ImportAttachmentsSettings_1_3_0,
     isSupportedMediaTag,
     MediaLabels,
+    RelativeLocation,
 } from './types';
 import * as Utils from "utils";
 
 import { sep, posix } from 'path';
-
-import { promises as fs } from 'fs';  // This imports the promises API from fs
 
 import { patchOpenFile, unpatchOpenFile, addKeyListeners, removeKeyListeners } from 'patchOpenFile';
 import { callPromptForDeletion, patchFilemanager, unpatchFilemanager } from 'patchFileManager';
@@ -54,12 +43,13 @@ import { patchObsidianImportFunctions, unpatchObsidianImportFunctions } from "pa
 import { patchFileExplorer, unpatchFileExplorer } from "patchFileExplorer";
 import { monkeyPatchConsole, unpatchConsole } from "patchConsole";
 
+import * as importFunctions from "importFunctions"
+
 import { DEFAULT_SETTINGS, DEFAULT_SETTINGS_1_3_0 } from "default";
 // import { debug } from "console";
 
-import { EditorSelection } from '@codemirror/state';
-
 import { ImportAttachmentsSettingTab } from 'settings';
+import { debounceFactoryWithWaitMechanism } from "utils";
 
 class DeleteLinkError extends Error {}
 
@@ -67,14 +57,17 @@ class DeleteLinkError extends Error {}
 export default class ImportAttachments extends Plugin {
 	settings: ImportAttachmentsSettings = { ...DEFAULT_SETTINGS };
 	vaultPath: string;
-	private settingsTab: ImportAttachmentsSettingTab;
+	public settingsTab: ImportAttachmentsSettingTab;
 	public matchAttachmentFolder: ((str:string)=>boolean) = (_:string) => true;
 
     // mechanism to prevent calling the callback multiple times when renaming attachments associated with a markdown note
-    private renameCallbackEnabled: boolean = true;
     private file_menu_cb_registered: boolean = false;
-    private file_menu_embedded_cb_registered_docs:Map<Document, boolean> = new Map<Document, boolean>();;
-    
+    private file_menu_embedded_cb_registered_docs:Map<Document, boolean> = new Map<Document, boolean>();
+
+    // Declare class methods that will be initialized in the constructor
+    public debouncedSaveSettings: (callback?: () => void) => void;
+    public waitForSaveToComplete: () => Promise<void>;
+
 	constructor(app: App, manifest: PluginManifest) {
 		super(app, manifest);
 
@@ -83,15 +76,27 @@ export default class ImportAttachments extends Plugin {
 			console.log("Import Attachments+: development mode including extra logging and debug features");
 		}
 
-		this.settingsTab = new ImportAttachmentsSettingTab(this.app, this);
+        // Configure module import function
+        importFunctions.setPlugin(this);
 
         // Bind the callback functions
         this.file_menu_cb = this.file_menu_cb.bind(this);
-        this.editor_drop_cb = this.editor_drop_cb.bind(this);
-        this.editor_paste_cb = this.editor_paste_cb.bind(this);
         this.editor_rename_cb = this.editor_rename_cb.bind(this);
         this.context_menu_cb = this.context_menu_cb.bind(this);
-        
+
+        // Set up debounced saving functions
+        const timeout_debounced_saving_ms = 100;
+        const { debouncedFct, waitFnc } = debounceFactoryWithWaitMechanism(
+            async (callback: () => void = (): void => {}) => {
+                await this.saveSettings();
+                if(callback) callback();
+            }, timeout_debounced_saving_ms);
+        this.debouncedSaveSettings = debouncedFct;
+        this.waitForSaveToComplete = waitFnc;
+
+        // Set up the setting pane
+        this.settingsTab = new ImportAttachmentsSettingTab(this.app, this);
+
 		// Store the path to the vault
 		if (Platform.isDesktopApp) {
 			// store the vault path
@@ -256,13 +261,13 @@ export default class ImportAttachments extends Plugin {
 		// Register event handlers for drag-and-drop and paste events
 		if (Platform.isDesktopApp) {
 			this.registerEvent( // check obsidian.d.ts for other types of events
-				this.app.workspace.on('editor-drop', this.editor_drop_cb)
+				this.app.workspace.on('editor-drop', importFunctions.editor_drop_cb)
             );
 		}
 
 		if (Platform.isDesktopApp) {
 			this.registerEvent(
-				this.app.workspace.on('editor-paste', this.editor_paste_cb)
+				this.app.workspace.on('editor-paste', importFunctions.editor_paste_cb)
 			);
 		}
 
@@ -335,7 +340,7 @@ export default class ImportAttachments extends Plugin {
         this.addCommand({
             id: "move-file-to-vault-link",
             name: "Move file to vault as linked attachment",
-            callback: () => this.choose_file_to_import_cb({
+            callback: () => importFunctions.choose_file_to_import_cb({
                 embed: false,
                 action: ImportActionType.MOVE,
             }),
@@ -345,7 +350,7 @@ export default class ImportAttachments extends Plugin {
         this.addCommand({
             id: "move-file-to-vault-embed",
             name: "Move file to vault as embedded attachment",
-            callback: () => this.choose_file_to_import_cb({
+            callback: () => importFunctions.choose_file_to_import_cb({
                 embed: true,
                 action: ImportActionType.MOVE,
             }),
@@ -355,7 +360,7 @@ export default class ImportAttachments extends Plugin {
         this.addCommand({
             id: "copy-file-to-vault-link",
             name: "Copy file to vault as linked attachment",
-            callback: () => this.choose_file_to_import_cb({
+            callback: () => importFunctions.choose_file_to_import_cb({
                 embed: false,
                 action: ImportActionType.COPY,
             }),
@@ -365,7 +370,7 @@ export default class ImportAttachments extends Plugin {
         this.addCommand({
             id: "copy-file-to-vault-embed",
             name: "Copy file to vault as embedded attachment",
-            callback: () => this.choose_file_to_import_cb({
+            callback: () => importFunctions.choose_file_to_import_cb({
                 embed: true,
                 action: ImportActionType.COPY,
             }),
@@ -731,85 +736,6 @@ export default class ImportAttachments extends Plugin {
 		}
 	}
 
-
-    // Get attachment folder path based on current note
-    getAttachmentFolderOfMdNote(md_file?: ParsedPath): string { 
-        // Get the current active note if md_file is not provided
-        if (md_file===undefined) {
-            const md_active_file = this.app.workspace.getActiveFile();
-            if (md_active_file === null) {
-                throw new Error("The active note could not be determined.");
-            }
-            md_file = Utils.parseFilePath(md_active_file.path);
-        }
-
-        if(md_file.ext !== ".md" && md_file.ext !== ".canvas") {
-            throw new Error("No Markdown file was provided.");
-        }
-        
-        const currentNoteFolderPath = md_file.dir;
-        const notename = md_file.filename;
-
-        const folderPath = this.settings.attachmentFolderPath.replace(/\$\{notename\}/g, notename);
-
-        let attachmentsFolderPath;
-        switch(this.settings.attachmentFolderLocation) {
-        case AttachmentFolderLocationType.CURRENT:
-            attachmentsFolderPath = currentNoteFolderPath;
-            break;
-        case AttachmentFolderLocationType.SUBFOLDER:
-            attachmentsFolderPath = Utils.joinPaths(currentNoteFolderPath, folderPath)
-            break;
-        case AttachmentFolderLocationType.ROOT:
-            attachmentsFolderPath = '/';
-            break;
-        case AttachmentFolderLocationType.FOLDER:
-            attachmentsFolderPath = folderPath
-            break;
-        }
-
-        attachmentsFolderPath = normalizePath(attachmentsFolderPath);
-
-        return attachmentsFolderPath;           
-    }
-
-    async createAttachmentName(originalFilePath:string, md_file?: ParsedPath, source?:ArrayBuffer | File): Promise<string> {
-
-        const originalFilePath_parsed = Utils.parseFilePath(originalFilePath);
-        const namePattern = this.settings.attachmentName;
-        const dateFormat = this.settings.dateFormat;
-        
-        const fileToImportName = originalFilePath_parsed.filename;
-        
-        let attachmentName = namePattern.replace(/\$\{original\}/g, fileToImportName)
-                                        .replace(/\$\{uuid\}/g, Utils.uuidv4())
-                                        .replace(/\$\{date\}/g, Utils.formatDateTime(dateFormat));
-
-        if(source && namePattern.includes('${md5}')) {
-            let hash = ''
-            try {
-                if(source instanceof ArrayBuffer) {
-                    hash = await Utils.hashArrayBuffer(source);
-                } else if(source instanceof File) {
-                    hash = await Utils.hashFile(source.path);
-                }
-            } catch (err: unknown) {
-                console.error('Error hashing the file:', err);
-            }
-            attachmentName = attachmentName.replace(/\$\{md5\}/g, hash);
-        }
-
-        // add the extension
-        attachmentName += originalFilePath_parsed.ext;
-
-        const attachmentsFolderPath = this.getAttachmentFolderOfMdNote(md_file);
-        
-        // Ensure the directory exists before moving the file
-        await Utils.createFolderIfNotExists(this.app.vault,attachmentsFolderPath);
-
-        return Utils.joinPaths(attachmentsFolderPath,attachmentName);
-    }
-
     context_menu_cb(evt: MouseEvent) {
         const activeLeaf = this.app.workspace.activeLeaf;
         if (activeLeaf) {
@@ -855,16 +781,15 @@ export default class ImportAttachments extends Plugin {
             const oldPath_parsed = Utils.parseFilePath(oldPath);
             if (oldPath_parsed.ext !== ".md" && oldPath_parsed.ext !== ".canvas") return;
 
-            const oldAttachmentFolderPath = this.getAttachmentFolderOfMdNote(oldPath_parsed);
+            const oldAttachmentFolderPath = importFunctions.getAttachmentFolderOfMdNote(oldPath_parsed);
             if (!oldAttachmentFolderPath) return;
             if (Utils.doesFolderExist(this.app.vault,oldAttachmentFolderPath)) {
-                const newAttachmentFolderPath = this.getAttachmentFolderOfMdNote(Utils.parseFilePath(newFile.path));
+                const newAttachmentFolderPath = importFunctions.getAttachmentFolderOfMdNote(Utils.parseFilePath(newFile.path));
 
                 const oldPath = oldAttachmentFolderPath;
                 const newPath = newAttachmentFolderPath;
                 
                 try {
-                    this.renameCallbackEnabled = false;
                     await this.renameFile(oldPath, newPath);
                 } catch (error: unknown) {
                     const msg = 'Failed to rename the attachment folder';
@@ -873,532 +798,9 @@ export default class ImportAttachments extends Plugin {
                     console.error("New attachment folder:", newPath);
                     console.error("Error msg:", error);
                     new Notice(msg + '.');
-                } finally {
-                    this.renameCallbackEnabled = true;
                 }
             }
         
-    }
-
-    async editor_paste_cb(evt: ClipboardEvent, editor: Editor, view: MarkdownView | MarkdownFileInfo) {
-        // Check if the event has already been handled
-        if (evt.defaultPrevented) return;
-
-        if (!(view instanceof MarkdownView)) {
-            console.error('No view provided')
-            return;
-        }
-
-        const clipboardData = evt.clipboardData;
-        if (clipboardData) {
-            const files = clipboardData.files;
-            // const items = clipboardData.items;
-
-            if (files && files.length > 0) {
-
-                // Check if all files have a non-empty 'path' property
-                const filesArray = Array.from(files);
-                const allFilesHavePath = filesArray.every(file => file.path && file.path !== "");
-                if(allFilesHavePath) {
-                    evt.preventDefault();
-
-                    const doToggleEmbedPreference = false; // Pretend shift was not pressed
-                    this.handleFiles(filesArray, editor, view, doToggleEmbedPreference, ImportOperationType.PASTE);
-                } else {
-                    // Nothing to do, let Obsidian handle the case of pasted graphics.
-                    // The file name will be suggested through the monkey-patched function `getAvailablePathForAttachments`.
-
-                    // const t = Array.from(files);
-                    // console.log(t);
-                    // console.log(clipboardData);
-                    // console.log(clipboardData.dropEffect);
-                    // console.log(clipboardData.files);
-                    // console.log(clipboardData.items);
-                    // console.log(clipboardData.types);
-                    // const arrayBuffer = await t[0].arrayBuffer();
-                    // fs.appendFile("path/test.png", Buffer.from(arrayBuffer));
-                }
-            }
-            // console.error("No files detected in paste data.");
-        }
-    }
-
-    async choose_file_to_import_cb(importSettings: ImportSettingsInterface) {
-        const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-        const editor = markdownView?.editor;
-
-        if (!editor) {
-            const msg = "No active markdown editor found.";
-            console.error(msg);
-            new Notice(msg);
-            return;
-        }
-
-        const input = document.createElement("input");
-        input.type = "file";
-        input.multiple = true; // Allow selection of multiple files
-
-        input.onchange = async (e: Event) => {
-            const target = e.target as HTMLInputElement;
-            const files = target.files; // This is already a FileList
-
-            if (files && files.length > 0) {
-                // Directly pass the FileList to the processing function
-                await this.moveFileToAttachmentsFolder(Array.from(files), editor, markdownView, importSettings);
-            } else {
-                const msg = "No files selected or file access error.";
-                console.error(msg);
-                new Notice(msg);
-            }
-        };
-        input.click(); // Trigger the file input dialog
-    }
-
-    async editor_drop_cb_test(evt: DragEvent, editor: Editor, view: MarkdownView | MarkdownFileInfo) {
-    //  let contentToInsert = null;
-        
-    //   const draggable = this.app.dragManager.draggable;
-    // debugger
-    // // Check if a draggable object exists
-    // if (draggable) {
-    //     // If `info` is an instance of `EX` and the shift (on macOS) or alt key (on others) is pressed
-    //     if (view instanceof MarkdownView && (Platform.isMacOS ? evt.shiftKey : evt.altKey)) {
-    //         evt.preventDefault(); // Prevent the default behavior
-    //         // view.handleDrop(event, draggable, false); // Delegate drop handling to `EX`
-    //         return true; // Event handled
-    //     }
-
-    //     const getPath = function() {
-    //         // Check if the 'file' property exists in the 'info' object, return its path or an empty string
-    //         return (view.file?.path) || "";
-    //     };
-
-    //     // Generate markdown links or other content based on the dragged object
-    //     // contentToInsert = ZM(this.app, draggable, getPath()).join("\n");
-    // } else {
-    //         // Trigger an "editor-drop" event if not prevented and handle the drop event
-    //         if (event.defaultPrevented || this.app.workspace.trigger("editor-drop", event, view.editor, view)) {
-    //             return true;
-    //         }
-
-    //         // Handle text or other content from the drop
-    //         if (!event.shiftKey) {
-    //             contentToInsert = this.handleDataTransfer(event.dataTransfer);
-    //         }
-            
-    //         // If no content was extracted, attempt to handle it as an editor drop
-    //         if (!contentToInsert) {
-    //             contentToInsert = this.handleDropIntoEditor(event);
-    //         }
-    //     }
-
-    //     // Get the active editor and position the drop based on mouse coordinates
-    //     const editor = view.editor.activeCM;
-    //     editor.dispatch({
-    //         selection: be.single(editor.posAtCoords({
-    //             x: event.clientX,
-    //             y: event.clientY
-    //         }))
-    //     });
-
-    //     // If content is a string, insert it into the editor
-    //     if (String.isString(contentToInsert)) {
-    //         editor.dispatch(editor.state.replaceSelection(contentToInsert)); // Insert content at the selection
-    //         editor.focus(); // Focus the editor after inserting content
-    //         event.preventDefault(); // Prevent default drop behavior
-    //         return true; // Event handled
-    //     }
-
-        return false; // Event not handled
-    }
-
-    async editor_drop_cb(evt: DragEvent, editor: Editor, view: MarkdownView | MarkdownFileInfo) {
-        // Check if the event has already been handled
-        if (evt.defaultPrevented) return;
-
-        if (!(view instanceof MarkdownView)) {
-            console.error('No view provided')
-            return;
-        }
-
-        // If the Alt key (on macOS) or Ctrl key (on other systems) is pressed, handle the drop in a specific way
-        const altKeyPressed = Platform.isMacOS ? evt.altKey : evt.ctrlKey;
-        if (altKeyPressed) {
-            // Follow standard behavior where a link to the external file is created
-            return;
-        } else {
-            // Prevent other handlers from executing
-            evt.preventDefault();
-        }
-
-        const doForceAsking = evt.shiftKey; // Check if Shift was pressed
-
-        // Handle the dropped files
-        const files = evt?.dataTransfer?.files;
-        if(!files) return;
-
-        if (files.length > 0) {
-            const dropPos = editor.cm.posAtCoords({ x: evt.clientX, y: evt.clientY });
-            
-            if(dropPos===null) {
-                console.error('Unable to determine drop position');
-                return;
-            }
-            
-            // Get the current selection
-            const user_selection = editor.cm.state.selection;
-            // const user_selection_alt = codemirror.viewState.state.selection;
-            const user_selection_main = user_selection.main;
-            
-             // Check if there is selected text
-            const isTextSelected = !user_selection_main.empty;
-            const selectionStart = user_selection_main.from;
-            const selectionEnd = user_selection_main.to;
-            
-            // Check if the drop position is within the selected text range
-            const isDropWithinSelection = isTextSelected && dropPos >= selectionStart && dropPos <= selectionEnd;
-
-            if(!isDropWithinSelection) {
-                // If the drop position is not in the current selection, we redefine the current selection to the new drop position
-                editor.cm.dispatch({
-                    selection: EditorSelection.single(dropPos)
-                });
-            }
-            
-            // Handle the files as per your existing logic
-            this.handleFiles(Array.from(files), editor, view, doForceAsking, ImportOperationType.DRAG_AND_DROP);
-        
-        } else {
-            console.error('No files dropped');
-        }
-    }
-
-	async handleFiles(files: File[], editor: Editor, view: MarkdownView, doForceAsking: boolean, importType: ImportOperationType) {
-
-		const {nonFolderFilesArray, foldersArray} = await Utils.filterOutFolders(Array.from(files));
-
-		if(foldersArray.length>0) {
-			const modal = new FolderImportErrorModal(this, foldersArray);
-			modal.open();
-			await modal.promise;
-		}
-
-		let actionFilesOnImport = ImportActionType.COPY; // for safety, the defualt is COPY
-		let lastActionFilesOnImport = ImportActionType.COPY; // for safety, the defualt is COPY
-		switch (importType) {
-			case ImportOperationType.DRAG_AND_DROP:
-				actionFilesOnImport = this.settings.actionDroppedFilesOnImport;
-				lastActionFilesOnImport = this.settings.lastActionDroppedFilesOnImport;
-				break;
-			case ImportOperationType.PASTE:
-				actionFilesOnImport = this.settings.actionPastedFilesOnImport;
-				lastActionFilesOnImport = this.settings.lastActionPastedFilesOnImport;
-				break;
-		}
-
-		let embedOption = this.settings.embedFilesOnImport;
-		const lastEmbedOption = this.settings.lastEmbedFilesOnImport;
-
-		if (doForceAsking || actionFilesOnImport == ImportActionType.ASK_USER || embedOption == YesNoTypes.ASK_USER) {
-			const modal = new ImportActionTypeModal(this, lastActionFilesOnImport, lastEmbedOption);
-			modal.open();
-			const choice = await modal.promise;
-			if (choice == null) return;
-			actionFilesOnImport = choice.action;
-			switch (importType) {
-				case ImportOperationType.DRAG_AND_DROP:
-					if (choice.rememberChoice) {
-						this.settings.actionDroppedFilesOnImport = actionFilesOnImport;
-					}
-					this.settings.lastActionDroppedFilesOnImport = actionFilesOnImport;
-					break;
-				case ImportOperationType.PASTE:
-					if (choice.rememberChoice) {
-						this.settings.actionPastedFilesOnImport = actionFilesOnImport;
-					}
-					this.settings.lastActionPastedFilesOnImport = actionFilesOnImport;
-					break;
-			}
-			embedOption = choice.embed;
-			if (choice.rememberChoice) {
-				this.settings.embedFilesOnImport = embedOption;
-			}
-			this.settings.lastEmbedFilesOnImport = embedOption;
-			this.settingsTab.debouncedSaveSettings();
-		}
-
-		const doEmbed = (embedOption == YesNoTypes.YES);
-
-		const importSettings = {
-			embed: doEmbed,
-			action: actionFilesOnImport,
-		};
-
-		this.moveFileToAttachmentsFolder(nonFolderFilesArray, editor, view, importSettings);
-	}
-
-	// Function to move files to the attachments folder using fs.rename
-	async moveFileToAttachmentsFolder(filesToImport: File[], editor: Editor, view: MarkdownView, importSettings: ImportSettingsInterface) {
-
-		// Get the current active note if md_file is not provided
-		// const md_active_file = this.app.workspace.getActiveFile();
-		// if (md_active_file == null) {
-		// 	throw new Error("The active note could not be determined.");
-		// }
-
-		const md_file = view.file;
-		if(md_file===null) { throw new Error("The active note could not be determined."); }
-
-		const md_file_parsed = Utils.parseFilePath(md_file.path)
-
-		const cursor = editor.getCursor(); // Get the current cursor position before insertion
-
-		if (filesToImport.length > 1 && this.settings.multipleFilesImportType != MultipleFilesImportTypes.INLINE) {
-			// Check if the cursor is at the beginning of a line
-			if (cursor.ch !== 0) {
-				// If not, insert a newline before the link
-				editor.replaceRange('\n', cursor);
-				// You need to explicitly set the cursor to the new position after the newline
-				editor.setCursor({ line: cursor.line + 1, ch: 0 });
-			}
-		}
-
-		const multipleFiles = filesToImport.length > 1;
-
-		const tasks = filesToImport.map(async (fileToImport:File): Promise<string | null> => {
-			const originalFilePath = fileToImport.path;
-			let destFilePath = await this.createAttachmentName(originalFilePath,md_file_parsed,fileToImport);
-
-			// Check if file already exists in the vault
-			const existingFile = await Utils.doesFileExist(this.app.vault,destFilePath);
-
-			// If the original file is already in the vault
-			const relativePath = await Utils.getFileInVault(this.vaultPath, originalFilePath)
-			if (relativePath) {
-
-				// If they are the same file, then skip copying/moving, we are alrady done
-				if (existingFile && Utils.arePathsSameFile(this.app.vault, relativePath, destFilePath)) return destFilePath;
-
-				const modal = new ImportFromVaultChoiceModal(this, originalFilePath, relativePath, importSettings.action);
-				modal.open();
-				const choice = await modal.promise;
-				if (choice == null) { return null; }
-				switch (choice) {
-					case ImportFromVaultOptions.SKIP:
-						return null;
-					case ImportFromVaultOptions.LINK:
-						importSettings.action = ImportActionType.LINK;
-						break;
-					case ImportFromVaultOptions.COPY:
-						importSettings.action = ImportActionType.COPY;
-						break;
-				}
-			}
-			
-			// Decide what to do if a file with the same name already exists at the destination
-			if (existingFile && importSettings.action != ImportActionType.LINK) {
-				const modal = new OverwriteChoiceModal(this, originalFilePath, destFilePath);
-				modal.open();
-				const choice = await modal.promise;
-				if (choice == null) { return null; }
-				switch (choice) {
-					case OverwriteChoiceOptions.OVERWRITE:
-						// continue
-						break;
-					case OverwriteChoiceOptions.KEEPBOTH:
-						destFilePath = Utils.findNewFilename(this.app.vault,destFilePath);
-						break;
-					case OverwriteChoiceOptions.SKIP:
-						return null;
-				}
-			}
-
-			try {
-				switch (importSettings.action) {
-					case ImportActionType.MOVE:
-						await fs.rename(originalFilePath, Utils.joinPaths(this.vaultPath,destFilePath));
-						return destFilePath;
-					case ImportActionType.COPY:
-						await fs.copyFile(originalFilePath, Utils.joinPaths(this.vaultPath,destFilePath));
-						return destFilePath;
-					case ImportActionType.LINK:
-					default:
-						return relativePath;
-				}
-			} catch (error) {
-				const msg = "Failed to process the file";
-				new Notice(msg + ".");
-				console.error(msg + ":", originalFilePath, error);
-				return null;  // Indicate failure in processing this file
-			}
-		});
-
-		// Wait for all tasks to complete
-		const results = await Promise.all(tasks);
-
-		// Now process the results
-		let counter = 0;
-		results.forEach((importedFilePath: (string | null)) => {
-			if (importedFilePath) {
-				this.insertLinkToEditor(importedFilePath, editor, md_file.path, importSettings, multipleFiles ? ++counter : undefined);
-			}
-		});
-
-		if (counter > 0) {
-			let operation = '';
-			switch (importSettings.action) {
-				case ImportActionType.MOVE:
-					operation = 'Moved';
-					break;
-				case ImportActionType.COPY:
-					operation = 'Copied';
-					break;
-			}
-			new Notice(`${operation} successfully ${counter} files to the attachments folder.`);
-		}
-	}
-
-    // Function to insert links to the imported files in the editor
-    insertLinkToEditor(importedFilePath: string, editor: Editor, md_file: string, importSettings: ImportSettingsInterface, counter?: number) {
-
-        /*
-        let relativePath;
-        switch (this.settings.linkFormat) {
-            case LinkFormat.RELATIVE:
-                relativePath = relative(currentNoteFolderPath, importedFilePath);
-                break;
-            case LinkFormat.ABSOLUTE:
-            default:
-                relativePath = relative(this.vaultPath, importedFilePath);
-                break;
-        }
-        */
-
-        let prefix = '';
-        let postfix = '';
-        if (counter) {
-            // if multiple files are imported
-            switch (this.settings.multipleFilesImportType) {
-                case MultipleFilesImportTypes.BULLETED:
-                    prefix = '- ';
-                    postfix = '\n';
-                    break;
-                case MultipleFilesImportTypes.NUMBERED:
-                    prefix = `${counter}. `;
-                    postfix = '\n';
-                    break;
-                case MultipleFilesImportTypes.INLINE:
-                    if (counter > 1) {
-                        // if it is not the first item
-                        prefix = '\n\n';
-                    }
-                    break;
-            }
-        }
-
-        // Get the current selection
-        const main_selection = editor.cm.state.selection.main;
-        
-        const file = Utils.createMockTFile(this.app.vault,importedFilePath);
-        const filename = file.name;
-        const customDisplayText = (():string=>{
-            let text="";
-            if(this.settings.customDisplayText) {
-                text = filename;
-            }
-            // if a single file is imported
-            if(!counter)
-            {
-                if(this.settings.useSelectionForDisplayText) {
-                    // Extract the selected text
-                    // const selectedText_alt = editor.getSelection();
-                    const selectedText = editor.cm.state.doc.sliceString(main_selection.from, main_selection.to);
-                    
-                    // If the user has selected some text, this will be used for the display text 
-                    if(selectedText.length>0) text = selectedText;
-                }
-            }
-            return text;
-        })();
-        
-        const generatedLink = this.app.fileManager.generateMarkdownLink(file,md_file,undefined,(this.settings.customDisplayText) ? customDisplayText : undefined);
-
-        const MDLink_regex = new RegExp('^(!)?(\\[[^\\]]*\\])(.*)$');
-        const WikiLink_regex = new RegExp('^(!)?(.*?)(|[^|]*)?$');
-        
-        const useMarkdownLinks = this.app.vault.getConfig("useMarkdownLinks");
-
-        let offset;
-        let processedLink;
-        let selectDisplayedText = false;
-        if(useMarkdownLinks) { // MD links
-            // Perform the match
-            const match = generatedLink.match(MDLink_regex);
-
-            offset = generatedLink.length;
-            processedLink = generatedLink;
-            if(match) {
-                offset = 1;
-                processedLink = "[" + customDisplayText + "]" + match[3];
-                selectDisplayedText = true;
-            }
-        } else { // Wiki links
-            // Perform the match
-            const match = generatedLink.match(WikiLink_regex);
-
-            offset = generatedLink.length;
-            processedLink = generatedLink;
-            if(match) {
-                offset = match[2].length;
-                processedLink = match[2] + (match[3] ? match[3] : "");
-                selectDisplayedText = true;
-            }
-        }
-
-        if (importSettings.embed) {
-            prefix = prefix + '!';
-        }
-
-        const linkText = prefix + processedLink + postfix;
-
-        const cursor_from = editor.getCursor("from");  // Get the current cursor position before insertion
-        const cursor_to = editor.getCursor("to");  // Get the current cursor position before insertion
-        
-        // Insert the link text at the current cursor position
-        editor.replaceRange(linkText, cursor_from, cursor_to);
-
-        if (counter == 0) {
-            if (selectDisplayedText) {
-                // Define the start and end positions for selecting 'baseName' within the inserted link
-                const startCursorPos = {
-                    line: cursor_to.line,
-                    ch: cursor_to.ch + offset + prefix.length,
-                };
-                const endCursorPos = {
-                    line: cursor_to.line,
-                    ch: startCursorPos.ch + customDisplayText.length,
-                };
-                
-                // Set the selection range to highlight 'baseName'
-                editor.setSelection(startCursorPos, endCursorPos);
-            } else {
-                const newCursorPos = {
-                    line: cursor_to.line,
-                    ch: cursor_to.ch + linkText.length
-                };
-
-                // Move cursor to the position right after the link
-                editor.setCursor(newCursorPos);
-            }
-        } else {
-            const newCursorPos = {
-                line: cursor_from.line,
-                ch: cursor_from.ch + linkText.length
-            };
-
-            // Move cursor to the position right after the link
-            editor.setCursor(newCursorPos);
-        }
     }
 
 	async open_attachments_folder_cb() {
@@ -1414,7 +816,7 @@ export default class ImportAttachments extends Plugin {
 			return;
 		}
 
-		const attachmentsFolderPath = this.getAttachmentFolderOfMdNote(Utils.parseFilePath(md_active_file.path));
+		const attachmentsFolderPath = importFunctions.getAttachmentFolderOfMdNote(Utils.parseFilePath(md_active_file.path));
 		
 		if (!Utils.doesFolderExist(this.app.vault,attachmentsFolderPath)) {
 			const modal = new CreateAttachmentFolderModal(this, attachmentsFolderPath);

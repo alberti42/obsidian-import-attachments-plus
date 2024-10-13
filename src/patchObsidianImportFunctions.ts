@@ -2,15 +2,17 @@
 
 /* eslint-disable @typescript-eslint/no-inferrable-types */
 
-import { App, Vault, Attachment, TFile, TFolder } from 'obsidian';
+import { App, Vault, Attachment, TFile, TFolder, DataWriteOptions } from 'obsidian';
 import ImportAttachments from 'main';
 
 import * as Utils from 'utils';
+import { createAttachmentName } from 'importFunctions';
 
 // Save a reference to the original method for the monkey patch
 let originalGetAvailablePathForAttachments: ((fileName: string, extension: string, currentFile: TFile | null, data?: ArrayBuffer) => Promise<string>) | null = null;
 let originalSaveAttachment: ((fileName: string, fileExtension: string, fileData: ArrayBuffer) => Promise<TFile>) | null = null;
 let originalImportAttachments: ((attachments: Attachment[], targetFolder: TFolder | null) => Promise<TFile[]>) | null = null;
+let originalCreateBinary: ((path: string, data: ArrayBuffer, options?: DataWriteOptions) => Promise<TFile>) | null = null;
 
 function unpatchObsidianImportFunctions() {
 	if (originalGetAvailablePathForAttachments) {
@@ -27,6 +29,8 @@ function unpatchObsidianImportFunctions() {
         App.prototype.importAttachments = originalImportAttachments;
         originalImportAttachments = null;
     }
+
+
 }
 
 function patchObsidianImportFunctions(plugin: ImportAttachments) {
@@ -113,9 +117,11 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
 			throw new Error("Could not execute the original getAvailablePathForAttachments function.");
 		}
 
+        debugger
+
 		const currentFile_parsed = current_md_file ? Utils.parseFilePath(current_md_file.path) : undefined;
         
-        const attachmentName = await plugin.createAttachmentName(fileName + "." + extension,currentFile_parsed,data);
+        const attachmentName = await createAttachmentName(fileName + "." + extension,currentFile_parsed,data);
         
 		return attachmentName;
 	};

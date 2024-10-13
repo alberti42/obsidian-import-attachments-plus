@@ -105,6 +105,62 @@ function formatDateTime(dateFormat:string):string {
 	}
 }
 
+
+export function debounceFactoryWithWaitMechanism<F extends (...args: never[]) => void | Promise<void>>(func: F, wait: number) {
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    let promise: Promise<void> | null = null;
+    let resolvePromise: (() => void) | null = null;
+
+    return {
+        // Function to wait for the completion of the current debounced call (if any)
+        waitFnc: async (): Promise<void> => {
+            while (promise) {
+                await promise;  // Await the current promise
+            }
+        },
+
+        // The debounced function itself
+        debouncedFct: (...args: Parameters<F>): void => {
+            // Clear the previous timeout to cancel any pending execution
+            if (timeout) {
+                clearTimeout(timeout);
+                timeout = null;
+                console.log(`TIMEOUT: ${timeout}\nCALLED: ${new Date()}`)
+            }
+
+            // Store the previous resolvePromise to reject it after the new promise is created
+            const previousResolvePromise = resolvePromise;
+
+            // Create a new promise for the current execution
+            promise = new Promise<void>((resolve, reject) => {
+                // Set the new resolvePromise function
+                resolvePromise = () => {
+                    resolve();  // Reference to resolve() used when the previous execution is cancelled
+                };
+
+                // Schedule the function to run after the debounce delay
+                timeout = setTimeout(async () => {
+                    promise = null;
+                    resolvePromise = null;
+                    timeout = null;
+                    try {
+                        await func(...args);  // Execute the debounced function
+                        // Clear the stored promise and resolve function after execution
+                        resolve();  // Resolve the promise once the function is done
+                    } catch (error) {
+                        reject(error);  // Reject the promise if the function throws an error
+                    }
+                }, wait);
+            });
+
+            // After the new promise is created, resolve the previous one
+            if (previousResolvePromise) {
+                previousResolvePromise();  // Resolve the previous promise to indicate cancellation
+            }
+        }
+    };
+}
+
 /*
 // Function to get the available path for attachments from Obsidian
 function getAvailablePathForAttachments = async function (fileName: string, extension: string, currentFile: TFile | null): Promise<string> {
