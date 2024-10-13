@@ -22,7 +22,7 @@
             "name": "TypeScript Dev",
             "shell_cmd": "npm run dev",
             "working_dir": "${project_folder}",
-            "file_regex": "^(src/\\S+\\.ts)\\((\\d+),(\\d+)\\):\\s*(.*)$",
+            "file_regex": "^(.+?\\.ts)\\((\\d+),(\\d+)\\):\\s*(.*)$",
             "selector": "source.ts"
         }
     ]

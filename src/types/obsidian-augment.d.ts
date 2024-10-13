@@ -4,6 +4,59 @@ import 'obsidian';
 import { EditorView } from '@codemirror/view';
 
 declare module 'obsidian' {
+
+    interface EditorManager {
+        app: App;  // The Obsidian app instance
+        containerEl: HTMLElement;  // The main container element for the embed
+        editorEl: HTMLElement;  // Element that contains the editor
+        previewEl: HTMLElement;  // Element that contains the preview content
+        editable: boolean;  // Indicates whether the embed is in editable mode
+        file: TFile | null;  // The file associated with the embed, or `null` if none
+        text: string;  // The text content of the embed
+
+        // Methods
+        load(): void;  // Load the embed content
+        showEditor(): void;  // Display the editor for the embed
+        unload(): void;  // Unload the embed and clean up resources
+
+        editMode: EditMode;
+    }
+
+    interface EditMode {
+        clipboardManager: ClipboardManager;
+    }
+
+    interface ClipboardManager {
+        getPath(): string;  // Retrieves the path associated with the clipboard manager
+        handlePaste(event: ClipboardEvent): boolean;  // Handles paste events in the editor
+        handleDragOver(event: DragEvent): void;  // Handles drag-over events in the editor
+        handleDrop(event: DragEvent): boolean;  // Handles file drops into the editor
+        handleDropIntoEditor(event: DragEvent): string | null;  // Handles dropping content directly into the editor
+        handleDataTransfer(data: DataTransfer): string | null;  // Handles data transfer (e.g., files or text) during a drag or paste
+        insertFiles(files: Attachment[]): Promise<void>;  // Inserts files into the editor
+        saveAttachment(
+            name: string, 
+            extension: string, 
+            data: ArrayBuffer | string, 
+            isLastFile: boolean
+        ): Promise<void>;  // Saves an attachment to the vault or editor
+        insertAttachmentEmbed(file: TFile, isLastFile: boolean): void;  // Inserts an attachment embed into the editor
+    }
+
+    interface EmbedContainer {
+        app: App;  // The Obsidian app instance
+        containerEl: HTMLElement;  // The HTML element where the embed is rendered
+        state: Record<string, any>;  // The state associated with the embed (can be empty or contain data)
+    }
+
+    interface EmbedByExtension {
+       [extension: string]: (arg1:EmbedContainer, arg2:TFile|null, arg3?:any) => EditorManager;
+    }
+
+    interface EmbedRegistry {
+        embedByExtension: EmbedByExtension;
+    }
+
     interface DraggableObject {
         type: string;          // The type of the draggable item (in this case, 'file')
         icon: string;          // The icon associated with the draggable item (likely used for UI)
@@ -35,6 +88,7 @@ declare module 'obsidian' {
 		plugins: Plugins;
 		setting: Setting;
         dragManager: DragManager;
+        embedRegistry: EmbedRegistry;
 	}
 
 	interface Plugins {

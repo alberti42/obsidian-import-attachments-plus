@@ -7,18 +7,30 @@ import ImportAttachments from 'main';
 
 import * as Utils from 'utils';
 import { createAttachmentName } from 'importFunctions';
+import { resolve } from 'dns';
 
 // Save a reference to the original method for the monkey patch
 let originalGetAvailablePathForAttachments: ((fileName: string, extension: string, currentFile: TFile | null, data?: ArrayBuffer) => Promise<string>) | null = null;
 let originalSaveAttachment: ((fileName: string, fileExtension: string, fileData: ArrayBuffer) => Promise<TFile>) | null = null;
 let originalImportAttachments: ((attachments: Attachment[], targetFolder: TFolder | null) => Promise<TFile[]>) | null = null;
 let originalCreateBinary: ((path: string, data: ArrayBuffer, options?: DataWriteOptions) => Promise<TFile>) | null = null;
+let originalResolveFilePath: ((filepath: string) => TFile|null) | null = null;
 
 function unpatchObsidianImportFunctions() {
-	if (originalGetAvailablePathForAttachments) {
-		Vault.prototype.getAvailablePathForAttachments = originalGetAvailablePathForAttachments;
-		originalGetAvailablePathForAttachments = null;
+    if (originalResolveFilePath) {
+        Vault.prototype.resolveFilePath = originalResolveFilePath;
+        originalResolveFilePath = null;
+    }
+
+	if (originalCreateBinary) {
+		Vault.prototype.createBinary = originalCreateBinary;
+		originalCreateBinary = null;
 	}
+
+    if (originalGetAvailablePathForAttachments) {
+        Vault.prototype.getAvailablePathForAttachments = originalGetAvailablePathForAttachments;
+        originalGetAvailablePathForAttachments = null;
+    }
 
 	if(originalSaveAttachment) {
 		App.prototype.saveAttachment = originalSaveAttachment;
@@ -29,11 +41,50 @@ function unpatchObsidianImportFunctions() {
         App.prototype.importAttachments = originalImportAttachments;
         originalImportAttachments = null;
     }
-
-
 }
 
 function patchObsidianImportFunctions(plugin: ImportAttachments) {
+
+    if (!originalResolveFilePath) {
+        originalResolveFilePath = Vault.prototype.resolveFilePath;
+    }
+
+    // Monkey patch the createBinary method
+    Vault.prototype.resolveFilePath = function patchedResolveFilePath(filepath: string): (TFile|null) {
+        if (!originalResolveFilePath) {
+            throw new Error("Could not execute the original resolveFilePath function.");
+        }
+
+        const resolvedFile = originalResolveFilePath.apply(this,[filepath]);
+
+        console.log("ORIGINAL FILEPATH");
+        console.log(filepath);
+        console.log("RESOLVED FILE");
+        console.log(resolvedFile);
+
+        debugger
+        return resolvedFile;
+    };
+
+
+    if (!originalCreateBinary) {
+        originalCreateBinary = Vault.prototype.createBinary;
+    }
+
+    // Monkey patch the createBinary method
+    Vault.prototype.createBinary = async function patchedCreateBinary(path: string, data: ArrayBuffer, options?: DataWriteOptions): Promise<TFile> {
+        if (!originalCreateBinary) {
+            throw new Error("Could not execute the original createBinary function.");
+        }
+
+        const createdFile = await originalCreateBinary.apply(this,[path,data,options]);
+
+        console.log("CREATED NEW BINARY");
+        console.log(createdFile);
+
+
+        return createdFile;
+    };
 
     if (!originalImportAttachments) {
         originalImportAttachments = App.prototype.importAttachments;
@@ -64,16 +115,26 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
             let name = attachment.name;  // Attachment name
             const extension = attachment.extension;  // Attachment extension
             const filepath = attachment.filepath;  // Existing filepath
-            const data = await attachment.data;  // Data of the attachment (e.g., image or binary content)
+            let data = attachment.data;  // Data of the attachment (e.g., image or binary content)
 
             let resolvedPath;
             
             // If filepath exists, try to resolve the filepath
             if (filepath && (resolvedPath = vault.resolveFilePath(filepath))) {
 
-
                 // Push the resolved file path to the array and continue
                 importedFilePaths.push(resolvedPath);
+                continue;
+            }
+
+            // Otherwise, if there is no existing file, process the data
+            if (data instanceof Promise) {
+                console.log("RESOLVED PROMISE");
+                data = await data;  // Await the resolution of the data promise
+            }
+
+            // If no data is found, skip to the next attachment
+            if (!data) {
                 continue;
             }
 
@@ -92,7 +153,6 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
                     newFilePath = await vault.createBinary(availablePath, data);
                 } else {
                     // Otherwise, save the attachment using the `saveAttachment` helper method
-                    debugger
                     newFilePath = await this.saveAttachment(name, extension, data);
                 }
 
@@ -104,27 +164,6 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
         // Return the array of imported file paths
         return importedFilePaths;
     };
-
-
-	if (!originalGetAvailablePathForAttachments) {
-		originalGetAvailablePathForAttachments = Vault.prototype.getAvailablePathForAttachments;
-	}
-
-	// Monkey patch the getAvailablePathForAttachments method
-	Vault.prototype.getAvailablePathForAttachments = async function patchedGetAvailablePathForAttachments(fileName: string, extension: string, current_md_file: TFile | null, data?: ArrayBuffer): Promise<string> {
-		if (!originalGetAvailablePathForAttachments) {
-            // In the current implementation, the original `getAvailablePathForAttachments`` is actually never called
-			throw new Error("Could not execute the original getAvailablePathForAttachments function.");
-		}
-
-        debugger
-
-		const currentFile_parsed = current_md_file ? Utils.parseFilePath(current_md_file.path) : undefined;
-        
-        const attachmentName = await createAttachmentName(fileName + "." + extension,currentFile_parsed,data);
-        
-		return attachmentName;
-	};
 
 	if (!originalSaveAttachment) {
 		originalSaveAttachment = App.prototype.saveAttachment;
@@ -148,7 +187,7 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
         // Create a binary file at the available path with the provided data
         const attachmentName = await this.vault.createBinary(availablePath, fileData);
 
-        console.log('ATTACHMENT NAME:');
+        console.log('CREATED ATTACHMENT FILE:');
         console.log(attachmentName);
 
 		// Return the created file

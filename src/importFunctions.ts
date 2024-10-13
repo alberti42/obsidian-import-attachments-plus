@@ -1,6 +1,6 @@
 // importFunctions.ts
 
-import { Editor, MarkdownFileInfo, MarkdownView, normalizePath, Notice, Platform } from "obsidian";
+import { ClipboardManager, Editor, MarkdownFileInfo, MarkdownView, normalizePath, Notice, Platform } from "obsidian";
 import { EditorSelection } from '@codemirror/state';
 
 import { promises as fs } from 'fs';  // This imports the promises API from fs
@@ -11,13 +11,29 @@ import { AttachmentFolderLocationType, ImportActionType, ImportFromVaultOptions,
 import { FolderImportErrorModal, ImportActionTypeModal, ImportFromVaultChoiceModal, OverwriteChoiceModal } from "ImportAttachmentsModal";
 
 let plugin: ImportAttachments;
+let clipboardManagerProto: ClipboardManager;
 
-export function setPlugin(p:ImportAttachments) {
+function getClipboardManager() {
+    let editorManager = plugin.app.embedRegistry.embedByExtension.md({
+        app: plugin.app,
+        containerEl: createDiv(),
+        state: {}
+    }, null, "");
+    editorManager.load();
+    editorManager.editable = true;
+    editorManager.showEditor();
+
+    clipboardManagerProto = Object.getPrototypeOf(editorManager.editMode.clipboardManager);
+    editorManager.unload();
+}
+
+export function initialize(p:ImportAttachments) {
     plugin = p;
+    getClipboardManager();
 }
 
 export async function editor_drop_cb(evt: DragEvent, editor: Editor, view: MarkdownView | MarkdownFileInfo) {
-    
+
 }
 
 export async function editor_drop_cb1(evt: DragEvent, editor: Editor, view: MarkdownView | MarkdownFileInfo) {

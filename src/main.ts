@@ -77,7 +77,7 @@ export default class ImportAttachments extends Plugin {
 		}
 
         // Configure module import function
-        importFunctions.setPlugin(this);
+        importFunctions.initialize(this);
 
         // Bind the callback functions
         this.file_menu_cb = this.file_menu_cb.bind(this);
@@ -547,7 +547,7 @@ export default class ImportAttachments extends Plugin {
             const editorView = activeView.editor;
             
             // Get the CodeMirror instance
-            const codemirror = editorView.cm
+            const codemirror = editorView.cm;
             const doc = codemirror.state.doc;
 
             // Get the position at the mouse event's coordinates or at the current cursor
