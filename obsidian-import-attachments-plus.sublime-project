@@ -15,14 +15,14 @@
             "name": "TypeScript Build",
             "shell_cmd": "npm run build",
             "working_dir": "${folder}",  // Use ${folder} to point to the project root
-            "file_regex": "^(.+?\\.ts)\\((\\d+),(\\d+)\\):\\s*(.*)$",
+            "file_regex": "^\\s*(.+?\\.ts)\\((\\d+),(\\d+)\\):\\s*(.*)$",
             "selector": "source.ts"
         },
         {
             "name": "TypeScript Dev",
             "shell_cmd": "npm run dev",
-            "working_dir": "${project_folder}",
-            "file_regex": "^(.+?\\.ts)\\((\\d+),(\\d+)\\):\\s*(.*)$",
+            "working_dir": "${folder}",  // Use ${folder} to point to the project root
+            "file_regex": "^\\s*(.+?\\.ts):(\\d+):(\\d+):\\s*(.*)$",
             "selector": "source.ts"
         }
     ]

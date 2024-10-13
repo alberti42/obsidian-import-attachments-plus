@@ -2,7 +2,7 @@
 
 /* eslint-disable @typescript-eslint/no-inferrable-types */
 
-import { App, Vault, Attachment, TFile, TFolder, DataWriteOptions, Platform, ClipboardManagerPrototypes, ClipboardManager } from 'obsidian';
+import { App, Vault, Attachment, TFile, TFolder, DataWriteOptions, Platform, ClipboardManagerPrototypes, ClipboardManager, MarkdownFileInfo, MarkdownView } from 'obsidian';
 import ImportAttachments from 'main';
 
 import * as Utils from 'utils';
@@ -17,6 +17,8 @@ let originalCreateBinary: ((path: string, data: ArrayBuffer, options?: DataWrite
 let originalResolveFilePath: ((filepath: string) => TFile|null) | null = null;
 let originalInsertFiles:((files: Attachment[]) => Promise<void>) | null = null;
 let originalHandleDropIntoEditor:((event: DragEvent) => string | null) | null = null;
+let originalHandlePaste:((event: ClipboardEvent)=>boolean) | null = null;
+let originalHandleDataTransfer:((dataTransfer: DataTransfer | null) => string | null) | null = null;
 
 let plugin: ImportAttachments;
 
@@ -76,6 +78,16 @@ function unpatchObsidianImportFunctions() {
     if(originalHandleDropIntoEditor) {
         clipboardManagerProto.handleDropIntoEditor = originalHandleDropIntoEditor;
         originalHandleDropIntoEditor = null;
+    }
+
+    if(originalHandlePaste) {
+        clipboardManagerProto.handlePaste = originalHandlePaste;
+        originalHandlePaste = null;
+    }
+
+    if(originalHandleDataTransfer) {
+        clipboardManagerProto.handleDataTransfer = originalHandleDataTransfer;
+        originalHandleDataTransfer = null;
     }
 }
 
@@ -326,6 +338,9 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
         });
     }
 
+    // See https://help.obsidian.md/Files+and+folders/Accepted+file+formats
+    const supported_image_extensions = ['bmp', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'avif'];
+
     function getBaseName(path: string): string {
         const lastSlashIndex = path.lastIndexOf("/");
         return lastSlashIndex === -1 ? path : path.slice(lastSlashIndex + 1);
@@ -363,8 +378,7 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
             : baseName.substr(0, lastDotIndex);  // Return the base name without the extension
     }
 
-
-    function handleDataTransfer(dataTransfer: DataTransfer|null, sourceType: string, includeData: boolean, ): Attachment[] {
+    function getFilesFromDataTransfer(dataTransfer: DataTransfer|null, sourceType: string, includeData: boolean, ): Attachment[] {
         
         if(!dataTransfer) return [] as Attachment[];
 
@@ -419,7 +433,7 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
         }
 
         // Handle special case for clipboard data on desktop apps (only if no files have been added)
-        if (sourceType === "clipboard" && attachments.length === 0 && Platform.isDesktopApp && !dataTransfer.getData("text/plain") /*&& !Ow.global.hasModifier("Shift")*/) {
+        if (sourceType === "clipboard" && attachments.length === 0 && Platform.isDesktopApp && !dataTransfer.getData("text/plain") && !plugin.app.keymap.hasModifier("Shift")) {
             // Special case: Handle pasting an image from the clipboard (for desktop apps)
             let specialAttachment = (function() {
                 let electron = window.require('electron');
@@ -486,14 +500,13 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
             throw new Error("Could not execute the original handleDropIntoEditor function.");
         }
 
-        // debugger
         // return originalHandleDropIntoEditor.apply(this,[event]);
         // debugger
 
         // If the Alt key (on macOS) or Ctrl key (on other systems) is pressed, handle the drop in a specific way
         if (Platform.isMacOS ? event.altKey : event.ctrlKey) {
             const fileLinks = [];
-            const droppedItems = handleDataTransfer(event.dataTransfer, "drop", false); // Extract files from the drop data
+            const droppedItems = getFilesFromDataTransfer(event.dataTransfer, "drop", false); // Extract files from the drop data
 
             // Loop through the dropped items to create links or embedded content
             for (let i = 0; i < droppedItems.length; i++) {
@@ -513,9 +526,6 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
                         const fileURL = "file:///" + filePath.replace(/^\/?/, "/"); // Convert path to file URL
                         let markdownLink = `[${displayName}](${fileURL})`;
 
-                        // See https://help.obsidian.md/Files+and+folders/Accepted+file+formats
-                        const supported_image_extensions = ['bmp', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'avif'];
-
                         // If the file is an image, prepend '!' for markdown image syntax
                         if (supported_image_extensions.contains(fileExtension)) {
                             markdownLink = "!" + markdownLink;
@@ -531,7 +541,7 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
         }
 
         // If the Alt/Ctrl key is not pressed, handle regular file drops
-        const files = handleDataTransfer(event.dataTransfer, "drop", true); // Extract files from the drop data
+        const files = getFilesFromDataTransfer(event.dataTransfer, "drop", true); // Extract files from the drop data
         if (files.length > 0) {
             event.preventDefault(); // Prevent default behavior
             this.insertFiles(files); // Insert the files into the editor
@@ -539,6 +549,175 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
         }
 
         return null; // No action taken
+    };
+
+    if (!originalHandlePaste) {
+        originalHandlePaste = clipboardManagerProto.handlePaste;
+    }
+
+    clipboardManagerProto.handlePaste = function patchedHandlePaste(this: ClipboardManager, event: ClipboardEvent): boolean {
+
+        if (!originalHandlePaste) {
+            throw new Error("Could not execute the original handlePaste function.");
+        }
+
+        // return originalHandlePaste.apply(this,[event]);
+
+        // Check if the paste event has already been handled (defaultPrevented is true) 
+        // OR trigger the "editor-paste" event in the workspace of the app.
+        if (event.defaultPrevented || this.app.workspace.trigger("editor-paste", event, this.info.editor, this.info),
+            // After triggering the event, check again if defaultPrevented is true
+            event.defaultPrevented) {
+            return true;  // If the event has been handled, return true (indicating the event was handled).
+        }
+     
+        // Process clipboard data from the event
+        const textToPaste = this.handleDataTransfer(event.clipboardData);
+        if (textToPaste) {
+            if(!this.info.editor) return false;
+
+            // If there's valid text data, replace the current selection with the pasted content
+            this.info.editor.replaceSelection(textToPaste, "paste");
+            event.preventDefault(); // Prevent the default paste behavior
+            return true; // Indicate that the event was handled
+        }
+
+        // Check if clipboard contains "obsidian/properties" data and if `info` is an instance of `EX`, handle it
+        if (event.clipboardData?.getData("obsidian/properties") && this.info instanceof MarkdownView) {
+            this.info.handlePaste(event);  // Call the paste handler for `EX` instances
+        }
+
+        // Handle file data from the clipboard if present
+        const files = getFilesFromDataTransfer(event.clipboardData, "clipboard", true);
+        if (files.length > 0) {
+            event.preventDefault(); // Prevent the default paste behavior
+            this.insertFiles(files); // Insert files into the editor
+            return true; // Indicate that the event was handled
+        }
+
+        return false; // Return false if no paste action was performed
+    }
+
+    // function sanitizeHtmlContent(html: string): DocumentFragment {
+    //     // Assuming NM.sanitize sanitizes the HTML content and HM is the configuration object
+    //     // NM.sanitize is used to clean the HTML according to some sanitization rules (defined in HM)
+    //     // document.importNode is used to import the sanitized content as a DocumentFragment
+    // 
+    //     return document.importNode(NM.sanitize(html, HM), true);
+    // }
+
+    if (!originalHandleDataTransfer) {
+        originalHandleDataTransfer = clipboardManagerProto.handleDataTransfer;
+    }
+
+    clipboardManagerProto.handleDataTransfer = function patchedHandleDataTransfer(this:ClipboardManager, dataTransfer: DataTransfer | null): string | null {
+
+        if (!originalHandleDataTransfer) {
+            throw new Error("Could not execute the original handleDataTransfer function.");
+        }
+
+        // debugger
+        // const textToPaste = originalHandleDataTransfer(dataTransfer);
+        // return textToPaste;
+
+        if (!dataTransfer) return null;
+
+        const app = this.app;
+
+        // Get HTML data from the transfer, if available
+        const htmlData = dataTransfer.getData("text/html");
+        if (htmlData) {
+            /*
+            // If HTML auto-conversion is not enabled, return null
+            if (!app.vault.getConfig("autoConvertHtml")) {
+                return null;
+            }
+
+            // Convert the HTML to a DOM element
+            const htmlElement = sanitizeHtmlContent(htmlData);
+            const container = createEl("div");
+            container.appendChild(htmlElement);
+
+            // If the data contains a single image tag, return null to avoid conversion
+            if (dataTransfer.files.length > 0 && /^<img [^>]+>$/.test(container.innerHTML.trim())) {
+                return null;
+            }
+
+            // Process image, audio, or video elements in the HTML content
+            const embeddedMedia = htmlElement.querySelectorAll("img, audio, video");
+            const dataURIs: string[] = [];
+
+            embeddedMedia.forEach((mediaElement: HTMLImageElement | HTMLMediaElement) => {
+                // Handle local files (in desktop app) by adjusting the file path
+                if (ql.isDesktopApp && mediaElement.src.startsWith(ql.resourcePathPrefix)) {
+                    mediaElement.src = "file:///" + mediaElement.src.substring(ql.resourcePathPrefix.length);
+                    const resolvedUrl = app.vault.resolveFileUrl(mediaElement.src);
+                    if (resolvedUrl instanceof TFile) {
+                        mediaElement.src = app.metadataCache.fileToLinktext(resolvedUrl, this.getPath(), true);
+                    }
+                }
+
+                // Handle base64-encoded media
+                if (mediaElement.src.startsWith("data:") && mediaElement.src.length > 1000) {
+                    dataURIs.push(mediaElement.src);
+                    mediaElement.remove(); // Remove the media element
+                }
+            });
+
+            // Asynchronously handle base64-encoded media (e.g., images)
+            if (dataURIs.length > 0) {
+                (async () => {
+                    for (const dataURI of dataURIs) {
+                        try {
+                            const match = dataURI.match(/^data:([\w/\-.]+);base64,(.*)/);
+                            if (!match) continue;
+
+                            const mimeType = match[1];
+                            const isJPEG = mimeType === "image/jpeg";
+                            const isPNG = mimeType === "image/png";
+
+                            // Save the base64-encoded image as a file
+                            const binaryData = tl(match[2]);
+                            if (isPNG || isJPEG) {
+                                await this.saveAttachment("Pasted image", isPNG ? "png" : "jpg", binaryData, true);
+                            }
+                        } catch (error) {
+                            console.error(error); // Handle errors
+                        }
+                    }
+                })();
+            }
+
+            // Return the cleaned HTML content
+            return ub(container.innerHTML.trim());
+            */
+            return originalHandleDataTransfer(dataTransfer);
+        }
+
+        // Get a URI from the transfer, if available
+        const uriData = dataTransfer.getData("text/uri-list");
+        if (uriData) {
+            const plainTextData = dataTransfer.getData("text/plain") || "";
+            if (!plainTextData) {
+                return uriData;
+            }
+            debugger
+
+            // If the plain text and URI data differ, format it as a markdown link
+            if (uriData.toLowerCase() !== plainTextData.toLowerCase() && decodeURIComponent(uriData.toLowerCase()) !== plainTextData.toLowerCase()) {
+                const extension = getFileExtension(getBaseName(uriData));
+                let markdownLink = `[${plainTextData}](${uriData})`;
+
+                // If the content is an image, prepend '!' for markdown image syntax
+                if (supported_image_extensions.contains(extension)) {
+                    markdownLink = "!" + markdownLink;
+                }
+
+                return markdownLink;
+            }
+        }
+
+        return null; // Return null if no relevant data was found
     };
 }
 

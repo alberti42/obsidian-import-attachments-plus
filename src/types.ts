@@ -125,10 +125,6 @@ export enum OverwriteChoiceOptions {
 	SKIP,
 }
 
-export interface App {
-	openWithDefaultApp(filepath: string): Promise<void>;
-}
-
 // Define a type for what resolveChoice will accept
 export type OverwriteChoiceResult = OverwriteChoiceOptions | null;
 

@@ -33,13 +33,17 @@ declare module 'obsidian' {
         info: MarkdownFileInfo;  // Information about the markdown file being edited
     }
 
+    interface MarkdownView {
+        handlePaste(event: ClipboardEvent): boolean;
+    }
+
     interface ClipboardManagerPrototypes {
         getPath(): string;  // Retrieves the path associated with the clipboard manager
         handlePaste(event: ClipboardEvent): boolean;  // Handles paste events in the editor
         handleDragOver(event: DragEvent): void;  // Handles drag-over events in the editor
         handleDrop(event: DragEvent): boolean;  // Handles file drops into the editor
         handleDropIntoEditor(event: DragEvent): string | null;  // Handles dropping content directly into the editor
-        handleDataTransfer(data: DataTransfer): string | null;  // Handles data transfer (e.g., files or text) during a drag or paste
+        handleDataTransfer(data: DataTransfer|null): string | null;  // Handles data transfer (e.g., files or text) during a drag or paste
         insertFiles(files: Attachment[]): Promise<void>;  // Inserts files into the editor
         saveAttachment(
             name: string, 
@@ -96,7 +100,12 @@ declare module 'obsidian' {
 		setting: Setting;
         dragManager: DragManager;
         embedRegistry: EmbedRegistry;
+        openWithDefaultApp(filepath: string): Promise<void>;
 	}
+
+    interface Keymap {
+        hasModifier(modifier:string):boolean;
+    }
 
 	interface Plugins {
 		manifests: Record<string, PluginManifest>;
