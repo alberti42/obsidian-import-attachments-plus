@@ -50,7 +50,7 @@ import { promises as fs } from 'fs';  // This imports the promises API from fs
 import { patchOpenFile, unpatchOpenFile, addKeyListeners, removeKeyListeners } from 'patchOpenFile';
 import { callPromptForDeletion, patchFilemanager, unpatchFilemanager } from 'patchFileManager';
 
-import { patchImportFunctions, unpatchImportFunctions } from "patchImportFunctions";
+import { patchObsidianImportFunctions, unpatchObsidianImportFunctions } from "patchObsidianImportFunctions";
 import { patchFileExplorer, unpatchFileExplorer } from "patchFileExplorer";
 import { monkeyPatchConsole, unpatchConsole } from "patchConsole";
 
@@ -238,7 +238,7 @@ export default class ImportAttachments extends Plugin {
 
 		// Monkey patches of the vault function
 		if (Platform.isDesktopApp) {
-			patchImportFunctions(this);
+			patchObsidianImportFunctions(this);
 		}
 
 		// Monkey-patch file manager to handle the deletion of the attachment folder
@@ -255,9 +255,9 @@ export default class ImportAttachments extends Plugin {
 
 		// Register event handlers for drag-and-drop and paste events
 		if (Platform.isDesktopApp) {
-			// this.registerEvent( // check obsidian.d.ts for other types of events
-			// 	this.app.workspace.on('editor-drop', this.editor_drop_cb)
-            // );
+			this.registerEvent( // check obsidian.d.ts for other types of events
+				this.app.workspace.on('editor-drop', this.editor_drop_cb)
+            );
 		}
 
 		if (Platform.isDesktopApp) {
@@ -388,7 +388,7 @@ export default class ImportAttachments extends Plugin {
 		unpatchFilemanager();
 
 		// unpatch Vault
-		unpatchImportFunctions();
+		unpatchObsidianImportFunctions();
 
 		// unpatch file-explorer plugin
 		unpatchFileExplorer();
@@ -773,7 +773,7 @@ export default class ImportAttachments extends Plugin {
         return attachmentsFolderPath;           
     }
 
-    async createAttachmentName(originalFilePath:string, md_file?: ParsedPath, data?:ArrayBuffer): Promise<string> {
+    async createAttachmentName(originalFilePath:string, md_file?: ParsedPath, source?:ArrayBuffer | File): Promise<string> {
 
         const originalFilePath_parsed = Utils.parseFilePath(originalFilePath);
         const namePattern = this.settings.attachmentName;
@@ -785,10 +785,14 @@ export default class ImportAttachments extends Plugin {
                                         .replace(/\$\{uuid\}/g, Utils.uuidv4())
                                         .replace(/\$\{date\}/g, Utils.formatDateTime(dateFormat));
 
-        if(data && namePattern.includes('${md5}')) {
+        if(source && namePattern.includes('${md5}')) {
             let hash = ''
             try {
-                hash = await Utils.hashArrayBuffer(data);
+                if(source instanceof ArrayBuffer) {
+                    hash = await Utils.hashArrayBuffer(source);
+                } else if(source instanceof File) {
+                    hash = await Utils.hashFile(source.path);
+                }
             } catch (err: unknown) {
                 console.error('Error hashing the file:', err);
             }
@@ -950,6 +954,64 @@ export default class ImportAttachments extends Plugin {
         input.click(); // Trigger the file input dialog
     }
 
+    async editor_drop_cb_test(evt: DragEvent, editor: Editor, view: MarkdownView | MarkdownFileInfo) {
+    //  let contentToInsert = null;
+        
+    //   const draggable = this.app.dragManager.draggable;
+    // debugger
+    // // Check if a draggable object exists
+    // if (draggable) {
+    //     // If `info` is an instance of `EX` and the shift (on macOS) or alt key (on others) is pressed
+    //     if (view instanceof MarkdownView && (Platform.isMacOS ? evt.shiftKey : evt.altKey)) {
+    //         evt.preventDefault(); // Prevent the default behavior
+    //         // view.handleDrop(event, draggable, false); // Delegate drop handling to `EX`
+    //         return true; // Event handled
+    //     }
+
+    //     const getPath = function() {
+    //         // Check if the 'file' property exists in the 'info' object, return its path or an empty string
+    //         return (view.file?.path) || "";
+    //     };
+
+    //     // Generate markdown links or other content based on the dragged object
+    //     // contentToInsert = ZM(this.app, draggable, getPath()).join("\n");
+    // } else {
+    //         // Trigger an "editor-drop" event if not prevented and handle the drop event
+    //         if (event.defaultPrevented || this.app.workspace.trigger("editor-drop", event, view.editor, view)) {
+    //             return true;
+    //         }
+
+    //         // Handle text or other content from the drop
+    //         if (!event.shiftKey) {
+    //             contentToInsert = this.handleDataTransfer(event.dataTransfer);
+    //         }
+            
+    //         // If no content was extracted, attempt to handle it as an editor drop
+    //         if (!contentToInsert) {
+    //             contentToInsert = this.handleDropIntoEditor(event);
+    //         }
+    //     }
+
+    //     // Get the active editor and position the drop based on mouse coordinates
+    //     const editor = view.editor.activeCM;
+    //     editor.dispatch({
+    //         selection: be.single(editor.posAtCoords({
+    //             x: event.clientX,
+    //             y: event.clientY
+    //         }))
+    //     });
+
+    //     // If content is a string, insert it into the editor
+    //     if (String.isString(contentToInsert)) {
+    //         editor.dispatch(editor.state.replaceSelection(contentToInsert)); // Insert content at the selection
+    //         editor.focus(); // Focus the editor after inserting content
+    //         event.preventDefault(); // Prevent default drop behavior
+    //         return true; // Event handled
+    //     }
+
+        return false; // Event not handled
+    }
+
     async editor_drop_cb(evt: DragEvent, editor: Editor, view: MarkdownView | MarkdownFileInfo) {
         // Check if the event has already been handled
         if (evt.defaultPrevented) return;
@@ -959,7 +1021,8 @@ export default class ImportAttachments extends Plugin {
             return;
         }
 
-        const altKeyPressed = evt.altKey; // Check if Alt was pressed
+        // If the Alt key (on macOS) or Ctrl key (on other systems) is pressed, handle the drop in a specific way
+        const altKeyPressed = Platform.isMacOS ? evt.altKey : evt.ctrlKey;
         if (altKeyPressed) {
             // Follow standard behavior where a link to the external file is created
             return;
@@ -1102,9 +1165,9 @@ export default class ImportAttachments extends Plugin {
 
 		const multipleFiles = filesToImport.length > 1;
 
-		const tasks = filesToImport.map(async (fileToImport): Promise<string | null> => {
+		const tasks = filesToImport.map(async (fileToImport:File): Promise<string | null> => {
 			const originalFilePath = fileToImport.path;
-			let destFilePath = await this.createAttachmentName(originalFilePath,fileToImport,md_file_parsed);
+			let destFilePath = await this.createAttachmentName(originalFilePath,md_file_parsed,fileToImport);
 
 			// Check if file already exists in the vault
 			const existingFile = await Utils.doesFileExist(this.app.vault,destFilePath);

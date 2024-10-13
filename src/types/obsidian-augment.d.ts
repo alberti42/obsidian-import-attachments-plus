@@ -4,6 +4,18 @@ import 'obsidian';
 import { EditorView } from '@codemirror/view';
 
 declare module 'obsidian' {
+    interface DraggableObject {
+        type: string;          // The type of the draggable item (in this case, 'file')
+        icon: string;          // The icon associated with the draggable item (likely used for UI)
+        title: string;         // The name or title of the item being dragged
+        file: TFile;           // The actual file object being dragged
+        source?: string;       // The source of the drag (could be undefined or e.g. bookmarks)
+    }
+
+    interface DragManager {
+        draggable: DraggableObject | null;
+    }
+
     interface Attachment {
         name: string;        // The name of the attachment (e.g., "image.png")
         extension: string;   // The file extension (e.g., "png", "jpg")
@@ -22,6 +34,7 @@ declare module 'obsidian' {
 		internalPlugins: InternalPlugins;
 		plugins: Plugins;
 		setting: Setting;
+        dragManager: DragManager;
 	}
 
 	interface Plugins {

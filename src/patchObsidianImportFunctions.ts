@@ -12,7 +12,7 @@ let originalGetAvailablePathForAttachments: ((fileName: string, extension: strin
 let originalSaveAttachment: ((fileName: string, fileExtension: string, fileData: ArrayBuffer) => Promise<TFile>) | null = null;
 let originalImportAttachments: ((attachments: Attachment[], targetFolder: TFolder | null) => Promise<TFile[]>) | null = null;
 
-function unpatchImportFunctions() {
+function unpatchObsidianImportFunctions() {
 	if (originalGetAvailablePathForAttachments) {
 		Vault.prototype.getAvailablePathForAttachments = originalGetAvailablePathForAttachments;
 		originalGetAvailablePathForAttachments = null;
@@ -29,7 +29,7 @@ function unpatchImportFunctions() {
     }
 }
 
-function patchImportFunctions(plugin: ImportAttachments) {
+function patchObsidianImportFunctions(plugin: ImportAttachments) {
 
     if (!originalImportAttachments) {
         originalImportAttachments = App.prototype.importAttachments;
@@ -37,14 +37,14 @@ function patchImportFunctions(plugin: ImportAttachments) {
 
     // Monkey patch the getAvailablePathForAttachments method
     App.prototype.importAttachments = async function importAttachments(attachments: Attachment[], targetFolder: TFolder | null): Promise<TFile[]> {
+        console.log("IMPORTATTACHMENTS");
+
         if (!originalImportAttachments) {
             // In the current implementation, the original `getAvailablePathForAttachments`` is not actually called
             throw new Error("Could not execute the original importAttachments function.");
         }
 
         // const importedAttachments = await originalImportAttachments.apply(this,[attachments,targetFolder]);
-
-        console.log(attachments);
 
         // If there are no attachments, return an empty array
         if (attachments.length === 0) {
@@ -60,7 +60,7 @@ function patchImportFunctions(plugin: ImportAttachments) {
             let name = attachment.name;  // Attachment name
             const extension = attachment.extension;  // Attachment extension
             const filepath = attachment.filepath;  // Existing filepath
-            const data = attachment.data;  // Data of the attachment (e.g., image or binary content)
+            const data = await attachment.data;  // Data of the attachment (e.g., image or binary content)
 
             let resolvedPath;
             
@@ -88,6 +88,7 @@ function patchImportFunctions(plugin: ImportAttachments) {
                     newFilePath = await vault.createBinary(availablePath, data);
                 } else {
                     // Otherwise, save the attachment using the `saveAttachment` helper method
+                    debugger
                     newFilePath = await this.saveAttachment(name, extension, data);
                 }
 
@@ -108,7 +109,7 @@ function patchImportFunctions(plugin: ImportAttachments) {
 	// Monkey patch the getAvailablePathForAttachments method
 	Vault.prototype.getAvailablePathForAttachments = async function patchedGetAvailablePathForAttachments(fileName: string, extension: string, current_md_file: TFile | null, data?: ArrayBuffer): Promise<string> {
 		if (!originalGetAvailablePathForAttachments) {
-            // In the current implementation, the original `getAvailablePathForAttachments`` is not actually called
+            // In the current implementation, the original `getAvailablePathForAttachments`` is actually never called
 			throw new Error("Could not execute the original getAvailablePathForAttachments function.");
 		}
 
@@ -126,6 +127,7 @@ function patchImportFunctions(plugin: ImportAttachments) {
 	// Function to save an attachment
 	App.prototype.saveAttachment = async function patchedSaveAttachment(fileName: string, fileExtension: string, fileData: ArrayBuffer): Promise<TFile> {
 		if (!originalSaveAttachment) {
+            // In the current implementation, the original `saveAttachment`` is actually never called
 			throw new Error("Could not execute the original saveAttachment function.");
 		}
 
@@ -139,39 +141,13 @@ function patchImportFunctions(plugin: ImportAttachments) {
         
         // Create a binary file at the available path with the provided data
         const attachmentName = await this.vault.createBinary(availablePath, fileData);
-       
 
-		/*
-		// The current active file in the workspace
-		const activeFile = plugin.app.workspace.getActiveFile();
+        console.log('ATTACHMENT NAME:');
+        console.log(attachmentName);
 
-		// Step 1: Determine an available path for the attachment
-		// `getAvailablePathForAttachments` is a method to get a unique path for the new attachment,
-		// preventing overwrites. It takes into account the current active file to determine the attachment path.
-		const attachmentPath = await plugin.app.vault.getAvailablePathForAttachments(fileName, fileExtension, activeFile);
-
-		// Step 2: Create a binary file in the vault at the determined path
-		// `createBinary` is a method to create a binary file (like an image or a PDF) at the specified path.
-		// The method returns the created file as a `TFile` object.
-		const newAttachmentFile = await plugin.app.vault.createBinary(attachmentPath, fileData);
-		*/
-		
 		// Return the created file
 		return attachmentName;
 	}
-
-    // Original function to save an individual attachment to the vault
-    // App.prototype.saveAttachment = async function(name, extension, data) {
-    //     // Get the currently active file in the workspace
-    //     const activeFile = this.workspace.getActiveFile();
-
-    //     // Find an available path for the attachment using the active file's context
-    //     const availablePath = await this.vault.getAvailablePathForAttachments(name, extension, activeFile);
-
-    //     // Create a binary file at the available path with the provided data
-    //     return await this.vault.createBinary(availablePath, data);
-    // };
-
 }
 
-export { patchImportFunctions, unpatchImportFunctions };
+export { patchObsidianImportFunctions, unpatchObsidianImportFunctions };
