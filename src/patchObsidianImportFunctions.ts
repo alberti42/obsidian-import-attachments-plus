@@ -105,7 +105,7 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
             throw new Error("Could not execute the original resolveFilePath function.");
         }
 
-        const resolvedFile = originalResolveFilePath.apply(this,[filepath]);
+        const resolvedFile = originalResolveFilePath.call(this,filepath);
 
         console.log("ORIGINAL FILEPATH");
         console.log(filepath);
@@ -127,7 +127,7 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
             throw new Error("Could not execute the original createBinary function.");
         }
 
-        const createdFile = await originalCreateBinary.apply(this,[path,data,options]);
+        const createdFile = await originalCreateBinary.call(this,path,data,options);
 
         console.log("CREATED NEW BINARY");
         console.log(createdFile);
@@ -149,7 +149,7 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
             throw new Error("Could not execute the original importAttachments function.");
         }
 
-        // const importedAttachments = await originalImportAttachments.apply(this,[attachments,targetFolder]);
+        // const importedAttachments = await originalImportAttachments.call(this,attachments,targetFolder);
 
         // If there are no attachments, return an empty array
         if (attachments.length === 0) {
@@ -226,7 +226,7 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
 			throw new Error("Could not execute the original saveAttachment function.");
 		}
 
-		// const attachmentName = await originalSaveAttachment.apply(this, [fileName, fileExtension, fileData]);
+		// const attachmentName = await originalSaveAttachment.call(this, fileName, fileExtension, fileData);
 
         // Get the currently active file in the workspace
         const activeFile = this.workspace.getActiveFile();
@@ -253,7 +253,7 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
             throw new Error("Could not execute the original insertFiles function.");
         }
 
-        // await originalInsertFiles.apply(this,[files]);
+        // await originalInsertFiles.call(this,files);
 
         // Loop through each file in the `files` array
         for (let t = 0; t < files.length; t++) {
@@ -500,7 +500,7 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
             throw new Error("Could not execute the original handleDropIntoEditor function.");
         }
 
-        // return originalHandleDropIntoEditor.apply(this,[event]);
+        // return originalHandleDropIntoEditor.call(this,event);
         // debugger
 
         // If the Alt key (on macOS) or Ctrl key (on other systems) is pressed, handle the drop in a specific way
@@ -561,7 +561,7 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
             throw new Error("Could not execute the original handlePaste function.");
         }
 
-        // return originalHandlePaste.apply(this,[event]);
+        // return originalHandlePaste.call(this,event);
 
         // Check if the paste event has already been handled (defaultPrevented is true) 
         // OR trigger the "editor-paste" event in the workspace of the app.
@@ -617,7 +617,7 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
         }
 
         // debugger
-        // const textToPaste = originalHandleDataTransfer(dataTransfer);
+        // const textToPaste = originalHandleDataTransfer.call(this,dataTransfer);
         // return textToPaste;
 
         if (!dataTransfer) return null;
@@ -634,8 +634,8 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
             }
 
             // Convert the HTML to a DOM element
-            const htmlElement = sanitizeHtmlContent(htmlData);
-            const container = createEl("div");
+            const htmlElement = sanitizeHtmlContent(htmlData);  // VM is assumed to convert HTML strings to DOM elements
+            const container = createEl("div"); // createEl is assumed to create an element
             container.appendChild(htmlElement);
 
             // If the data contains a single image tag, return null to avoid conversion
@@ -644,10 +644,12 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
             }
 
             // Process image, audio, or video elements in the HTML content
-            const embeddedMedia = htmlElement.querySelectorAll("img, audio, video");
+            const embeddedMedia = htmlElement.findAll("img, audio, video");  // findAll is assumed to be a utility to find elements
             const dataURIs: string[] = [];
 
-            embeddedMedia.forEach((mediaElement: HTMLImageElement | HTMLMediaElement) => {
+            for (let i = 0; i < embeddedMedia.length; i++) {
+                const mediaElement = embeddedMedia[i] as HTMLImageElement | HTMLAudioElement | HTMLVideoElement;
+
                 // Handle local files (in desktop app) by adjusting the file path
                 if (ql.isDesktopApp && mediaElement.src.startsWith(ql.resourcePathPrefix)) {
                     mediaElement.src = "file:///" + mediaElement.src.substring(ql.resourcePathPrefix.length);
@@ -662,22 +664,22 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
                     dataURIs.push(mediaElement.src);
                     mediaElement.remove(); // Remove the media element
                 }
-            });
+            }
 
-            // Asynchronously handle base64-encoded media (e.g., images)
+            // Process base64-encoded media (e.g., images) asynchronously
             if (dataURIs.length > 0) {
-                (async () => {
+                await (async () => {
                     for (const dataURI of dataURIs) {
                         try {
                             const match = dataURI.match(/^data:([\w/\-.]+);base64,(.*)/);
                             if (!match) continue;
-
+                            
                             const mimeType = match[1];
                             const isJPEG = mimeType === "image/jpeg";
                             const isPNG = mimeType === "image/png";
 
                             // Save the base64-encoded image as a file
-                            const binaryData = tl(match[2]);
+                            const binaryData = tl(match[2]);  // Assuming `tl` converts base64 string to binary data
                             if (isPNG || isJPEG) {
                                 await this.saveAttachment("Pasted image", isPNG ? "png" : "jpg", binaryData, true);
                             }
@@ -686,12 +688,15 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
                         }
                     }
                 })();
+
+                return ub(container.innerHTML.trim()); // Return the HTML content after processing
             }
 
             // Return the cleaned HTML content
             return ub(container.innerHTML.trim());
             */
-            return originalHandleDataTransfer(dataTransfer);
+
+            return originalHandleDataTransfer.call(this,dataTransfer);
         }
 
         // Get a URI from the transfer, if available
@@ -701,7 +706,6 @@ function patchObsidianImportFunctions(plugin: ImportAttachments) {
             if (!plainTextData) {
                 return uriData;
             }
-            debugger
 
             // If the plain text and URI data differ, format it as a markdown link
             if (uriData.toLowerCase() !== plainTextData.toLowerCase() && decodeURIComponent(uriData.toLowerCase()) !== plainTextData.toLowerCase()) {
