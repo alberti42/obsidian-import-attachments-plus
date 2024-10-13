@@ -261,9 +261,9 @@ export default class ImportAttachments extends Plugin {
 		}
 
 		if (Platform.isDesktopApp) {
-			// this.registerEvent(
-			// 	this.app.workspace.on('editor-paste', this.editor_paste_cb)
-			// );
+			this.registerEvent(
+				this.app.workspace.on('editor-paste', this.editor_paste_cb)
+			);
 		}
 
 		this.registerEvent(
