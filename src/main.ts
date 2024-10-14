@@ -863,7 +863,6 @@ export default class ImportAttachments extends Plugin {
                 const newPath = newAttachmentFolderPath;
                 
                 try {
-                    this.renameCallbackEnabled = false;
                     await this.renameFile(oldPath, newPath);
                 } catch (error: unknown) {
                     const msg = 'Failed to rename the attachment folder';
@@ -872,8 +871,6 @@ export default class ImportAttachments extends Plugin {
                     console.error("New attachment folder:", newPath);
                     console.error("Error msg:", error);
                     new Notice(msg + '.');
-                } finally {
-                    this.renameCallbackEnabled = true;
                 }
             }
         
