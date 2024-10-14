@@ -71,7 +71,6 @@ export default class ImportAttachments extends Plugin {
 	public matchAttachmentFolder: ((str:string)=>boolean) = (_:string) => true;
 
     // mechanism to prevent calling the callback multiple times when renaming attachments associated with a markdown note
-    private renameCallbackEnabled: boolean = true;
     private file_menu_cb_registered: boolean = false;
     private file_menu_embedded_cb_registered_docs:Map<Document, boolean> = new Map<Document, boolean>();;
     
@@ -462,6 +461,8 @@ export default class ImportAttachments extends Plugin {
     }
 
     file_menu_cb(menu: Menu, file: TAbstractFile) {
+        if(menu.sections.contains("canvas")) return;
+        
         if (file instanceof TFile) {
             // Inspect the currently available menu items
             let first_action_menu: MenuItem | null = null;

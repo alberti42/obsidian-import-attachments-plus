@@ -47,6 +47,7 @@ declare module 'obsidian' {
 
 	interface Menu {
 		items: MenuItem[];
+        sections: string[];
 	}
 
 	interface FileManager {
