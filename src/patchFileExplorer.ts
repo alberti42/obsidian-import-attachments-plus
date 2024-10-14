@@ -99,7 +99,7 @@ function updateVisibilityAttachmentFolders(plugin: ImportAttachments){
 
 function patchFileExplorer(plugin: ImportAttachments) {
 	if (originalViewFactory || originalCreateFolderDom) { return; }
-    debugger
+    
 	// First attempt to apply the patch to existing leaves, in case file-explorer plugin was already loaded
 	let patched = false;
 	const leaves = plugin.app.workspace.getLeavesOfType('file-explorer');
