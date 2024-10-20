@@ -84,6 +84,7 @@ declare module 'obsidian' {
 	interface Setting {
 		openTabById(id: string): SettingTab;
         tabContentContainer:HTMLElement;
+        activeTab: SettingTab;
 	}
     interface SettingTab {
         id: string;

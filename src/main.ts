@@ -19,6 +19,7 @@ import {
     EditorPosition,
     WorkspaceWindow,
     WorkspaceLeaf,
+    SettingTab,
 } from "obsidian";
 
 // Import utility and modal components
@@ -648,6 +649,14 @@ export default class ImportAttachments extends Plugin {
         if(!fileToBeDeleted) return;
 
         this.delete_file_cb(fileToBeDeleted,target);
+    }
+
+    async onExternalSettingsChange() {
+        // Load settings
+        await this.loadSettings();
+
+        const activeTab = this.app.setting.activeTab;
+        if(activeTab && activeTab instanceof ImportAttachmentsSettingTab) activeTab.display();
     }
 
 	async loadSettings() {
