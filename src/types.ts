@@ -54,6 +54,7 @@ export interface ImportAttachmentsSettings {
 	lastEmbedFilesOnImport: YesNoTypes;
 	multipleFilesImportType: MultipleFilesImportTypes;
 	customDisplayText: boolean;
+    hideExtForDisplayText: boolean;
     useSelectionForDisplayText: boolean;
 	attachmentFolderLocation: AttachmentFolderLocationType;
 	attachmentFolderPath: string;

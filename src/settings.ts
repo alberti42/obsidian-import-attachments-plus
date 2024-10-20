@@ -143,25 +143,40 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                 });
 
             new Setting(containerEl)
-                .setName('Use the filename for the displayed text:')
-                .setDesc('With this option enabled, the filename of the imported document is used as the display text.')
-                .addToggle(toggle => toggle
-                    .setValue(this.plugin.settings.customDisplayText)
-                    .onChange(async (value: boolean) => {
-                        this.plugin.settings.customDisplayText = value;
-                        this.debouncedSaveSettings(); // Update visibility based on the toggle
-                    }));
-
-            new Setting(containerEl)
                 .setName('Use the selected text for the displayed text:')
-                .setDesc('With this option enabled, the selected text is replaced by the link to the imported document \
-                    and the same selected text is automatically used as the display text for the link. This option \
-                    takes priority over the filename as displayed text. Moreover, this option is ignored for multiple imported attachments.')
+                .setDesc('With this option enabled, the selected text is replaced with the link to the imported document and the same \
+                    selected text is automatically used as the display text for the link itself. Note that you need to drag the attachment onto \
+                    the selected text. This option is ignored when multiple attachments are imported.')
                 .addToggle(toggle => toggle
                     .setValue(this.plugin.settings.useSelectionForDisplayText)
                     .onChange(async (value: boolean) => {
                         this.plugin.settings.useSelectionForDisplayText = value;
-                        this.debouncedSaveSettings(); // Update visibility based on the toggle
+                        this.debouncedSaveSettings();
+                    }));
+
+            const use_filename_setting = new Setting(containerEl)
+                .setName('Use the filename for the displayed text:')
+                .setDesc('With this option enabled, the filename of the imported document is used as the display text. This option is ignored when \
+                    the previous option applies.');
+
+            const hide_ext_for_displayed_text_setting = new Setting(containerEl)
+                .setName('Hide the extension in the filename for the displayed text:')
+                .setDesc('With this option enabled, the extension of the imported file is not included in the displayed text.')
+                .addToggle(toggle => toggle
+                    .setValue(this.plugin.settings.hideExtForDisplayText)
+                    .onChange(async (value: boolean) => {
+                        this.plugin.settings.hideExtForDisplayText = value;
+                        this.debouncedSaveSettings();
+                    }));
+
+            hide_ext_for_displayed_text_setting.settingEl.style.display = this.plugin.settings.customDisplayText ? '' : 'none';
+
+            use_filename_setting.addToggle(toggle => toggle
+                    .setValue(this.plugin.settings.customDisplayText)
+                    .onChange(async (value: boolean) => {
+                        this.plugin.settings.customDisplayText = value;
+                        hide_ext_for_displayed_text_setting.settingEl.style.display = value ? '' : 'none';
+                        this.debouncedSaveSettings();
                     }));
 
             const wikilinksSetting = new Setting(containerEl)
@@ -266,7 +281,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                     // Hide external_exclude_ext if the toggle is off
                     this.plugin.settings.openAttachmentExternal = value;
                     this.debouncedSaveSettings();
-                    external_exclude_ext.settingEl.style.display = value ? "" : "none"; // Update visibility based on the toggle
+                    external_exclude_ext.settingEl.style.display = value ? "" : "none";
                 }));
 
             if (Platform.isMacOS) {
@@ -305,7 +320,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                     // Hide reveal_exclude_ext if the toggle is off
                     this.plugin.settings.revealAttachment = value;
                     this.debouncedSaveSettings();
-                    reveal_exclude_ext.settingEl.style.display = value ? "" : "none";  // Update visibility based on the toggle
+                    reveal_exclude_ext.settingEl.style.display = value ? "" : "none"; 
                 }));
         }
 
@@ -436,6 +451,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                     frag.appendText('Choose how to name the imported attachments, using the following variables as a placeholder:');
                     const ul = frag.createEl('ul');
                     ul.createEl('li', { text: '${original} for the original name (omitting file extension) of the imported attachment files' });
+                    ul.createEl('li', { text: '${notename} for the name of the MarkDown note into which the attachment files will be imported' });
                     ul.createEl('li', { text: '${date} for the current date' })
                     ul.createEl('li', { text: '${uuid} for a 128-bit Universally Unique Identifier' })
                     ul.createEl('li', { text: '${md5} for a MD5 hash of the imported file' });

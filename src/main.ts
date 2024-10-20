@@ -19,7 +19,6 @@ import {
     EditorPosition,
     WorkspaceWindow,
     WorkspaceLeaf,
-    SettingTab,
 } from "obsidian";
 
 // Import utility and modal components
@@ -785,7 +784,7 @@ export default class ImportAttachments extends Plugin {
         return attachmentsFolderPath;           
     }
 
-    async createAttachmentName(originalFilePath:string, data: File | ArrayBuffer, md_file?: ParsedPath | undefined): Promise<string> {
+    async createAttachmentName(originalFilePath:string, data: File | ArrayBuffer, md_file: ParsedPath | undefined): Promise<string> {
 
         const originalFilePath_parsed = Utils.parseFilePath(originalFilePath);
         const namePattern = this.settings.attachmentName;
@@ -796,6 +795,8 @@ export default class ImportAttachments extends Plugin {
         let attachmentName = namePattern.replace(/\$\{original\}/g, fileToImportName)
                                         .replace(/\$\{uuid\}/g, Utils.uuidv4())
                                         .replace(/\$\{date\}/g, Utils.formatDateTime(dateFormat));
+
+        if(md_file) attachmentName = attachmentName.replace(/\$\{notename\}/g, md_file.filename);
 
         if(namePattern.includes('${md5}')) {
             let hash = ''
@@ -1249,7 +1250,7 @@ export default class ImportAttachments extends Plugin {
         const customDisplayText = (():string=>{
             let text="";
             if(this.settings.customDisplayText) {
-                text = filename;
+                text = filename + (this.settings.hideExtForDisplayText ? "" : file.extension);
             }
             // if a single file is imported
             if(!counter)

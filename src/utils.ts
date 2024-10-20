@@ -213,7 +213,7 @@ export function doesFileExist(vault: Vault, relativePath: string): boolean {
 // Custom function to create a mock TFile object
 export function createMockTFile(vault:Vault,filepath:string): TFile {
 
-	const { filename, path } = parseFilePath(filepath);
+	const { filename, path, ext } = parseFilePath(filepath);
 	
 	// Create a new TFile object
 	const tfile = Object.create(TFile.prototype) as TFile;
@@ -223,6 +223,7 @@ export function createMockTFile(vault:Vault,filepath:string): TFile {
 	tfile.name = filename;
 	tfile.vault = vault;
 	tfile.parent = null;
+    tfile.extension = ext;
   
 	return tfile;
 }
