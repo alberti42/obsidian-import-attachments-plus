@@ -489,7 +489,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                 });
         }
 
-            if (Platform.isDesktopApp) {
+        if (Platform.isDesktopApp) {
 
             new Setting(containerEl).setName('Commands and hotkeys').setHeading();
 
