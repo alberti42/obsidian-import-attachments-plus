@@ -982,8 +982,8 @@ export default class ImportAttachments extends Plugin {
         // Handle the dropped files
         const files = evt?.dataTransfer?.files;
         if(!files) return;
-
         if (files.length > 0) {
+
             const dropPos = editor.cm.posAtCoords({ x: evt.clientX, y: evt.clientY });
             
             if(dropPos===null) {
@@ -1010,10 +1010,31 @@ export default class ImportAttachments extends Plugin {
                     selection: EditorSelection.single(dropPos)
                 });
             }
+
+            // Using Electron's webFrameUtils to get the file path
+            const webUtils = require("electron").webUtils;
+
+            let files_array;
+
+            if(!webUtils) {
+                const installer_version = require("electron").remote.app.getVersion();
+                console.warn(`webUtils not available with the current Obsidian installer version ${installer_version}. Please replace your installation of Obsidian with a fresh new installation.`);
+            
+                files_array = Array.from(files);
+            } else {
+                // Enrich File objects with the `path` property
+                files_array = Array.from(files).map((file:File) => {
+                    const fullPath = webUtils.getPathForFile(file);
+
+                    // Dynamically add the `path` property
+                    file.path = fullPath;
+
+                    return file;
+                });
+            }
             
             // Handle the files as per your existing logic
-            // console.log(files);
-            this.handleFiles(Array.from(files), editor, view, doForceAsking, ImportOperationType.DRAG_AND_DROP);
+            this.handleFiles(files_array, editor, view, doForceAsking, ImportOperationType.DRAG_AND_DROP);
         
         } else {
             console.error('No files dropped');
