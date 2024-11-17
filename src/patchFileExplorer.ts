@@ -149,6 +149,8 @@ async function patchFileExplorer(plugin: ImportAttachments) {
         
         if(isFileExplorerView(viewInstance)) {
             viewClass = viewInstance.constructor as FileExplorerViewConstructorType; // Get the class from the instance
+            // console.log(viewInstance.containerEl);
+
     		patchFileExplorerView(plugin,viewClass);
             patched = true;
             // we want to apply the monkey-patch once, so we need to break out of the for loop
