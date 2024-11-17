@@ -1,7 +1,7 @@
 // types.ts
 
 import { DEFAULT_SETTINGS } from "default";
-import { HotkeysSettingTab } from "obsidian";
+import { FileExplorerView, HotkeysSettingTab, WorkspaceLeaf } from "obsidian";
 
 export enum ImportActionType {
 	MOVE='MOVE',
@@ -176,6 +176,38 @@ export function isAttachmentFolderLocationType(value: unknown): value is Attachm
            value === AttachmentFolderLocationType.SUBFOLDER;
 }
 
+/* File Explorer */
+
+export function isFileExplorerView(obj: unknown): obj is FileExplorerView {
+    if (typeof obj !== 'object' || obj === null) {
+        return false;
+    }
+
+    // Check if the object has the `fileItems` property
+    if (!('fileItems' in obj)) {
+        return false;
+    }
+
+    // Check if `fileItems` is an object
+    const fileExplorerView = obj as Partial<FileExplorerView>;
+    if (typeof fileExplorerView.fileItems !== 'object' || fileExplorerView.fileItems === null) {
+        return false;
+    }
+
+    if (!('fileBeingRenamed' in obj)) {
+        return false;
+    }
+
+    // Additional checks for specific properties if needed
+    // if (typeof fileExplorerView.createFolderDom !== 'function') {
+    //     return false;
+    // }
+    
+    // All checks passed, this is a FileExplorerView
+    return true;
+}
+
+export type FileExplorerViewConstructorType = { new(leaf: WorkspaceLeaf): FileExplorerView };
 
 /* Format version 1.3.0 */
 
@@ -202,3 +234,5 @@ export function isHotkeysSettingTab(obj: unknown): obj is HotkeysSettingTab {
     // Check if `obj` is an object and has the `setQuery` method
     return typeof obj === 'object' && obj !== null && 'setQuery' in obj && typeof (obj as HotkeysSettingTab).setQuery === 'function';
 }
+
+

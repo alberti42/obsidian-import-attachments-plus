@@ -60,7 +60,7 @@ declare module 'obsidian' {
 		fileItems: FileItems;
 		fileBeingRenamed: TAbstractFile;
 	}
-
+    
 	interface Editor {
 		cm: EditorView;
 	}

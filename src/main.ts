@@ -410,7 +410,7 @@ export default class ImportAttachments extends Plugin {
             this.file_menu_cb_registered = true;
         } else {
             if(this.file_menu_cb_registered) {
-                this.app.workspace.off("file-menu", this.file_menu_cb);
+                this.app.workspace.off("file-menu", this.file_menu_cb as (...data: unknown[]) => unknown);
                 this.file_menu_cb_registered = false;
             }
         }
@@ -460,7 +460,7 @@ export default class ImportAttachments extends Plugin {
         }
     }
 
-    file_menu_cb(menu: Menu, file: TAbstractFile) {
+    file_menu_cb(menu: Menu, file: TAbstractFile):void {
         if(menu.sections.contains("canvas")) return;
         
         if (file instanceof TFile) {
@@ -1012,6 +1012,7 @@ export default class ImportAttachments extends Plugin {
             }
             
             // Handle the files as per your existing logic
+            // console.log(files);
             this.handleFiles(Array.from(files), editor, view, doForceAsking, ImportOperationType.DRAG_AND_DROP);
         
         } else {
@@ -1021,7 +1022,7 @@ export default class ImportAttachments extends Plugin {
 
 	async handleFiles(files: File[], editor: Editor, view: MarkdownView, doForceAsking: boolean, importType: ImportOperationType) {
 
-		const {nonFolderFilesArray, foldersArray} = await Utils.filterOutFolders(Array.from(files));
+		const {nonFolderFilesArray, foldersArray} = await Utils.filterOutFolders(files);
 
 		if(foldersArray.length>0) {
 			const modal = new FolderImportErrorModal(this, foldersArray);

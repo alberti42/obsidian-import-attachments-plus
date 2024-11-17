@@ -3,7 +3,7 @@ import { promises as fs } from 'fs';  // This imports the promises API from fs
 import * as crypto from 'crypto';
 
 import { v4 as uuidv4 } from 'uuid';
-import { Vault, normalizePath, TAbstractFile, TFile, TFolder, Editor } from 'obsidian';
+import { Vault, normalizePath, TAbstractFile, TFile, TFolder, Editor, FileExplorerView } from 'obsidian';
 
 import { ParsedPath as ParsedFilePath, ParsedFolderPath } from 'types';
 import * as path from 'path';
@@ -231,9 +231,12 @@ export function createMockTFile(vault:Vault,filepath:string): TFile {
 export async function filterOutFolders(filesArray: File[]) {
 	const nonFolderFilesArray: File[] = [];
 	const foldersArray: File[] = [];
-
-	// Use Promise.all with map to handle asynchronous operations
-	await Promise.all(filesArray.map(async (file) => {
+    
+    // Use Promise.all with map to handle asynchronous operations
+	await Promise.all(filesArray.map(async (file:File) => {
+        // console.log(file);
+        // console.log(file.path);
+    
 		if (await doesDirectoryOutsideVaultExist(file.path)) {
 			foldersArray.push(file); // If it's a folder, add to foldersArray
 		} else {
