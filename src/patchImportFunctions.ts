@@ -10,7 +10,6 @@ import { parseFilePath } from 'utils';
 // Save a reference to the original method for the monkey patch
 let originalGetAvailablePathForAttachments: ((fileName: string, extension: string, currentFile: TFile | null) => Promise<string>) | null = null;
 let originalSaveAttachment: ((fileName: string, fileExtension: string, fileData: ArrayBuffer) => Promise<TFile>) | null = null;
-let data: ArrayBuffer | null = null;
 
 function unpatchImportFunctions() {
 	if (originalGetAvailablePathForAttachments) {
@@ -35,12 +34,10 @@ function patchImportFunctions(plugin: ImportAttachments) {
 		if (!originalGetAvailablePathForAttachments) {
 			throw new Error("Could not execute the original getAvailablePathForAttachments function.");
 		}
-
-		if(!data) throw new Error("The variable data is unexpectedly null.")
 		
 		const currentFile_parsed = currentFile ? parseFilePath(currentFile.path) : undefined;
 		
-		return await plugin.createAttachmentName(fileName + "." + extension,data,currentFile_parsed);
+		return await plugin.createAttachmentName(fileName + "." + extension, currentFile_parsed);
 	};
 
 	if (!originalSaveAttachment) {
@@ -53,10 +50,7 @@ function patchImportFunctions(plugin: ImportAttachments) {
 			throw new Error("Could not execute the original saveAttachment function.");
 		}
 
-		// Save `data` in the module variable. This allows getAvailablePathForAttachments, which is called from `originalsaveAttachment`, to use `data`
-		data = fileData;
 		const newAttachmentFile = await originalSaveAttachment.apply(this, [fileName, fileExtension, fileData]);
-		data = null;
 
 		/*
 		// The current active file in the workspace
