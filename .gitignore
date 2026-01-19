@@ -21,3 +21,6 @@ data.json
 
 # Sublime
 obsidian-import-attachments-plus.sublime-workspace
+
+# iCLoud
+*.nosync
