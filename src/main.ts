@@ -784,7 +784,7 @@ export default class ImportAttachments extends Plugin {
         return attachmentsFolderPath;           
     }
 
-    async createAttachmentName(originalFilePath:string, data: File | ArrayBuffer, md_file: ParsedPath | undefined): Promise<string> {
+    async createAttachmentName(originalFilePath:string, md_file: ParsedPath | undefined): Promise<string> {
 
         const originalFilePath_parsed = Utils.parseFilePath(originalFilePath);
         const namePattern = this.settings.attachmentName;
@@ -1135,7 +1135,7 @@ export default class ImportAttachments extends Plugin {
 
 		const tasks = filesToImport.map(async (fileToImport): Promise<string | null> => {
 			const originalFilePath = fileToImport.path;
-			let destFilePath = await this.createAttachmentName(originalFilePath,fileToImport,md_file_parsed);
+			let destFilePath = await this.createAttachmentName(originalFilePath, md_file_parsed);
 
 			// Check if file already exists in the vault
 			const existingFile = await Utils.doesFileExist(this.app.vault,destFilePath);
