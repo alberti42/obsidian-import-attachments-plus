@@ -1,24 +1,25 @@
-import { TFile, TFolder, normalizePath, CachedMetadata, LinkCache, ReferenceLinkCache, FrontmatterLinkCache } from 'obsidian';
-import { parseFilePath, createFolderIfNotExists, joinPaths, doesFileExist, findNewFilename } from './utils';
+import { TFile, CachedMetadata } from 'obsidian';
+import { parseFilePath, mapSoftSet } from './utils';
 import type ImportAttachments from 'main';
 
 declare const app: any;
-
-export type FileSet = { set: Set<SomeLink>, file: TFile };
 export type AttachFolder = { attachFolder: string, file: TFile };
-
-const NOTE_EXTENSIONS = new Set(["md", "canvas"]);
-
-const noteToAttachFolder = new Map<string, AttachFolder>();
-
-const	noteToAttachment = new Map<string, FileSet>();
-const attachmentToNote = new Map<string, FileSet>();
-
 export type SomeLink = {
 	text: string,
 	dest: string,
 	resolvedDest: TFile
 }
+type dedupeFileList = {f: TFile, list: Map<string, TFile>};
+type dedupeLinkList = {f: TFile, list: Map<string, SomeLink>};
+
+const NOTE_EXTENSIONS = new Set(["md", "canvas"]);
+
+const noteToAttachFolder = new Map<string, AttachFolder>();
+
+// deduplicated on link.resolvedDest.path
+const noteToAttachments = new Map<string, dedupeLinkList>();
+// deduplicated on TFile.path
+const attachmentToNotes = new Map<string, dedupeFileList>();
 
 function unifyLinkCaches(input: { f: TFile, m: CachedMetadata | null}) {
 	const links: SomeLink[] = [];
@@ -60,7 +61,6 @@ function buildReferenceMaps(plugin: ImportAttachments) {
 		))
 		.map(unifyLinkCaches)
 		.filter(e => e.links.length > 0)
-		.slice(0, 10);
 
 	for (const file of filesWithLinks) {
 		noteToAttachFolder.set(file.f.path, {
@@ -68,21 +68,31 @@ function buildReferenceMaps(plugin: ImportAttachments) {
 			file: file.f
 		});
 
+		if (!noteToAttachments.has(file.f.path)) {
+			noteToAttachments.set(file.f.path, { f: file.f, list: new Map<string, SomeLink>() });
+		}
+
+		// Deduplicate links
 		for (const link of file.links) {
-			if (!noteToAttachment.has(file.f.path)) {
-				noteToAttachment.set(file.f.path, { set: new Set(), file: file.f })
-			} else {
-				noteToAttachment.get(file.f.path)?.set.add(link);
+			if (!attachmentToNotes.has(link.resolvedDest.path)) {
+				attachmentToNotes.set(link.resolvedDest.path, { f: link.resolvedDest, list: new Map<string, TFile>() });
 			}
+
+			// bind note -> attachment
+			mapSoftSet(noteToAttachments.get(file.f.path)!.list, file.f.path, link);
+
+			// bind attachment -> note
+			mapSoftSet(attachmentToNotes.get(link.resolvedDest.path)!.list, link.resolvedDest.path, file.f);
 		}
 	}
-
 }
 
 export async function getAttachmentResortPairs(plugin: ImportAttachments) {
 
 	buildReferenceMaps(plugin);
-	return [];
+	console.log(noteToAttachFolder);
+	console.log(noteToAttachments);
+	console.log(attachmentToNotes);
 
-	// return files;
+	return [];
 }

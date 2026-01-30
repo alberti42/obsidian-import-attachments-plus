@@ -256,6 +256,10 @@ export async function createFolderIfNotExists(vault: Vault, folderPath: string) 
 		throw new Error(`Failed to create folder at ${folderPath}: ${error}`);
 	}
 }
+
+export function mapSoftSet<K, V>(map: Map<K, V>, key: K, value: V) {
+	if (!map.has(key)) map.set(key, value);
+}
 	
 export { uuidv4, formatDateTime };
 
