@@ -10,7 +10,8 @@ export type DedupeLinkList = {f: TFile, list: Map<string, SomeLink>};
 export type AttachmentResortPair = { file: TFile, from: string, to: AttachFolder[] }
 
 const NOTE_EXTENSIONS = new Set(["md", "canvas"]);
-const warnInConsole = process.env.NODE_ENV === "development";
+// const warnInConsole = process.env.NODE_ENV === "development";
+const warnInConsole = false;
 
 const noteToAttachFolder = new Map<string, AttachFolder>();
 
@@ -23,13 +24,20 @@ function unifyLinkCaches(input: { f: TFile, m: CachedMetadata | null}) {
 	const links: SomeLink[] = [];
 	if (!input.m) return { f: input.f, links: []};
 
-	for (const elem of [...(input.m?.links ?? []), ...(input.m?.frontmatterLinks ?? []) ]) {
+	const mergedLinks = [
+		...(input.m?.links ?? []), 
+		...(input.m?.frontmatterLinks ?? []), 
+		...(input.m?.embeds ?? []) 
+	]
+
+	for (const elem of mergedLinks) {
 		if (!elem.original || elem.original.startsWith("[[#")) continue; // skip [[#heading]]
 
 		let dest = elem.original;
-		if (dest.startsWith("[[") && dest.endsWith("]]")) { // strip [[ and ]]
-			dest = dest.replace("[[", "").replace("]]", "");
-		}
+
+		// strip [[ and ]], ![[ and ]]
+		if (dest.startsWith("[[") && dest.endsWith("]]")) dest = dest.slice(2, -2);
+		if (dest.startsWith("![[") && dest.endsWith("]]")) dest = dest.slice(3, -2);
 		if (dest.match(/^\[.+\]\(.+\)$/)) continue; // skip links like [components](#components)
 		dest = dest.replace(/(?:\||\\\||#|\\#).+$/, ""); // strip |alt, #heading, #heading|alt
 
@@ -40,6 +48,8 @@ function unifyLinkCaches(input: { f: TFile, m: CachedMetadata | null}) {
 		}
 		// we are not interested in notes linking to other notes
 		if (NOTE_EXTENSIONS.has(res.extension.toLowerCase())) continue;
+
+		// console.log(`Resolved link: ${elem.original} -> ${res.path}`);
 
 		links.push({ text: elem.link, dest: elem.original, resolvedDest: res });
 	}
@@ -54,18 +64,26 @@ function buildReferenceMaps(plugin: ImportAttachments) {
 		.filter(t => NOTE_EXTENSIONS.has(t.extension.toLowerCase()))
 		.map(t => ({ f: t, m: app.metadataCache.getFileCache(t) as CachedMetadata | null }))
 		.filter(e => e.m !== null && (
+			!(e.m.embeds == null || e.m.embeds.length == 0) ||
 			!(e.m.links == null || e.m.links.length === 0) ||
 			!(e.m.frontmatterLinks == null || e.m.frontmatterLinks.length === 0)
 		))
 		.map(unifyLinkCaches)
-		.filter(e => e.links.length > 0)
+		// .filter(e => e.links.length > 0)
+
+	for (const f of filesWithLinks) {
+		if (f.f.path.includes("intersection")) {
+			console.log("intersection!",f);
+			console.log(app.metadataCache.getFileCache(f.f))
+		}
+	}
 
 	for (const file of filesWithLinks) {
 		noteToAttachFolder.set(file.f.path, {
 			attachFolder: plugin.getAttachmentFolderOfMdNote(parseFilePath(file.f.path)),
 			file: file.f
 		});
-
+		
 		if (!noteToAttachments.has(file.f.path)) {
 			noteToAttachments.set(file.f.path, { f: file.f, list: new Map<string, SomeLink>() });
 		}
@@ -75,24 +93,30 @@ function buildReferenceMaps(plugin: ImportAttachments) {
 			if (!attachmentToNotes.has(link.resolvedDest.path)) {
 				attachmentToNotes.set(link.resolvedDest.path, { f: link.resolvedDest, list: new Map<string, TFile>() });
 			}
-
+			
 			// bind note -> attachment
 			mapSoftSet(noteToAttachments.get(file.f.path)!.list, file.f.path, link);
-
+			
 			// bind attachment -> note
 			mapSoftSet(attachmentToNotes.get(link.resolvedDest.path)!.list, link.resolvedDest.path, file.f);
 		}
+
+		// if (file.f.path.includes("intersection")) {
+		// 	console.log("intersections!", noteToAttachFolder.get(file.f.path), noteToAttachments.get(file.f.path));
+		// }
 	}
 }
 
 export async function getAttachmentResortPairs(plugin: ImportAttachments) {
-	buildReferenceMaps(plugin);
+	if (noteToAttachFolder.size === 0 || noteToAttachments.size === 0 || attachmentToNotes.size === 0) {
+		buildReferenceMaps(plugin);
+	}
 
 	const attachmentResortPairs: AttachmentResortPair[] = [];
 
-	// console.log(noteToAttachFolder);
-	// console.log(noteToAttachments);
-	// console.log(attachmentToNotes);
+	console.log(noteToAttachFolder);
+	console.log(noteToAttachments);
+	console.log(attachmentToNotes);
 
 	for (const [note, attachFolder] of noteToAttachFolder.entries()) {
 		const folder = app.vault.getAbstractFileByPath(attachFolder.attachFolder) as TFolder;
@@ -101,8 +125,9 @@ export async function getAttachmentResortPairs(plugin: ImportAttachments) {
 			continue;
 		}
 
+		console.log("processing", note, attachFolder);
 		const filesInAttachFolder = getAllFilesInFolder(folder);
-		// console.log("fiaf", filesInAttachFolder);
+		console.log("fiaf", filesInAttachFolder);
 		for (const attachment of filesInAttachFolder) {
 			if (!noteToAttachments.has(note)) continue;
 			
