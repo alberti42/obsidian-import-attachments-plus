@@ -4,25 +4,21 @@ import type ImportAttachments from 'main';
 
 declare const app: any;
 
-export type AttachmentResortPair = {
-	attachmentPath: string;
-	fromFolder: string;
-	toFolder: string;
-	fromNote: string;
-	toNote: string;
-};
+export type FileSet = { set: Set<SomeLink>, file: TFile };
+export type AttachFolder = { attachFolder: string, file: TFile };
 
 const NOTE_EXTENSIONS = new Set(["md", "canvas"]);
 
-const noteToAttachFolder = new Map<String, String>();
-const	noteToFile = new Map<String, Set<TFile>>();
+const noteToAttachFolder = new Map<string, AttachFolder>();
+
+const	noteToAttachment = new Map<string, FileSet>();
+const attachmentToNote = new Map<string, FileSet>();
 
 export type SomeLink = {
 	text: string,
 	dest: string,
-	resolvedDest?: TFile
+	resolvedDest: TFile
 }
-
 
 function unifyLinkCaches(input: { f: TFile, m: CachedMetadata | null}) {
 	const links: SomeLink[] = [];
@@ -36,7 +32,7 @@ function unifyLinkCaches(input: { f: TFile, m: CachedMetadata | null}) {
 			dest = dest.replace("[[", "").replace("]]", "");
 		}
 		if (dest.match(/^\[.+\]\(.+\)$/)) continue; // skip links like [components](#components)
-		dest = dest.replace(/(?:\||\\\||#|\\#|).+$/, ""); // strip |alt, #heading, #heading|alt
+		dest = dest.replace(/(?:\||\\\||#|\\#).+$/, ""); // strip |alt, #heading, #heading|alt
 
 		const res: TFile | null = app.metadataCache.getFirstLinkpathDest(dest, input.f.path);
 		if (res == null) {
@@ -52,7 +48,7 @@ function unifyLinkCaches(input: { f: TFile, m: CachedMetadata | null}) {
 	return { f: input.f, links };
 }
 
-function buildReferenceMaps() {
+function buildReferenceMaps(plugin: ImportAttachments) {
 	app.metadataCache.trigger('resolve');
 
 	const filesWithLinks = (app.vault.getFiles() as TFile[])
@@ -64,17 +60,28 @@ function buildReferenceMaps() {
 		))
 		.map(unifyLinkCaches)
 		.filter(e => e.links.length > 0)
-		.slice(0, 10)
+		.slice(0, 10);
 
-	for (const f of filesWithLinks) {
-		console.log(f);
+	for (const file of filesWithLinks) {
+		noteToAttachFolder.set(file.f.path, {
+			attachFolder: plugin.getAttachmentFolderOfMdNote(parseFilePath(file.f.path)),
+			file: file.f
+		});
+
+		for (const link of file.links) {
+			if (!noteToAttachment.has(file.f.path)) {
+				noteToAttachment.set(file.f.path, { set: new Set(), file: file.f })
+			} else {
+				noteToAttachment.get(file.f.path)?.set.add(link);
+			}
+		}
 	}
 
 }
 
 export async function getAttachmentResortPairs(plugin: ImportAttachments) {
 
-	buildReferenceMaps()
+	buildReferenceMaps(plugin);
 	return [];
 
 	// return files;
