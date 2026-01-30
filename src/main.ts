@@ -60,6 +60,7 @@ import { DEFAULT_SETTINGS, DEFAULT_SETTINGS_1_3_0 } from "default";
 import { EditorSelection } from '@codemirror/state';
 
 import { ImportAttachmentsSettingTab } from 'settings';
+import { getAttachmentResortPairs } from "resortAttachments";
 
 class DeleteLinkError extends Error {}
 
@@ -377,6 +378,12 @@ export default class ImportAttachments extends Plugin {
             id: "open-attachments-folder",
             name: "Open attachments folder",
             callback: () => this.open_attachments_folder_cb(),
+        });
+
+        this.addCommand({
+            id: "resort-attachemnts",
+            name: "Resort attachments into appropriate folders",
+            callback: () => this.resort_attachments_cb(),
         });
     }
 
@@ -1398,4 +1405,10 @@ export default class ImportAttachments extends Plugin {
 		// eslint-disable-next-line @typescript-eslint/no-var-requires
 		require('electron').remote.shell.openPath(Utils.makePosixPathOScompatible(absAttachmentsFolderPath));
 	}
+
+    async resort_attachments_cb() {
+        console.log("resorting");
+        const pairs = await getAttachmentResortPairs(this);
+        console.log(pairs);
+    }
 }
