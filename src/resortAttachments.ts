@@ -69,14 +69,14 @@ function buildReferenceMaps(plugin: ImportAttachments) {
 			!(e.m.frontmatterLinks == null || e.m.frontmatterLinks.length === 0)
 		))
 		.map(unifyLinkCaches)
-		// .filter(e => e.links.length > 0)
+		.filter(e => e.links.length > 0)
 
-	for (const f of filesWithLinks) {
-		if (f.f.path.includes("intersection")) {
-			console.log("intersection!",f);
-			console.log(app.metadataCache.getFileCache(f.f))
-		}
-	}
+	// for (const f of filesWithLinks) {
+	// 	if (f.f.path.includes("intersection")) {
+	// 		console.log("intersection!",f);
+	// 		console.log(app.metadataCache.getFileCache(f.f))
+	// 	}
+	// }
 
 	for (const file of filesWithLinks) {
 		noteToAttachFolder.set(file.f.path, {
@@ -95,10 +95,10 @@ function buildReferenceMaps(plugin: ImportAttachments) {
 			}
 			
 			// bind note -> attachment
-			mapSoftSet(noteToAttachments.get(file.f.path)!.list, file.f.path, link);
+			mapSoftSet(noteToAttachments.get(file.f.path)!.list, link.resolvedDest.path, link);
 			
 			// bind attachment -> note
-			mapSoftSet(attachmentToNotes.get(link.resolvedDest.path)!.list, link.resolvedDest.path, file.f);
+			mapSoftSet(attachmentToNotes.get(link.resolvedDest.path)!.list, file.f.path, file.f);
 		}
 
 		// if (file.f.path.includes("intersection")) {
@@ -114,9 +114,9 @@ export async function getAttachmentResortPairs(plugin: ImportAttachments) {
 
 	const attachmentResortPairs: AttachmentResortPair[] = [];
 
-	console.log(noteToAttachFolder);
-	console.log(noteToAttachments);
-	console.log(attachmentToNotes);
+	// console.log(noteToAttachFolder);
+	// console.log(noteToAttachments);
+	// console.log(attachmentToNotes);
 
 	for (const [note, attachFolder] of noteToAttachFolder.entries()) {
 		const folder = app.vault.getAbstractFileByPath(attachFolder.attachFolder) as TFolder;
@@ -125,9 +125,9 @@ export async function getAttachmentResortPairs(plugin: ImportAttachments) {
 			continue;
 		}
 
-		console.log("processing", note, attachFolder);
+		// console.log("processing", note, attachFolder);
 		const filesInAttachFolder = getAllFilesInFolder(folder);
-		console.log("fiaf", filesInAttachFolder);
+		// console.log("fiaf", filesInAttachFolder);
 		for (const attachment of filesInAttachFolder) {
 			if (!noteToAttachments.has(note)) continue;
 			
