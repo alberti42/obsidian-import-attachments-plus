@@ -260,6 +260,23 @@ export async function createFolderIfNotExists(vault: Vault, folderPath: string) 
 export function mapSoftSet<K, V>(map: Map<K, V>, key: K, value: V) {
 	if (!map.has(key)) map.set(key, value);
 }
-	
+
+export function getAllFilesInFolder(folder: TFolder): TFile[] {
+	const files: TFile[] = [];
+
+	function traverse(currentFolder: TFolder) {
+		for (const child of currentFolder.children) {
+			if (child instanceof TFile) {
+				files.push(child);
+			} else if (child instanceof TFolder) {
+				traverse(child); // Recurse into subfolders
+			}
+		}
+	}
+
+	traverse(folder);
+	return files;
+}
+
 export { uuidv4, formatDateTime };
 

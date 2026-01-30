@@ -1,25 +1,23 @@
-import { TFile, CachedMetadata } from 'obsidian';
-import { parseFilePath, mapSoftSet } from './utils';
+import { TFile, TFolder, CachedMetadata } from 'obsidian';
+import { parseFilePath, mapSoftSet, getAllFilesInFolder } from './utils';
 import type ImportAttachments from 'main';
 
 declare const app: any;
 export type AttachFolder = { attachFolder: string, file: TFile };
-export type SomeLink = {
-	text: string,
-	dest: string,
-	resolvedDest: TFile
-}
-type dedupeFileList = {f: TFile, list: Map<string, TFile>};
-type dedupeLinkList = {f: TFile, list: Map<string, SomeLink>};
+export type SomeLink = { text: string, dest: string, resolvedDest: TFile };
+export type DedupeFileList = {f: TFile, list: Map<string, TFile>};
+export type DedupeLinkList = {f: TFile, list: Map<string, SomeLink>};
+export type AttachmentResortPair = { file: TFile, from: string, to: AttachFolder[] }
 
 const NOTE_EXTENSIONS = new Set(["md", "canvas"]);
+const warnInConsole = process.env.NODE_ENV === "development";
 
 const noteToAttachFolder = new Map<string, AttachFolder>();
 
 // deduplicated on link.resolvedDest.path
-const noteToAttachments = new Map<string, dedupeLinkList>();
+const noteToAttachments = new Map<string, DedupeLinkList>();
 // deduplicated on TFile.path
-const attachmentToNotes = new Map<string, dedupeFileList>();
+const attachmentToNotes = new Map<string, DedupeFileList>();
 
 function unifyLinkCaches(input: { f: TFile, m: CachedMetadata | null}) {
 	const links: SomeLink[] = [];
@@ -37,7 +35,7 @@ function unifyLinkCaches(input: { f: TFile, m: CachedMetadata | null}) {
 
 		const res: TFile | null = app.metadataCache.getFirstLinkpathDest(dest, input.f.path);
 		if (res == null) {
-			console.warn("could not resolve link:", elem.original, `(parsed as: '${dest}')`);
+			if (warnInConsole) console.warn("resort: could not resolve link:", elem.original, `(parsed as: '${dest}')`);
 			continue;
 		}
 		// we are not interested in notes linking to other notes
@@ -88,11 +86,42 @@ function buildReferenceMaps(plugin: ImportAttachments) {
 }
 
 export async function getAttachmentResortPairs(plugin: ImportAttachments) {
-
 	buildReferenceMaps(plugin);
-	console.log(noteToAttachFolder);
-	console.log(noteToAttachments);
-	console.log(attachmentToNotes);
 
-	return [];
+	const attachmentResortPairs: AttachmentResortPair[] = [];
+
+	// console.log(noteToAttachFolder);
+	// console.log(noteToAttachments);
+	// console.log(attachmentToNotes);
+
+	for (const [note, attachFolder] of noteToAttachFolder.entries()) {
+		const folder = app.vault.getAbstractFileByPath(attachFolder.attachFolder) as TFolder;
+		if (!folder) {
+			if (warnInConsole) console.warn("resort: could not resolve folder: ", attachFolder);
+			continue;
+		}
+
+		const filesInAttachFolder = getAllFilesInFolder(folder);
+		// console.log("fiaf", filesInAttachFolder);
+		for (const attachment of filesInAttachFolder) {
+			if (!noteToAttachments.has(note)) continue;
+			
+			// this *attachment* is in *note*'s attach folder, but the *note* does not reference it!
+			if (!noteToAttachments.get(note)?.list.has(attachment.path)) {
+				if (!attachmentToNotes.get(attachment.path)) continue;
+				// console.log("found misplaced!", attachment);
+
+				const alternatives = Array.from(attachmentToNotes.get(attachment.path)!.list.values())
+					.map(ntf => noteToAttachFolder.get(ntf.path))
+					.filter(e => typeof e !== "undefined");
+				
+				if (alternatives.length === 0) continue; // file is an orphan
+				
+				// save alternatives to where the attachment should be moved
+				attachmentResortPairs.push({ file: attachment, from: attachment.path, to: alternatives });
+			}
+		}
+	}
+
+	return attachmentResortPairs;
 }
