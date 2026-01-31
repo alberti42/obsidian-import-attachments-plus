@@ -670,6 +670,7 @@ export class MovePairsModal extends Modal {
 					&& wrapper.nextElementSibling.classList.contains("resort-pair-row")
 					&& this.rowToPair.has(wrapper.nextElementSibling as HTMLElement)
 			) {
+				// TODO fix selecting next row logic
 				const nes = wrapper.nextElementSibling as HTMLElement;
 				this.selectedRow.removeAttribute('data-selected');
 				this.selectedRow = nes;
