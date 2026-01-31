@@ -588,8 +588,11 @@ export class MovePairsModal extends Modal {
 	private resolveChoice: (result: boolean) => void = () => {};  // To resolve the promise. Initialize with a no-op function
 	private rows: HTMLElement[] = [];
 	private previewEl: HTMLElement | null = null;
+	private previewImgEl: HTMLImageElement | null = null;
+	private previewEmptyEl: HTMLElement | null = null;
+	private previewToken = 0;
 	private selectedRow: HTMLElement | null = null;
-	private selectedPair: AttachmentResortPair | null;
+	private selectedPair: AttachmentResortPair | null = null;
 
 	private static readonly imageExtensions = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif']);
 
@@ -597,25 +600,50 @@ export class MovePairsModal extends Modal {
 		super(app);
 	}
 
-	private renderNoPreview() {
+	private initPreviewElements() {
+		if (!this.previewEl || this.previewImgEl) return;
 		
+		this.previewEmptyEl = this.previewEl.createDiv({ cls: 'import-preview-empty' });
+		this.previewEmptyEl.createDiv({ cls: 'import-preview-icon' });
+		this.previewEmptyEl.createEl('div', { text: 'No preview available', cls: 'import-preview-text' });
 		
-		
-		
-		
+		this.previewImgEl = this.previewEl.createEl('img', { cls: 'import-preview-image' });
+	}
+
+	private showPreview(show: 'image' | 'fallback') {
+		if (!this.previewImgEl || !this.previewEmptyEl) return;
+		if (show === 'image') {
+			this.previewImgEl.style.opacity = '1';
+			this.previewImgEl.style.visibility = 'visible';
+			this.previewEmptyEl.style.opacity = '0';
+			this.previewEmptyEl.style.visibility = 'hidden';
+		} else {
+			this.previewImgEl.style.opacity = '0';
+			this.previewImgEl.style.visibility = 'hidden';
+			this.previewEmptyEl.style.opacity = '1';
+			this.previewEmptyEl.style.visibility = 'visible';
+		}
 	}
 
 	private renderPreview() {
-		if (!this.previewEl) return;
+		this.initPreviewElements();
+		if (!this.previewImgEl || !this.previewEmptyEl) return;
 
-		if (this.selectedPair) {
-
-		} else {
-			const placeholder = this.previewEl.createDiv({ cls: 'import-preview-empty' });
-			const icon = placeholder.createDiv({ cls: 'import-preview-icon' });
-			icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m2 2l20 20M10.41 10.41a2 2 0 1 1-2.83-2.83m5.92 5.92L6 21m12-9l3 3"/><path d="M3.59 3.59A2 2 0 0 0 3 5v14a2 2 0 0 0 2 2h14c.55 0 1.052-.22 1.41-.59M21 15V5a2 2 0 0 0-2-2H9"/></g></svg>';
-			placeholder.createEl('div', { text: 'No preview available', cls: 'import-preview-text' });
+		const pair = this.selectedPair;
+		if (!pair || !MovePairsModal.imageExtensions.has(pair.file.extension.toLowerCase())) {
+			this.showPreview('fallback');
+			return;
 		}
+
+		const token = ++this.previewToken;
+		const img = this.previewImgEl;
+		
+		this.showPreview('fallback');
+		
+		img.onload = () => token === this.previewToken && this.showPreview('image');
+		img.onerror = () => token === this.previewToken && this.showPreview('fallback');
+		img.src = this.app.vault.adapter.getResourcePath(pair.file.path);
+		img.alt = pair.file.name;
 	}
 
 	private renderRow(parent: HTMLElement, pair: AttachmentResortPair) {
@@ -632,6 +660,7 @@ export class MovePairsModal extends Modal {
 			this.selectedRow = wrapper;
 			this.selectedRow.setAttribute('data-selected', 'true');
 			this.selectedPair = pair;
+			this.renderPreview();
 		})
 	}
 
@@ -660,6 +689,7 @@ export class MovePairsModal extends Modal {
 		for (const pair of this.pairs) {
 			this.renderRow(scroller, pair);
 		}
+		this.renderPreview();
 		
 		const yesButton = bottomBar.createEl('button', {
 				text: 'Move attachments',
