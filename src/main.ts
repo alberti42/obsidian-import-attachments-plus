@@ -381,7 +381,7 @@ export default class ImportAttachments extends Plugin {
         });
 
         this.addCommand({
-            id: "resort-attachemnts",
+            id: "resort-attachments",
             name: "Resort attachments into appropriate folders",
             callback: () => this.resort_attachments_cb(),
         });
