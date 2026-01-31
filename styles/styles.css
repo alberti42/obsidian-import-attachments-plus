@@ -204,6 +204,7 @@ input:checked+.import-slider:before {
 
 .resort-pair-row {
 	display: flex;
+	align-items: center;
 	gap: .5rem;
 
 	padding: 0.3rem 0.5rem;
@@ -214,6 +215,22 @@ input:checked+.import-slider:before {
 		padding-inline: 0.25rem;
 		border-radius: var(--radius-s);
 		border: 1px solid var(--background-modifier-border);
+	}
+	.rpr-arrow {
+		height: 100%;
+		display: flex;
+		align-items: center;
+	}
+	.rpr-spacer { flex-grow: 1; };
+	.resort-pair-row-btn {
+		border: 1px solid var(--background-modifier-border);
+	}
+	.resort-pair-row-from {
+		/* width: 100%; */
+	}
+	.resort-pair-row-to {
+		margin-right: .25rem;
+		/* width: 100%; */
 	}
 }
 .resort-pair-row:not([data-selected="true"]) {
@@ -229,4 +246,8 @@ input:checked+.import-slider:before {
 .resort-pair-row[data-selected="true"] {
 	color: var(--modal-background);
 	background-color: var(--interactive-accent);
+
+	.resort-pair-row-btn {
+		color: var(--modal-background);
+	}
 }

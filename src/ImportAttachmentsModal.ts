@@ -593,11 +593,13 @@ export class MovePairsModal extends Modal {
 	private previewToken = 0;
 	private selectedRow: HTMLElement | null = null;
 	private selectedPair: AttachmentResortPair | null = null;
+	private rowToPair: Map<HTMLElement, AttachmentResortPair>;
 
 	private static readonly imageExtensions = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif']);
 
 	constructor(app: App, private pairs: AttachmentResortPair[]) {
 		super(app);
+		this.rowToPair = new Map();
 	}
 
 	private initPreviewElements() {
@@ -648,18 +650,39 @@ export class MovePairsModal extends Modal {
 
 	private renderRow(parent: HTMLElement, pair: AttachmentResortPair) {
 		const wrapper = parent.createDiv({ cls: "resort-pair-row" });
+		this.rowToPair.set(wrapper, pair);
 
 		const name = wrapper.createSpan({ cls: 'resort-pair-row-name', text: `${pair.file.name}` });
 		const from = wrapper.createSpan({ cls: ['resort-pair-row-from', 'reverse-ellipsis'], text: `${pair.from}` });
-		const arrow = wrapper.createSpan()
+		const arrow = wrapper.createSpan({ cls: 'rpr-arrow' })
 		const to = wrapper.createSpan({ cls: ['resort-pair-row-to', 'reverse-ellipsis'], text: `${pair.to.at(0)?.attachFolder ?? "-"}` });
 
 		setIcon(arrow, 'arrow-right');
 
-		wrapper.addEventListener("click", () => {
-			if (this.selectedRow) {
+		wrapper.createSpan({ cls: 'rpr-spacer' });
+		const confirmButton = wrapper.createEl("button", { cls: ['clickable-icon', 'resort-pair-row-btn', 'rpr-btn-confirm'] });
+		setIcon(confirmButton, 'check');
+
+		const removeButton = wrapper.createEl("button", { cls: ['clickable-icon', 'resort-pair-row-btn', 'rpr-btn-dismiss'] });
+		removeButton.addEventListener("click", () => {
+			if (this.selectedRow === wrapper 
+					&& wrapper.nextElementSibling != null
+					&& wrapper.nextElementSibling.classList.contains("resort-pair-row")
+					&& this.rowToPair.has(wrapper.nextElementSibling as HTMLElement)
+			) {
+				const nes = wrapper.nextElementSibling as HTMLElement;
 				this.selectedRow.removeAttribute('data-selected');
+				this.selectedRow = nes;
+				nes.setAttribute('data-selected', 'true');
+				this.selectedPair = this.rowToPair.get(nes) as AttachmentResortPair;
+				this.renderPreview();
 			}
+			// setTimeout(() => wrapper.remove(), 0);
+		})
+		setIcon(removeButton, 'x');
+
+		wrapper.addEventListener("click", () => {
+			if (this.selectedRow) this.selectedRow.removeAttribute('data-selected');
 			this.selectedRow = wrapper;
 			this.selectedRow.setAttribute('data-selected', 'true');
 			this.selectedPair = pair;
@@ -695,7 +718,7 @@ export class MovePairsModal extends Modal {
 		this.renderPreview();
 		
 		const yesButton = bottomBar.createEl('button', {
-				text: 'Move attachments',
+				text: 'Move all attachments',
 				cls: 'mod-cta'
 		});
 
