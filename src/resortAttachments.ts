@@ -108,9 +108,12 @@ function buildReferenceMaps(plugin: ImportAttachments) {
 }
 
 export async function getAttachmentResortPairs(plugin: ImportAttachments) {
-	if (noteToAttachFolder.size === 0 || noteToAttachments.size === 0 || attachmentToNotes.size === 0) {
-		buildReferenceMaps(plugin);
-	}
+	// rebuild updated maps
+	noteToAttachFolder.clear();
+	noteToAttachments.clear();
+	attachmentToNotes.clear();
+
+	buildReferenceMaps(plugin);
 
 	const attachmentResortPairs: AttachmentResortPair[] = [];
 
