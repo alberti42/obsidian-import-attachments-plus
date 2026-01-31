@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-inferrable-types */
 // ImportAttachmentsModal.ts
-import { Modal, Platform, TFolder } from 'obsidian';
+import { App, Modal, Platform, TFolder } from 'obsidian';
 import {
 		ImportActionType,
 		ImportActionChoiceResult,
@@ -14,8 +14,16 @@ import {
 	} from './types';
 import * as Utils from "utils";
 import type ImportAttachments from 'main'; // Import the type of your plugin class if needed for type hinting
+import type { AttachmentResortPair } from 'resortAttachments';
 
 const MODAL_TITLE_HTML_EL='h4';
+
+export type MovePairsModalResult = {
+	selections: {
+		sourcePath: string;
+		destinationPath: string;
+	}[];
+} | null;
 
 export class ImportActionTypeModal extends Modal {
 	promise: Promise<ImportActionChoiceResult>;
@@ -197,6 +205,7 @@ export class OverwriteChoiceModal extends Modal {
 	}
 
 	onOpen() {
+		void this.plugin;
 		const { contentEl } = this;
 
 		const container = contentEl.createDiv({ cls: 'import-plugin' });
@@ -275,7 +284,6 @@ export class OverwriteChoiceModal extends Modal {
 		this.resolveChoice(null);  // Resolve with null if the modal is closed without a choice
 	}
 }
-
 
 export class DeleteAttachmentFolderModal extends Modal {
 	promise: Promise<boolean>;
@@ -360,8 +368,6 @@ export class DeleteAttachmentFolderModal extends Modal {
 		this.resolveChoice(false);  // Resolve with null if the modal is closed without a choice
 	}
 }
-
-
 
 export class ImportFromVaultChoiceModal extends Modal {
 	promise: Promise<ImportFromVaultChoiceResult>;
@@ -518,7 +524,6 @@ export class FolderImportErrorModal extends Modal {
     }
 }
 
-
 export class CreateAttachmentFolderModal extends Modal {
     promise: Promise<boolean>;
     private resolveChoice: (result: boolean) => void = () => {};  // To resolve the promise. Initialize with a no-op function
@@ -577,4 +582,44 @@ export class CreateAttachmentFolderModal extends Modal {
         this.contentEl.empty();
         this.resolveChoice(false);  // Resolve with false if the modal is closed without a choice
     }
+}
+
+export class MovePairsModal extends Modal {
+	private rows: HTMLElement[] = [];
+	private previewEl: HTMLElement | null = null;
+
+	private static readonly imageExtensions = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif']);
+
+	constructor(app: App, private pairs: AttachmentResortPair[]) {
+		super(app);
+	}
+
+	private renderNoPreview() {
+		if (!this.previewEl) return;
+		const placeholder = this.previewEl.createDiv({ cls: 'import-preview-empty' });
+		const icon = placeholder.createDiv({ cls: 'import-preview-icon' });
+		icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m2 2l20 20M10.41 10.41a2 2 0 1 1-2.83-2.83m5.92 5.92L6 21m12-9l3 3"/><path d="M3.59 3.59A2 2 0 0 0 3 5v14a2 2 0 0 0 2 2h14c.55 0 1.052-.22 1.41-.59M21 15V5a2 2 0 0 0-2-2H9"/></g></svg>';
+		placeholder.createEl('div', { text: 'No preview available', cls: 'import-preview-text' });
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		this.modalEl.style.width = '90vw';
+		this.modalEl.style.maxWidth = '1200px';
+		this.modalEl.style.height = '70vh';
+		this.modalEl.style.maxHeight = '70vh';
+
+		const container = contentEl.createDiv({ cls: 'import-plugin resort-pairs-modal' });
+
+		const header = container.createEl('header', { cls: 'resort-pairs-header' })
+		header.createEl('h4', 'Resort attachments')
+
+		const scroller = container.createDiv({ cls: 'resort-pairs-scroller'});
+		const preview = container.createDiv({ cls: 'resort-pairs-preview'});
+		const bottomBar = container.createDiv({ cls: 'resort-pairs-bottom-bar'});
+	}
+
+	onClose() {
+		this.contentEl.empty();
+	}
 }

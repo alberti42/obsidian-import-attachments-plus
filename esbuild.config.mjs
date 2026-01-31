@@ -21,7 +21,10 @@ const context = await esbuild.context({
 	banner: {
 		js: banner,
 	},
-	entryPoints: ["src/main.ts"],
+	entryPoints: {
+		main: "src/main.ts",
+		styles: "styles/styles.css"
+	},
 	bundle: true,
 	external: [
 		"obsidian",
@@ -57,12 +60,6 @@ const context = await esbuild.context({
 			assets: {
 				from: ['./manifest.json'],
 				to: ['./manifest.json']
-			}
-		}),
-		copy({
-			assets: {
-				from: ['./styles/styles.css'],
-				to: ['./styles.css']
 			}
 		})
 	],

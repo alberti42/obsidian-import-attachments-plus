@@ -22,7 +22,7 @@ import {
 } from "obsidian";
 
 // Import utility and modal components
-import { ImportActionTypeModal, OverwriteChoiceModal, ImportFromVaultChoiceModal, FolderImportErrorModal, CreateAttachmentFolderModal } from './ImportAttachmentsModal';
+import { ImportActionTypeModal, OverwriteChoiceModal, ImportFromVaultChoiceModal, FolderImportErrorModal, CreateAttachmentFolderModal, MovePairsModal } from './ImportAttachmentsModal';
 import {
 	ImportActionType,
 	MultipleFilesImportTypes,
@@ -61,6 +61,7 @@ import { EditorSelection } from '@codemirror/state';
 
 import { ImportAttachmentsSettingTab } from 'settings';
 import { getAttachmentResortPairs } from "resortAttachments";
+
 
 class DeleteLinkError extends Error {}
 
@@ -1407,8 +1408,16 @@ export default class ImportAttachments extends Plugin {
 	}
 
     async resort_attachments_cb() {
-        console.log("resorting");
         const pairs = await getAttachmentResortPairs(this);
-        console.log(pairs);
+        if (pairs.length === 0) {
+            new Notice('No attachments need resorting.');
+            return;
+        }
+
+        const modal = new MovePairsModal(this.app, pairs);
+        modal.open();
+        const choice = await modal.promise;
+        if (choice == null) return;
+        console.log(choice);
     }
 }
