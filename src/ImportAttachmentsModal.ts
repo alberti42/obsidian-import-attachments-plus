@@ -585,6 +585,7 @@ export class CreateAttachmentFolderModal extends Modal {
 }
 
 export class MovePairsModal extends Modal {
+	private resolveChoice: (result: boolean) => void = () => {};  // To resolve the promise. Initialize with a no-op function
 	private rows: HTMLElement[] = [];
 	private previewEl: HTMLElement | null = null;
 
@@ -605,33 +606,35 @@ export class MovePairsModal extends Modal {
 	private renderRow(parent: HTMLElement, pair: AttachmentResortPair) {
 		const div = parent.createDiv({ cls: "resort-pair-row" });
 
-		const name = div.createEl('span', { cls: 'resort-pair-row-name', text: `${pair.file.name}` });
-		const from = div.createEl('span', { cls: 'resort-pair-row-from', text: `${pair.from}` });
-		const to = div.createEl('span', { cls: 'resort-pair-row-to', text: `${pair.to.at(0) ?? "-"}` });
+		const name = div.createSpan({ cls: 'resort-pair-row-name', text: `${pair.file.name}` });
+		const from = div.createSpan({ cls: 'resort-pair-row-from', text: `${pair.from}` });
+		const to = div.createSpan({ cls: 'resort-pair-row-to', text: `${pair.to.at(0) ?? "-"}` });
 	}
 
 	onOpen() {
-		const { contentEl } = this;
-		this.modalEl.style.minWidth = '100ch';
-		this.modalEl.style.width = "max-content";
-		this.modalEl.style.maxWidth = '56rem';
+		const { contentEl, modalEl } = this;
 
-		this.modalEl.style.minHeight = '70vh';
-		this.modalEl.style.height = 'max-content';
-		// this.modalEl.style.maxHeight = '70vh';
+		modalEl.style.minWidth = '100ch';
+		modalEl.style.width = "max-content";
+		modalEl.style.maxWidth = '90vh';
+
+		modalEl.style.height = '100%';
+		modalEl.style.maxHeight = '60vh';
+
+		contentEl.style.height = '98%';
 
 		const container = contentEl.createDiv({ cls: 'import-plugin resort-pairs-modal' });
 
 		const header = container.createEl('header', { cls: 'resort-pairs-header' })
-		header.createEl('h4', 'Resort attachments')
+		header.createEl('h4', { text: 'Resort attachments' })
+		header.createSpan({ text: "Here are attachments that are in a different attachment folder than the one they belong in, and where they should be moved." })
 
 		const scroller = container.createDiv({ cls: 'resort-pairs-scroller'});
-		const scrollerInner = scroller.createDiv({ cls: 'resort-pairs-scroller-inner'});
 		const preview = container.createDiv({ cls: 'resort-pairs-preview'});
 		const bottomBar = container.createDiv({ cls: 'resort-pairs-bottom-bar'});
 
 		for (const pair of this.pairs) {
-			this.renderRow(scrollerInner, pair);
+			this.renderRow(scroller, pair);
 		}
 		
 		const yesButton = bottomBar.createEl('button', {
@@ -642,6 +645,10 @@ export class MovePairsModal extends Modal {
 		const cancelButton = bottomBar.createEl('button', {
 				text: 'Cancel',
 				cls: 'mod-cancel'
+		});
+		cancelButton.addEventListener('click', () => {
+				this.resolveChoice(false);
+				this.close(); 
 		});
 	}
 
