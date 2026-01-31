@@ -3,11 +3,17 @@ import { parseFilePath, mapSoftSet, getAllFilesInFolder } from './utils';
 import type ImportAttachments from 'main';
 
 declare const app: any;
-export type AttachFolder = { attachFolder: string, file: TFile };
 export type SomeLink = { text: string, dest: string, resolvedDest: TFile };
 export type DedupeFileList = {f: TFile, list: Map<string, TFile>};
 export type DedupeLinkList = {f: TFile, list: Map<string, SomeLink>};
-export type AttachmentResortPair = { file: TFile, from: string, to: AttachFolder[] }
+
+export type AttachFolder = { attachFolder: string, file: TFile };
+export type AttachmentResortPair = { 
+	from: string,
+	file: TFile, 
+	fromPath: string, 
+	to: AttachFolder[] 
+}
 
 const NOTE_EXTENSIONS = new Set(["md", "canvas"]);
 // const warnInConsole = process.env.NODE_ENV === "development";
@@ -130,7 +136,12 @@ export async function getAttachmentResortPairs(plugin: ImportAttachments) {
 				if (alternatives.length === 0) continue; // file is an orphan
 
 				// save alternatives to where the attachment should be moved
-				attachmentResortPairs.push({ file: attachment, from: attachment.path, to: alternatives });
+				attachmentResortPairs.push({ 
+					file: attachment, 
+					from: attachment.parent?.name ?? "no parent!", 
+					fromPath: attachment.path, 
+					to: alternatives 
+				});
 			}
 		}
 	}

@@ -602,12 +602,23 @@ export class MovePairsModal extends Modal {
 		placeholder.createEl('div', { text: 'No preview available', cls: 'import-preview-text' });
 	}
 
+	private renderRow(parent: HTMLElement, pair: AttachmentResortPair) {
+		const div = parent.createDiv({ cls: "resort-pair-row" });
+
+		const name = div.createEl('span', { cls: 'resort-pair-row-name', text: `${pair.file.name}` });
+		const from = div.createEl('span', { cls: 'resort-pair-row-from', text: `${pair.from}` });
+		const to = div.createEl('span', { cls: 'resort-pair-row-to', text: `${pair.to.at(0) ?? "-"}` });
+	}
+
 	onOpen() {
 		const { contentEl } = this;
-		this.modalEl.style.width = '90vw';
-		this.modalEl.style.maxWidth = '1200px';
-		this.modalEl.style.height = '70vh';
-		this.modalEl.style.maxHeight = '70vh';
+		this.modalEl.style.minWidth = '100ch';
+		this.modalEl.style.width = "max-content";
+		this.modalEl.style.maxWidth = '56rem';
+
+		this.modalEl.style.minHeight = '70vh';
+		this.modalEl.style.height = 'max-content';
+		// this.modalEl.style.maxHeight = '70vh';
 
 		const container = contentEl.createDiv({ cls: 'import-plugin resort-pairs-modal' });
 
@@ -615,8 +626,23 @@ export class MovePairsModal extends Modal {
 		header.createEl('h4', 'Resort attachments')
 
 		const scroller = container.createDiv({ cls: 'resort-pairs-scroller'});
+		const scrollerInner = scroller.createDiv({ cls: 'resort-pairs-scroller-inner'});
 		const preview = container.createDiv({ cls: 'resort-pairs-preview'});
 		const bottomBar = container.createDiv({ cls: 'resort-pairs-bottom-bar'});
+
+		for (const pair of this.pairs) {
+			this.renderRow(scrollerInner, pair);
+		}
+		
+		const yesButton = bottomBar.createEl('button', {
+				text: 'Move attachments',
+				cls: 'mod-cta'
+		});
+
+		const cancelButton = bottomBar.createEl('button', {
+				text: 'Cancel',
+				cls: 'mod-cancel'
+		});
 	}
 
 	onClose() {

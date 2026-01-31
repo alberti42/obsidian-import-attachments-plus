@@ -105,9 +105,12 @@ input:checked+.import-slider:before {
 
 /* resort pairs modal */
 .resort-pairs-modal {
+	box-sizing: border-box;
+	* { box-sizing: border-box; }
+
 	display: grid;
 	grid-template-rows: min-content 1fr min-content;
-	grid-template-columns: 1fr min-content;
+	grid-template-columns: 1fr 1fr;
 	gap: 1rem;
 	grid-template-areas: 
 		"header preview"
@@ -116,27 +119,42 @@ input:checked+.import-slider:before {
 	;
 	width: 100%;
 	height: 100%;
+	max-height: calc(100% - 32px - 11.250px);
 
 	.resort-pairs-header {
 		grid-area: header;
-		min-height: 5rem;
+		min-height: 7rem;
 
 		background: blue;
 	}
 	.resort-pairs-preview {
 		grid-area: preview;
-		min-width: 5rem;
 
 		background: teal;
 	}
 	.resort-pairs-scroller {
 		grid-area: scroller;
-		background: red;
+		background: rebeccapurple;
+		min-height: 0;
+		overflow-y: hidden;
+	}
+	.resort-pairs-scroller-inner {
+		overflow-y: auto;
+		height: 100%;
 	}
 	.resort-pairs-bottom-bar {
 		grid-area: bottom;
-		min-height: 3rem;
+		display: flex;
+		flex-direction: row-reverse;
+		padding: 0.25rem 0;
+		gap: 0.5rem;
+		justify-content: end;
 
-		background: pink;
+		/* background: pink; */
+	}
+
+	.resort-pair-row {
+		display: flex;
+		gap: 1rem;
 	}
 }
