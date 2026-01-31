@@ -149,7 +149,7 @@ input:checked+.import-slider:before {
 		display: flex;
 		flex-direction: row-reverse;
 		padding: 0.25rem 0;
-		gap: 0.25rem;
+		gap: 0.5rem;
 		justify-content: end;
 
 		/* background: pink; */
@@ -194,14 +194,35 @@ input:checked+.import-slider:before {
 	display: block;
 	transition: opacity 0.15s ease;
 }
+.reverse-ellipsis {
+	direction: rtl;
+	text-align: left;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
 
 .resort-pair-row {
 	display: flex;
-	gap: 1rem;
+	gap: .5rem;
 
 	padding: 0.3rem 0.5rem;
 	border-radius: 4px;
+
+	.resort-pair-row-name {
+		padding-block: 0.125rem;
+		padding-inline: 0.25rem;
+		border-radius: var(--radius-s);
+		border: 1px solid var(--background-modifier-border);
+	}
 }
+.resort-pair-row:not([data-selected="true"]) {
+	.resort-pair-row-name {
+		background: var(--background-primary-alt);
+		/* border-color: var(--background-modifier-border); */
+	}
+}
+
 .resort-pair-row:hover:not([data-selected="true"]) {
 	background-color: var(--background-modifier-hover);
 }

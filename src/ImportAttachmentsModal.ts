@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-inferrable-types */
 // ImportAttachmentsModal.ts
-import { App, Modal, Platform, TFolder } from 'obsidian';
+import { App, Modal, Platform, TFolder, setIcon } from 'obsidian';
 import {
 		ImportActionType,
 		ImportActionChoiceResult,
@@ -650,8 +650,11 @@ export class MovePairsModal extends Modal {
 		const wrapper = parent.createDiv({ cls: "resort-pair-row" });
 
 		const name = wrapper.createSpan({ cls: 'resort-pair-row-name', text: `${pair.file.name}` });
-		const from = wrapper.createSpan({ cls: 'resort-pair-row-from', text: `${pair.from}` });
-		const to = wrapper.createSpan({ cls: 'resort-pair-row-to', text: `${pair.to.at(0)?.attachFolder ?? "-"}` });
+		const from = wrapper.createSpan({ cls: ['resort-pair-row-from', 'reverse-ellipsis'], text: `${pair.from}` });
+		const arrow = wrapper.createSpan()
+		const to = wrapper.createSpan({ cls: ['resort-pair-row-to', 'reverse-ellipsis'], text: `${pair.to.at(0)?.attachFolder ?? "-"}` });
+
+		setIcon(arrow, 'arrow-right');
 
 		wrapper.addEventListener("click", () => {
 			if (this.selectedRow) {
