@@ -25,9 +25,9 @@ function unifyLinkCaches(input: { f: TFile, m: CachedMetadata | null}) {
 	if (!input.m) return { f: input.f, links: []};
 
 	const mergedLinks = [
-		...(input.m?.links ?? []), 
-		...(input.m?.frontmatterLinks ?? []), 
-		...(input.m?.embeds ?? []) 
+		...(input.m?.links ?? []),
+		...(input.m?.frontmatterLinks ?? []),
+		...(input.m?.embeds ?? [])
 	]
 
 	for (const elem of mergedLinks) {
@@ -49,8 +49,6 @@ function unifyLinkCaches(input: { f: TFile, m: CachedMetadata | null}) {
 		// we are not interested in notes linking to other notes
 		if (NOTE_EXTENSIONS.has(res.extension.toLowerCase())) continue;
 
-		// console.log(`Resolved link: ${elem.original} -> ${res.path}`);
-
 		links.push({ text: elem.link, dest: elem.original, resolvedDest: res });
 	}
 
@@ -71,19 +69,12 @@ function buildReferenceMaps(plugin: ImportAttachments) {
 		.map(unifyLinkCaches)
 		.filter(e => e.links.length > 0)
 
-	// for (const f of filesWithLinks) {
-	// 	if (f.f.path.includes("intersection")) {
-	// 		console.log("intersection!",f);
-	// 		console.log(app.metadataCache.getFileCache(f.f))
-	// 	}
-	// }
-
 	for (const file of filesWithLinks) {
 		noteToAttachFolder.set(file.f.path, {
 			attachFolder: plugin.getAttachmentFolderOfMdNote(parseFilePath(file.f.path)),
 			file: file.f
 		});
-		
+
 		if (!noteToAttachments.has(file.f.path)) {
 			noteToAttachments.set(file.f.path, { f: file.f, list: new Map<string, SomeLink>() });
 		}
@@ -93,17 +84,13 @@ function buildReferenceMaps(plugin: ImportAttachments) {
 			if (!attachmentToNotes.has(link.resolvedDest.path)) {
 				attachmentToNotes.set(link.resolvedDest.path, { f: link.resolvedDest, list: new Map<string, TFile>() });
 			}
-			
+
 			// bind note -> attachment
 			mapSoftSet(noteToAttachments.get(file.f.path)!.list, link.resolvedDest.path, link);
-			
+
 			// bind attachment -> note
 			mapSoftSet(attachmentToNotes.get(link.resolvedDest.path)!.list, file.f.path, file.f);
 		}
-
-		// if (file.f.path.includes("intersection")) {
-		// 	console.log("intersections!", noteToAttachFolder.get(file.f.path), noteToAttachments.get(file.f.path));
-		// }
 	}
 }
 
@@ -128,23 +115,20 @@ export async function getAttachmentResortPairs(plugin: ImportAttachments) {
 			continue;
 		}
 
-		// console.log("processing", note, attachFolder);
 		const filesInAttachFolder = getAllFilesInFolder(folder);
-		// console.log("fiaf", filesInAttachFolder);
 		for (const attachment of filesInAttachFolder) {
 			if (!noteToAttachments.has(note)) continue;
-			
+
 			// this *attachment* is in *note*'s attach folder, but the *note* does not reference it!
 			if (!noteToAttachments.get(note)?.list.has(attachment.path)) {
 				if (!attachmentToNotes.get(attachment.path)) continue;
-				// console.log("found misplaced!", attachment);
 
 				const alternatives = Array.from(attachmentToNotes.get(attachment.path)!.list.values())
 					.map(ntf => noteToAttachFolder.get(ntf.path))
 					.filter(e => typeof e !== "undefined");
-				
+
 				if (alternatives.length === 0) continue; // file is an orphan
-				
+
 				// save alternatives to where the attachment should be moved
 				attachmentResortPairs.push({ file: attachment, from: attachment.path, to: alternatives });
 			}
