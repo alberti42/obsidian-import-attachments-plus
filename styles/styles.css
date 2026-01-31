@@ -130,11 +130,10 @@ input:checked+.import-slider:before {
 	.resort-pairs-preview {
 		grid-area: preview;
 
-		background: teal;
+		/* background: teal; */
 	}
 	.resort-pairs-scroller {
 		grid-area: scroller;
-		background: rebeccapurple;
 		min-height: 0;
 		max-height: 100%;
 		overflow-y: auto;
@@ -144,14 +143,24 @@ input:checked+.import-slider:before {
 		display: flex;
 		flex-direction: row-reverse;
 		padding: 0.25rem 0;
-		gap: 0.5rem;
+		gap: 0.25rem;
 		justify-content: end;
 
 		/* background: pink; */
 	}
+}
 
-	.resort-pair-row {
-		display: flex;
-		gap: 1rem;
-	}
+.resort-pair-row {
+	display: flex;
+	gap: 1rem;
+
+	padding: 0.3rem 0.5rem;
+	border-radius: 4px;
+}
+.resort-pair-row:hover:not([data-selected="true"]) {
+	background-color: var(--background-modifier-hover);
+}
+.resort-pair-row[data-selected="true"] {
+	color: var(--modal-background);
+	background-color: var(--interactive-accent);
 }

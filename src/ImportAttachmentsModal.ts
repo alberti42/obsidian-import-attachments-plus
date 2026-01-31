@@ -588,6 +588,8 @@ export class MovePairsModal extends Modal {
 	private resolveChoice: (result: boolean) => void = () => {};  // To resolve the promise. Initialize with a no-op function
 	private rows: HTMLElement[] = [];
 	private previewEl: HTMLElement | null = null;
+	private selectedRow: HTMLElement | null = null;
+	private selectedPair: AttachmentResortPair | null;
 
 	private static readonly imageExtensions = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif']);
 
@@ -596,19 +598,41 @@ export class MovePairsModal extends Modal {
 	}
 
 	private renderNoPreview() {
+		
+		
+		
+		
+		
+	}
+
+	private renderPreview() {
 		if (!this.previewEl) return;
-		const placeholder = this.previewEl.createDiv({ cls: 'import-preview-empty' });
-		const icon = placeholder.createDiv({ cls: 'import-preview-icon' });
-		icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m2 2l20 20M10.41 10.41a2 2 0 1 1-2.83-2.83m5.92 5.92L6 21m12-9l3 3"/><path d="M3.59 3.59A2 2 0 0 0 3 5v14a2 2 0 0 0 2 2h14c.55 0 1.052-.22 1.41-.59M21 15V5a2 2 0 0 0-2-2H9"/></g></svg>';
-		placeholder.createEl('div', { text: 'No preview available', cls: 'import-preview-text' });
+
+		if (this.selectedPair) {
+
+		} else {
+			const placeholder = this.previewEl.createDiv({ cls: 'import-preview-empty' });
+			const icon = placeholder.createDiv({ cls: 'import-preview-icon' });
+			icon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m2 2l20 20M10.41 10.41a2 2 0 1 1-2.83-2.83m5.92 5.92L6 21m12-9l3 3"/><path d="M3.59 3.59A2 2 0 0 0 3 5v14a2 2 0 0 0 2 2h14c.55 0 1.052-.22 1.41-.59M21 15V5a2 2 0 0 0-2-2H9"/></g></svg>';
+			placeholder.createEl('div', { text: 'No preview available', cls: 'import-preview-text' });
+		}
 	}
 
 	private renderRow(parent: HTMLElement, pair: AttachmentResortPair) {
-		const div = parent.createDiv({ cls: "resort-pair-row" });
+		const wrapper = parent.createDiv({ cls: "resort-pair-row" });
 
-		const name = div.createSpan({ cls: 'resort-pair-row-name', text: `${pair.file.name}` });
-		const from = div.createSpan({ cls: 'resort-pair-row-from', text: `${pair.from}` });
-		const to = div.createSpan({ cls: 'resort-pair-row-to', text: `${pair.to.at(0) ?? "-"}` });
+		const name = wrapper.createSpan({ cls: 'resort-pair-row-name', text: `${pair.file.name}` });
+		const from = wrapper.createSpan({ cls: 'resort-pair-row-from', text: `${pair.from}` });
+		const to = wrapper.createSpan({ cls: 'resort-pair-row-to', text: `${pair.to.at(0)?.attachFolder ?? "-"}` });
+
+		wrapper.addEventListener("click", () => {
+			if (this.selectedRow) {
+				this.selectedRow.removeAttribute('data-selected');
+			}
+			this.selectedRow = wrapper;
+			this.selectedRow.setAttribute('data-selected', 'true');
+			this.selectedPair = pair;
+		})
 	}
 
 	onOpen() {
@@ -630,8 +654,8 @@ export class MovePairsModal extends Modal {
 		header.createSpan({ text: "Here are attachments that are in a different attachment folder than the one they belong in, and where they should be moved." })
 
 		const scroller = container.createDiv({ cls: 'resort-pairs-scroller'});
-		const preview = container.createDiv({ cls: 'resort-pairs-preview'});
 		const bottomBar = container.createDiv({ cls: 'resort-pairs-bottom-bar'});
+		this.previewEl = container.createDiv({ cls: 'resort-pairs-preview'});
 
 		for (const pair of this.pairs) {
 			this.renderRow(scroller, pair);
