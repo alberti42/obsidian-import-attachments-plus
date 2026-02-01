@@ -180,19 +180,20 @@ export async function moveAttachmentPairs(plugin: ImportAttachments, selections:
 	for (const { sourcePath, destinationPath, sourceFile } of selections) {
 		try {
 			let destPath = joinPaths(destinationPath, sourceFile.name);
+			if (sourcePath === destPath) continue;
 
 			if (doesFileExist(vault, destPath)) {
-				if (sourcePath === destPath) {
-					continue;
+				const existingFile = vault.getAbstractFileByPath(destPath);
+				if (existingFile && existingFile.path !== sourceFile.path) {
+					destPath = findNewFilename(vault, destPath);
 				}
-				destPath = findNewFilename(vault, destPath);
 			}
 
 			const destFolder = vault.getAbstractFileByPath(destinationPath);
 			if (!destFolder || !(destFolder instanceof TFolder)) await vault.createFolder(destinationPath);
 
 			const sourceFolder = sourceFile.parent;
-			await vault.rename(sourceFile, destPath);
+			await plugin.app.fileManager.renameFile(sourceFile, destPath);
 			successCount++;
 
 			if (sourceFolder && sourceFolder instanceof TFolder && sourceFolder.children.length === 0) {
