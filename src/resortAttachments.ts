@@ -69,6 +69,12 @@ function unifyLinkCaches(input: { f: TFile, m: CachedMetadata | null}) {
 function buildReferenceMaps(plugin: ImportAttachments) {
 	app.metadataCache.trigger('resolve');
 
+	// find all files that are notes
+	// get all their metadata
+	// filter out notes which don't have any links, frontmatter links or embeds
+	// unify all those links into a standardized link format (unifyLinkCaches)
+	// filter out notes which end up without any links
+
 	const filesWithLinks = (app.vault.getFiles() as TFile[])
 		.filter(t => NOTE_EXTENSIONS.has(t.extension.toLowerCase()))
 		.map(t => ({ f: t, m: app.metadataCache.getFileCache(t) as CachedMetadata | null }))
@@ -90,7 +96,7 @@ function buildReferenceMaps(plugin: ImportAttachments) {
 			noteToAttachments.set(file.f.path, { f: file.f, list: new Map<string, SomeLink>() });
 		}
 
-		// Deduplicate links
+		// deduplicate links
 		for (const link of file.links) {
 			if (!attachmentToNotes.has(link.resolvedDest.path)) {
 				attachmentToNotes.set(link.resolvedDest.path, { f: link.resolvedDest, list: new Map<string, TFile>() });
