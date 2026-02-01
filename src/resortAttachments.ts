@@ -111,10 +111,6 @@ export async function getAttachmentResortPairs(plugin: ImportAttachments) {
 
 	const attachmentResortPairs: AttachmentResortPair[] = [];
 
-	// console.log(noteToAttachFolder);
-	// console.log(noteToAttachments);
-	// console.log(attachmentToNotes);
-
 	for (const [note, attachFolder] of noteToAttachFolder.entries()) {
 		const folder = app.vault.getAbstractFileByPath(attachFolder.attachFolder) as TFolder;
 		if (!folder) {
@@ -157,8 +153,9 @@ export type MovePairSelection = {
 };
 
 export async function moveAttachmentPairs(plugin: ImportAttachments, selections: MovePairSelection[]) {
+	const vault = plugin.app.vault;
+	const vaultPath = plugin.vaultPath;
 	let successCount = 0;
-	const { vault, vaultPath } = { vault: plugin.app.vault, vaultPath: plugin.vaultPath };
 
 	for (const { sourcePath, destinationPath, sourceFile } of selections) {
 		try {
@@ -166,7 +163,7 @@ export async function moveAttachmentPairs(plugin: ImportAttachments, selections:
 
 			if (doesFileExist(vault, destPath)) {
 				if (sourcePath === destPath) {
-					console.log(`Skipping ${sourceFile.name} - already in correct location`);
+					// console.log(`Skipping ${sourceFile.name} - already in correct location`);
 					continue;
 				}
 				destPath = findNewFilename(vault, destPath);
@@ -177,7 +174,7 @@ export async function moveAttachmentPairs(plugin: ImportAttachments, selections:
 
 			await fs.rename(joinPaths(vaultPath, sourcePath), joinPaths(vaultPath, destPath));
 			successCount++;
-			console.log(`Moved: ${sourcePath} -> ${destPath}`);
+			// console.log(`Moved: ${sourcePath} -> ${destPath}`);
 		} catch (error) {
 			console.error(`Failed to move ${sourcePath}:`, error);
 			new Notice(`Failed to move ${sourceFile.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);

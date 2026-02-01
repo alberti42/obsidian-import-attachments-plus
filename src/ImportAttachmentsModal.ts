@@ -842,7 +842,7 @@ export class MovePairsModal extends Modal {
 			this.close();
 		} catch (error) {
 			console.error('Error moving attachments:', error);
-			new Notice(`Error moving attachments: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			new Notice(`Error moving attachments: ${error instanceof Error ? error.message : 'Unknown error (check console)'}`);
 			this.resolveChoice(false);
 		}
 	}
