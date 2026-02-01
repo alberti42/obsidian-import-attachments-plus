@@ -584,6 +584,8 @@ export class CreateAttachmentFolderModal extends Modal {
     }
 }
 
+const ROW_CLASSNAME = "resort-pair-row";
+
 export class MovePairsModal extends Modal {
 	private resolveChoice: (result: boolean) => void = () => {};  // To resolve the promise. Initialize with a no-op function
 	private rows: HTMLElement[] = [];
@@ -642,20 +644,52 @@ export class MovePairsModal extends Modal {
 		
 		this.showPreview('fallback');
 		
+		// oxlint-disable-next-line unicorn/prefer-add-event-listener
 		img.onload = () => token === this.previewToken && this.showPreview('image');
 		img.onerror = () => token === this.previewToken && this.showPreview('fallback');
 		img.src = this.app.vault.adapter.getResourcePath(pair.file.path);
 		img.alt = pair.file.name;
 	}
 
+	private selectTargetRow(target: HTMLElement, doRenderPreview = true) {
+		if (this.rowToPair.get(target) == null) {
+			console.warn('trying to select row for which a pair does not exist!', target);
+			return;
+		}
+		if (this.selectedRow != null) {
+			this.selectedRow.removeAttribute('data-selected');
+		}
+		this.selectedRow = target;
+		this.selectedRow.setAttribute('data-selected', 'true');
+		this.selectedPair = this.rowToPair.get(target)!
+		if (doRenderPreview) this.renderPreview();
+	}
+	private selectNextRow(row: HTMLElement) {
+		if (row == null || !row.classList.contains(ROW_CLASSNAME)) return;
+		const target = row.nextElementSibling as HTMLElement;
+		if (target == null || !target.classList.contains(ROW_CLASSNAME)) return;
+
+		this.selectTargetRow(target);
+	}
+	private selectPreviousRow(row: HTMLElement) {
+		if (row == null || !row.classList.contains(ROW_CLASSNAME)) return;
+		const target = row.previousElementSibling as HTMLElement;
+		if (target == null || !target.classList.contains(ROW_CLASSNAME)) return;
+
+		this.selectTargetRow(target);
+	}
+
 	private renderRow(parent: HTMLElement, pair: AttachmentResortPair) {
-		const wrapper = parent.createDiv({ cls: "resort-pair-row" });
+		const wrapper = parent.createDiv({ cls: ROW_CLASSNAME });
 		this.rowToPair.set(wrapper, pair);
 
-		const name = wrapper.createSpan({ cls: 'resort-pair-row-name', text: `${pair.file.name}` });
-		const from = wrapper.createSpan({ cls: ['resort-pair-row-from', 'reverse-ellipsis'], text: `${pair.from}` });
+		const name = wrapper.createSpan({ cls: 'resort-pair-row-name', text: pair.file.name, title: pair.file.name });
+		const fromText = pair.from;
+		const toText = pair.to.at(0)?.attachFolder ?? "-";
+
+		const from = wrapper.createSpan({ cls: ['resort-pair-row-from', 'reverse-ellipsis'], text: fromText, title: toText });
 		const arrow = wrapper.createSpan({ cls: 'rpr-arrow' })
-		const to = wrapper.createSpan({ cls: ['resort-pair-row-to', 'reverse-ellipsis'], text: `${pair.to.at(0)?.attachFolder ?? "-"}` });
+		const to = wrapper.createSpan({ cls: ['resort-pair-row-to', 'reverse-ellipsis'], text: toText, title: toText });
 
 		setIcon(arrow, 'arrow-right');
 
@@ -664,21 +698,11 @@ export class MovePairsModal extends Modal {
 		setIcon(confirmButton, 'check');
 
 		const removeButton = wrapper.createEl("button", { cls: ['clickable-icon', 'resort-pair-row-btn', 'rpr-btn-dismiss'] });
-		removeButton.addEventListener("click", () => {
-			if (this.selectedRow === wrapper 
-					&& wrapper.nextElementSibling != null
-					&& wrapper.nextElementSibling.classList.contains("resort-pair-row")
-					&& this.rowToPair.has(wrapper.nextElementSibling as HTMLElement)
-			) {
-				// TODO fix selecting next row logic
-				const nes = wrapper.nextElementSibling as HTMLElement;
-				this.selectedRow.removeAttribute('data-selected');
-				this.selectedRow = nes;
-				nes.setAttribute('data-selected', 'true');
-				this.selectedPair = this.rowToPair.get(nes) as AttachmentResortPair;
-				this.renderPreview();
-			}
-			// setTimeout(() => wrapper.remove(), 0);
+		removeButton.addEventListener("click", (e) => {
+			e.stopPropagation();
+			if (this.selectedRow === wrapper) this.selectNextRow(wrapper);
+			
+			wrapper.remove();
 		})
 		setIcon(removeButton, 'x');
 
@@ -694,7 +718,7 @@ export class MovePairsModal extends Modal {
 	onOpen() {
 		const { contentEl, modalEl } = this;
 
-		modalEl.style.minWidth = '100ch';
+		modalEl.style.minWidth = '60ch';
 		modalEl.style.width = "max-content";
 		modalEl.style.maxWidth = '90vh';
 

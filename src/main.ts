@@ -1416,8 +1416,5 @@ export default class ImportAttachments extends Plugin {
 
         const modal = new MovePairsModal(this.app, pairs);
         modal.open();
-        const choice = await modal.promise;
-        if (choice == null) return;
-        console.log(choice);
     }
 }
