@@ -191,8 +191,13 @@ export async function moveAttachmentPairs(plugin: ImportAttachments, selections:
 			const destFolder = vault.getAbstractFileByPath(destinationPath);
 			if (!destFolder || !(destFolder instanceof TFolder)) await vault.createFolder(destinationPath);
 
+			const sourceFolder = sourceFile.parent;
 			await vault.rename(sourceFile, destPath);
 			successCount++;
+
+			if (sourceFolder && sourceFolder instanceof TFolder && sourceFolder.children.length === 0) {
+				try { await vault.delete(sourceFolder); } catch { }
+			}
 		} catch (error) {
 			console.error(`Failed to move ${sourcePath}:`, error);
 			new Notice(`Failed to move ${sourceFile.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
