@@ -590,6 +590,7 @@ const ROW_CLASSNAME = "resort-pair-row";
 export class MovePairsModal extends Modal {
 	promise: Promise<boolean>;
 	private resolveChoice: (result: boolean) => void = () => { };  // To resolve the promise. Initialize with a no-op function
+	private isResolved = false;
 	private rows: HTMLElement[] = [];
 	private previewEl: HTMLElement | null = null;
 	private previewImgEl: HTMLImageElement | null = null;
@@ -609,6 +610,13 @@ export class MovePairsModal extends Modal {
 		this.promise = new Promise((resolve) => {
 			this.resolveChoice = resolve;
 		});
+	}
+
+	private resolve(result: boolean) {
+		if (!this.isResolved) {
+			this.isResolved = true;
+			this.resolveChoice(result);
+		}
 	}
 
 	private initPreviewElements() {
@@ -834,7 +842,7 @@ export class MovePairsModal extends Modal {
 			cls: 'mod-cancel'
 		});
 		cancelButton.addEventListener('click', () => {
-			this.resolveChoice(false);
+			this.resolve(false);
 			this.close();
 		});
 
@@ -860,7 +868,7 @@ export class MovePairsModal extends Modal {
 		}
 		
 		if (selections.length === 0) {
-			this.resolveChoice(false);
+			this.resolve(false);
 			this.close();
 			return;
 		}
@@ -868,16 +876,19 @@ export class MovePairsModal extends Modal {
 		try {
 			const count = await moveAttachmentPairs(this.plugin, selections);
 			if (count > 0) new Notice(`Successfully moved ${count} attachment${count > 1 ? 's' : ''}`);
-			this.resolveChoice(true);
+			this.resolve(true);
 			this.close();
 		} catch (error) {
 			console.error('Error moving attachments:', error);
 			new Notice(`Error moving attachments: ${error instanceof Error ? error.message : 'Unknown error (check console)'}`);
-			this.resolveChoice(false);
+			this.resolve(false);
 		}
 	}
 
 	onClose() {
+		// Ensure promise is resolved even if modal is closed via ESC/X button
+		this.resolve(false);
+		
 		if (this.keydownHandler && this.docBody) {
 			this.docBody.removeEventListener('keydown', this.keydownHandler);
 			this.keydownHandler = null;
