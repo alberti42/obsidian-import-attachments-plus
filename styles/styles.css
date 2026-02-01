@@ -212,7 +212,7 @@ input:checked+.import-slider:before {
 	padding: 0.3rem 0.5rem;
 	border-radius: 4px;
 
-	.resort-pair-row-name {
+	.resort-pair-row-name, select.resort-pair-row-to {
 		padding-block: 0.125rem;
 		padding-inline: 0.25rem;
 		border-radius: var(--radius-s);
@@ -227,16 +227,19 @@ input:checked+.import-slider:before {
 	.resort-pair-row-btn {
 		border: 1px solid var(--background-modifier-border);
 	}
-	.resort-pair-row-from {
-		/* width: 100%; */
-	}
 	.resort-pair-row-to {
 		margin-right: .25rem;
-		/* width: 100%; */
+	}
+	select.resort-pair-row-to {
+		color: inherit;
+		font-size: inherit;
+		line-height: inherit;
+		background: transparent;
+		direction: initial;
 	}
 }
 .resort-pair-row:not([data-selected="true"]) {
-	.resort-pair-row-name {
+	.resort-pair-row-name, select.resort-pair-row-to {
 		background: var(--background-primary-alt);
 		/* border-color: var(--background-modifier-border); */
 	}

@@ -599,8 +599,8 @@ export class MovePairsModal extends Modal {
 
 	private static readonly imageExtensions = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif']);
 
-	constructor(app: App, private pairs: AttachmentResortPair[]) {
-		super(app);
+	constructor(private plugin: ImportAttachments, private pairs: AttachmentResortPair[]) {
+		super(plugin.app);
 		this.rowToPair = new Map();
 	}
 
@@ -651,7 +651,7 @@ export class MovePairsModal extends Modal {
 		img.alt = pair.file.name;
 	}
 
-	private selectTargetRow(target: HTMLElement, doRenderPreview = true) {
+	private selectTargetRow(target: HTMLElement, doRenderPreview = true, doScroll = false) {
 		if (this.rowToPair.get(target) == null) {
 			console.warn('trying to select row for which a pair does not exist!', target);
 			return;
@@ -662,6 +662,7 @@ export class MovePairsModal extends Modal {
 		this.selectedRow = target;
 		this.selectedRow.setAttribute('data-selected', 'true');
 		this.selectedPair = this.rowToPair.get(target)!
+		if (doScroll) this.selectedRow.scrollIntoView({ behavior: 'auto', block: 'nearest' });
 		if (doRenderPreview) this.renderPreview();
 	}
 	private selectNextRow(row: HTMLElement) {
@@ -669,27 +670,47 @@ export class MovePairsModal extends Modal {
 		const target = row.nextElementSibling as HTMLElement;
 		if (target == null || !target.classList.contains(ROW_CLASSNAME)) return;
 
-		this.selectTargetRow(target);
+		this.selectTargetRow(target, true, true);
 	}
 	private selectPreviousRow(row: HTMLElement) {
 		if (row == null || !row.classList.contains(ROW_CLASSNAME)) return;
 		const target = row.previousElementSibling as HTMLElement;
 		if (target == null || !target.classList.contains(ROW_CLASSNAME)) return;
 
-		this.selectTargetRow(target);
+		this.selectTargetRow(target, true, true);
 	}
 
 	private renderRow(parent: HTMLElement, pair: AttachmentResortPair) {
 		const wrapper = parent.createDiv({ cls: ROW_CLASSNAME });
+		wrapper.dataset.destIndex = '0';
 		this.rowToPair.set(wrapper, pair);
 
 		const name = wrapper.createSpan({ cls: 'resort-pair-row-name', text: pair.file.name, title: pair.file.name });
-		const fromText = pair.from;
-		const toText = pair.to.at(0)?.attachFolder ?? "-";
+		const destIndex = parseInt(wrapper.dataset.destIndex ?? '0');
+		const toText = pair.to[destIndex]?.attachFolder ?? "-";
 
-		const from = wrapper.createSpan({ cls: ['resort-pair-row-from', 'reverse-ellipsis'], text: fromText, title: toText });
+		const from = wrapper.createSpan({ cls: ['resort-pair-row-from', 'reverse-ellipsis'], text: pair.from, title: pair.from });
 		const arrow = wrapper.createSpan({ cls: 'rpr-arrow' })
-		const to = wrapper.createSpan({ cls: ['resort-pair-row-to', 'reverse-ellipsis'], text: toText, title: toText });
+		
+		let to: HTMLElement;
+		if (pair.to.length === 1) {
+			to = wrapper.createSpan({ cls: ['resort-pair-row-to', 'reverse-ellipsis'], text: toText, title: toText });
+		} else {
+			const select = wrapper.createEl('select', { cls: ['resort-pair-row-to', 'reverse-ellipsis'] });
+			for (let i = 0; i < pair.to.length; i++) {
+				const option = select.createEl('option', { 
+					text: pair.to[i].attachFolder,
+					value: String(i)
+				});
+				if (i === destIndex) option.selected = true;
+			}
+			select.addEventListener('change', (e) => {
+				e.stopPropagation();
+				wrapper.dataset.destIndex = select.value;
+				this.contentEl.focus();
+			});
+			to = select;
+		}
 
 		setIcon(arrow, 'arrow-right');
 
@@ -700,9 +721,17 @@ export class MovePairsModal extends Modal {
 		const removeButton = wrapper.createEl("button", { cls: ['clickable-icon', 'resort-pair-row-btn', 'rpr-btn-dismiss'] });
 		removeButton.addEventListener("click", (e) => {
 			e.stopPropagation();
-			if (this.selectedRow === wrapper) this.selectNextRow(wrapper);
+			if (this.selectedRow === wrapper) {
+				const next = wrapper.nextElementSibling as HTMLElement | null;
+				if (next && next.classList.contains(ROW_CLASSNAME)) {
+					this.selectNextRow(wrapper);
+				} else {
+					this.selectPreviousRow(wrapper);
+				}
+			}
 			
 			wrapper.remove();
+			this.contentEl.focus();
 		})
 		setIcon(removeButton, 'x');
 
@@ -726,6 +755,7 @@ export class MovePairsModal extends Modal {
 		modalEl.style.maxHeight = '60vh';
 
 		contentEl.style.height = '98%';
+		contentEl.tabIndex = -1;
 
 		const container = contentEl.createDiv({ cls: 'import-plugin resort-pairs-modal' });
 
@@ -741,6 +771,20 @@ export class MovePairsModal extends Modal {
 			this.renderRow(scroller, pair);
 		}
 		this.renderPreview();
+
+		this.plugin.registerDomEvent(contentEl.ownerDocument.body, 'keydown', (e: KeyboardEvent) => {
+			if (this.selectedRow == null) return;
+			if (e.key === "ArrowUp") {
+				e.preventDefault();
+				this.selectPreviousRow(this.selectedRow);
+			} else if (e.key === "ArrowDown") {
+				e.preventDefault();
+				this.selectNextRow(this.selectedRow);
+			} else if (e.key === "Delete") {
+				e.preventDefault();
+				(this.selectedRow.querySelector('.rpr-btn-dismiss') as HTMLButtonElement)?.click();
+			}
+		})
 		
 		const yesButton = bottomBar.createEl('button', {
 				text: 'Move all attachments',
@@ -755,6 +799,8 @@ export class MovePairsModal extends Modal {
 				this.resolveChoice(false);
 				this.close(); 
 		});
+
+		contentEl.focus();
 	}
 
 	onClose() {
