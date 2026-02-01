@@ -813,6 +813,10 @@ export class MovePairsModal extends Modal {
 		}
 		this.renderPreview();
 
+		// select the first row by default so keyboard navigation and preview work immediately
+		const firstRow = scroller.querySelector(`.${ROW_CLASSNAME}`) as HTMLElement | null;
+		if (firstRow) this.selectTargetRow(firstRow);
+
 		this.docBody = contentEl.ownerDocument.body;
 		this.keydownHandler = (e: KeyboardEvent) => {
 			if (this.selectedRow == null) return;

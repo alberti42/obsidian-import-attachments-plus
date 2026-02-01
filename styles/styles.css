@@ -107,7 +107,7 @@ input:checked+.import-slider:before {
 .resort-pairs-modal {
 	top: 0;
 	box-sizing: border-box;
-	* { box-sizing: border-box; }
+	& * { box-sizing: border-box; }
 
 	display: grid;
 	grid-template-rows: min-content minmax(0, 1fr) min-content;
@@ -122,12 +122,12 @@ input:checked+.import-slider:before {
 	height: calc(100% - 11.250px);
 	padding-top: 1rem;
 
-	.resort-pairs-header {
+	& .resort-pairs-header {
 		grid-area: header;
 
-		h4 { margin-block: 0.25rem; }
+		& h4 { margin-block: 0.25rem; }
 	}
-	.resort-pairs-preview {
+	& .resort-pairs-preview {
 		grid-area: preview;
 		min-height: 6rem;
 		display: flex;
@@ -139,13 +139,13 @@ input:checked+.import-slider:before {
 
 		/* background: teal; */
 	}
-	.resort-pairs-scroller {
+	& .resort-pairs-scroller {
 		grid-area: scroller;
 		min-height: 0;
 		max-height: 100%;
 		overflow-y: auto;
 	}
-	.resort-pairs-bottom-bar {
+	& .resort-pairs-bottom-bar {
 		grid-area: bottom;
 		display: flex;
 		flex-direction: row-reverse;
@@ -212,25 +212,25 @@ input:checked+.import-slider:before {
 	padding: 0.3rem 0.5rem;
 	border-radius: 4px;
 
-	.resort-pair-row-name, select.resort-pair-row-to {
+	& .resort-pair-row-name, & select.resort-pair-row-to {
 		padding-block: 0.125rem;
 		padding-inline: 0.25rem;
 		border-radius: var(--radius-s);
 		border: 1px solid var(--background-modifier-border);
 	}
-	.rpr-arrow {
+	& .rpr-arrow {
 		height: 100%;
 		display: flex;
 		align-items: center;
 	}
-	.rpr-spacer { flex-grow: 1; };
-	.resort-pair-row-btn {
+	& .rpr-spacer { flex-grow: 1; };
+	& .resort-pair-row-btn {
 		border: 1px solid var(--background-modifier-border);
 	}
-	.resort-pair-row-to {
+	& .resort-pair-row-to {
 		margin-right: .25rem;
 	}
-	select.resort-pair-row-to {
+	& select.resort-pair-row-to {
 		color: inherit;
 		font-size: inherit;
 		line-height: inherit;
@@ -239,7 +239,7 @@ input:checked+.import-slider:before {
 	}
 }
 .resort-pair-row:not([data-selected="true"]) {
-	.resort-pair-row-name, select.resort-pair-row-to {
+	& .resort-pair-row-name, & select.resort-pair-row-to {
 		background: var(--background-primary-alt);
 		/* border-color: var(--background-modifier-border); */
 	}
@@ -252,7 +252,7 @@ input:checked+.import-slider:before {
 	color: var(--modal-background);
 	background-color: var(--interactive-accent);
 
-	.resort-pair-row-btn {
+	& .resort-pair-row-btn {
 		color: var(--modal-background);
 	}
 }
