@@ -1,6 +1,7 @@
-import { TFile, TFolder, CachedMetadata } from 'obsidian';
-import { parseFilePath, mapSoftSet, getAllFilesInFolder } from './utils';
+import { TFile, TFolder, CachedMetadata, Notice } from 'obsidian';
+import { parseFilePath, mapSoftSet, getAllFilesInFolder, joinPaths, findNewFilename, doesFileExist } from './utils';
 import type ImportAttachments from 'main';
+import { promises as fs } from 'fs';
 
 declare const app: any;
 export type SomeLink = { text: string, dest: string, resolvedDest: TFile };
@@ -147,4 +148,40 @@ export async function getAttachmentResortPairs(plugin: ImportAttachments) {
 	}
 
 	return attachmentResortPairs;
+}
+
+export type MovePairSelection = {
+	sourcePath: string;
+	destinationPath: string;
+	sourceFile: TFile;
+};
+
+export async function moveAttachmentPairs(plugin: ImportAttachments, selections: MovePairSelection[]) {
+	let successCount = 0;
+	const { vault, vaultPath } = { vault: plugin.app.vault, vaultPath: plugin.vaultPath };
+
+	for (const { sourcePath, destinationPath, sourceFile } of selections) {
+		try {
+			let destPath = joinPaths(destinationPath, sourceFile.name);
+
+			if (doesFileExist(vault, destPath)) {
+				if (sourcePath === destPath) {
+					console.log(`Skipping ${sourceFile.name} - already in correct location`);
+					continue;
+				}
+				destPath = findNewFilename(vault, destPath);
+			}
+
+			const destFolder = vault.getAbstractFileByPath(destinationPath);
+			if (!destFolder || !(destFolder instanceof TFolder)) await vault.createFolder(destinationPath);
+
+			await fs.rename(joinPaths(vaultPath, sourcePath), joinPaths(vaultPath, destPath));
+			successCount++;
+			console.log(`Moved: ${sourcePath} -> ${destPath}`);
+		} catch (error) {
+			console.error(`Failed to move ${sourcePath}:`, error);
+			new Notice(`Failed to move ${sourceFile.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+		}
+	}
+	return successCount;
 }

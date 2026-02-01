@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-inferrable-types */
 // ImportAttachmentsModal.ts
-import { App, Modal, Platform, TFolder, setIcon } from 'obsidian';
+import { App, Modal, Platform, TFolder, setIcon, Notice } from 'obsidian';
 import {
 		ImportActionType,
 		ImportActionChoiceResult,
@@ -15,6 +15,7 @@ import {
 import * as Utils from "utils";
 import type ImportAttachments from 'main'; // Import the type of your plugin class if needed for type hinting
 import type { AttachmentResortPair } from 'resortAttachments';
+import { moveAttachmentPairs, type MovePairSelection } from 'resortAttachments';
 
 const MODAL_TITLE_HTML_EL='h4';
 
@@ -587,6 +588,7 @@ export class CreateAttachmentFolderModal extends Modal {
 const ROW_CLASSNAME = "resort-pair-row";
 
 export class MovePairsModal extends Modal {
+	promise: Promise<boolean>;
 	private resolveChoice: (result: boolean) => void = () => { };  // To resolve the promise. Initialize with a no-op function
 	private rows: HTMLElement[] = [];
 	private previewEl: HTMLElement | null = null;
@@ -602,6 +604,9 @@ export class MovePairsModal extends Modal {
 	constructor(private plugin: ImportAttachments, private pairs: AttachmentResortPair[]) {
 		super(plugin.app);
 		this.rowToPair = new Map();
+		this.promise = new Promise((resolve) => {
+			this.resolveChoice = resolve;
+		});
 	}
 
 	private initPreviewElements() {
@@ -790,6 +795,9 @@ export class MovePairsModal extends Modal {
 			text: 'Move all attachments',
 			cls: 'mod-cta'
 		});
+		yesButton.addEventListener('click', async () => {
+			await this.handleMoveAll();
+		});
 
 		const cancelButton = bottomBar.createEl('button', {
 			text: 'Cancel',
@@ -801,6 +809,42 @@ export class MovePairsModal extends Modal {
 		});
 
 		contentEl.focus();
+	}
+
+	private async handleMoveAll() {
+		const selections: MovePairSelection[] = [];
+		const moveRows = Array.from(this.contentEl.querySelectorAll(`.${ROW_CLASSNAME}`));
+
+		for (const rowEl of moveRows) {
+			const row = rowEl as HTMLElement;
+			const pair = this.rowToPair.get(row);
+			if (!pair) continue;
+			
+			const destFolder = pair.to[parseInt(row.dataset.destIndex ?? '0')];
+			if (!destFolder) {
+				console.warn('No destination folder found for pair:', pair);
+				continue;
+			}
+			
+			selections.push({ sourcePath: pair.fromPath, destinationPath: destFolder.attachFolder, sourceFile: pair.file });
+		}
+		
+		if (selections.length === 0) {
+			this.resolveChoice(false);
+			this.close();
+			return;
+		}
+		
+		try {
+			const count = await moveAttachmentPairs(this.plugin, selections);
+			if (count > 0) new Notice(`Successfully moved ${count} attachment${count > 1 ? 's' : ''}`);
+			this.resolveChoice(true);
+			this.close();
+		} catch (error) {
+			console.error('Error moving attachments:', error);
+			new Notice(`Error moving attachments: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			this.resolveChoice(false);
+		}
 	}
 
 	onClose() {
