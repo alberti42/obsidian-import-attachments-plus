@@ -670,6 +670,7 @@ export class MovePairsModal extends Modal {
 		if (doScroll) this.selectedRow.scrollIntoView({ behavior: 'auto', block: 'nearest' });
 		if (doRenderPreview) this.renderPreview();
 	}
+	
 	private selectNextRow(row: HTMLElement) {
 		if (row == null || !row.classList.contains(ROW_CLASSNAME)) return;
 		const target = row.nextElementSibling as HTMLElement;
@@ -677,12 +678,23 @@ export class MovePairsModal extends Modal {
 
 		this.selectTargetRow(target, true, true);
 	}
+
 	private selectPreviousRow(row: HTMLElement) {
 		if (row == null || !row.classList.contains(ROW_CLASSNAME)) return;
 		const target = row.previousElementSibling as HTMLElement;
 		if (target == null || !target.classList.contains(ROW_CLASSNAME)) return;
 
 		this.selectTargetRow(target, true, true);
+	}
+
+	private selectNextOrPreviousBeforeRemove(wrapper: HTMLElement) {
+		if (this.selectedRow !== wrapper) return;
+		const next = wrapper.nextElementSibling as HTMLElement | null;
+		if (next && next.classList.contains(ROW_CLASSNAME)) {
+			this.selectNextRow(wrapper);
+		} else {
+			this.selectPreviousRow(wrapper);
+		}
 	}
 
 	private renderRow(parent: HTMLElement, pair: AttachmentResortPair) {
@@ -722,19 +734,33 @@ export class MovePairsModal extends Modal {
 		wrapper.createSpan({ cls: 'rpr-spacer' });
 		const confirmButton = wrapper.createEl("button", { cls: ['clickable-icon', 'resort-pair-row-btn', 'rpr-btn-confirm'] });
 		setIcon(confirmButton, 'check');
+		confirmButton.addEventListener("click", async (e) => {
+			e.stopPropagation();
+			const destFolder = pair.to[parseInt(wrapper.dataset.destIndex ?? '0')];
+			if (!destFolder) {
+				console.warn('No destination folder found for pair:', pair);
+				return;
+			}
+			try {
+				const count = await moveAttachmentPairs(this.plugin, [{
+					sourcePath: pair.fromPath,
+					destinationPath: destFolder.attachFolder,
+					sourceFile: pair.file
+				}]);
+				if (count > 0) new Notice(`Successfully moved ${pair.file.name}`);
+				this.selectNextOrPreviousBeforeRemove(wrapper);
+				wrapper.remove();
+				this.contentEl.focus();
+			} catch (error) {
+				console.error('Error moving attachment:', error);
+				new Notice(`Failed to move ${pair.file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			}
+		});
 
 		const removeButton = wrapper.createEl("button", { cls: ['clickable-icon', 'resort-pair-row-btn', 'rpr-btn-dismiss'] });
 		removeButton.addEventListener("click", (e) => {
 			e.stopPropagation();
-			if (this.selectedRow === wrapper) {
-				const next = wrapper.nextElementSibling as HTMLElement | null;
-				if (next && next.classList.contains(ROW_CLASSNAME)) {
-					this.selectNextRow(wrapper);
-				} else {
-					this.selectPreviousRow(wrapper);
-				}
-			}
-
+			this.selectNextOrPreviousBeforeRemove(wrapper);
 			wrapper.remove();
 			this.contentEl.focus();
 		})
