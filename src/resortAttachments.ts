@@ -1,7 +1,6 @@
 import { App, TFile, TFolder, CachedMetadata, Notice } from 'obsidian';
 import { parseFilePath, mapSoftSet, getAllFilesInFolder, joinPaths, findNewFilename, doesFileExist } from './utils';
 import type ImportAttachments from 'main';
-import { promises as fs } from 'fs';
 
 declare const app: App;
 export type SomeLink = { text: string, dest: string, resolvedDest: TFile };
@@ -132,19 +131,20 @@ export async function getAttachmentResortPairs(plugin: ImportAttachments) {
 			if (!noteToAttachments.get(note)?.list.has(attachment.path)) {
 				if (!attachmentToNotes.get(attachment.path)) continue;
 
-			const alternatives = Array.from(attachmentToNotes.get(attachment.path)!.list.values())
-				.map(ntf => noteToAttachFolder.get(ntf.path))
-				.filter(e => typeof e !== "undefined");
+				const alternatives = Array.from(attachmentToNotes.get(attachment.path)!.list.values())
+					.map(ntf => noteToAttachFolder.get(ntf.path))
+					.filter(e => typeof e !== "undefined");
 
-			if (alternatives.length === 0) continue;
-			processedAttachments.add(attachment.path);
+				if (alternatives.length === 0) continue;
+				processedAttachments.add(attachment.path);
 
-			attachmentResortPairs.push({ 
-				file: attachment, 
-				from: attachment.parent?.name ?? "no parent!", 
-				fromPath: attachment.path, 
-				to: alternatives 
-			});
+				attachmentResortPairs.push({ 
+					file: attachment, 
+					from: attachment.parent?.name ?? "no parent!", 
+					fromPath: attachment.path, 
+					to: alternatives 
+				});
+			}
 		}
 	}
 
@@ -175,7 +175,6 @@ export async function getAttachmentResortPairs(plugin: ImportAttachments) {
 
 export async function moveAttachmentPairs(plugin: ImportAttachments, selections: MovePairSelection[]) {
 	const vault = plugin.app.vault;
-	const vaultPath = plugin.vaultPath;
 	let successCount = 0;
 
 	for (const { sourcePath, destinationPath, sourceFile } of selections) {
@@ -184,7 +183,6 @@ export async function moveAttachmentPairs(plugin: ImportAttachments, selections:
 
 			if (doesFileExist(vault, destPath)) {
 				if (sourcePath === destPath) {
-					// console.log(`Skipping ${sourceFile.name} - already in correct location`);
 					continue;
 				}
 				destPath = findNewFilename(vault, destPath);
@@ -193,9 +191,8 @@ export async function moveAttachmentPairs(plugin: ImportAttachments, selections:
 			const destFolder = vault.getAbstractFileByPath(destinationPath);
 			if (!destFolder || !(destFolder instanceof TFolder)) await vault.createFolder(destinationPath);
 
-			await fs.rename(joinPaths(vaultPath, sourcePath), joinPaths(vaultPath, destPath));
+			await vault.rename(sourceFile, destPath);
 			successCount++;
-			// console.log(`Moved: ${sourcePath} -> ${destPath}`);
 		} catch (error) {
 			console.error(`Failed to move ${sourcePath}:`, error);
 			new Notice(`Failed to move ${sourceFile.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
