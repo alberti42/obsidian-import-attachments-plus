@@ -587,7 +587,7 @@ export class CreateAttachmentFolderModal extends Modal {
 const ROW_CLASSNAME = "resort-pair-row";
 
 export class MovePairsModal extends Modal {
-	private resolveChoice: (result: boolean) => void = () => {};  // To resolve the promise. Initialize with a no-op function
+	private resolveChoice: (result: boolean) => void = () => { };  // To resolve the promise. Initialize with a no-op function
 	private rows: HTMLElement[] = [];
 	private previewEl: HTMLElement | null = null;
 	private previewImgEl: HTMLImageElement | null = null;
@@ -606,11 +606,11 @@ export class MovePairsModal extends Modal {
 
 	private initPreviewElements() {
 		if (!this.previewEl || this.previewImgEl) return;
-		
+
 		this.previewEmptyEl = this.previewEl.createDiv({ cls: 'import-preview-empty' });
 		this.previewEmptyEl.createDiv({ cls: 'import-preview-icon' });
 		this.previewEmptyEl.createEl('div', { text: 'No preview available', cls: 'import-preview-text' });
-		
+
 		this.previewImgEl = this.previewEl.createEl('img', { cls: 'import-preview-image' });
 	}
 
@@ -641,9 +641,9 @@ export class MovePairsModal extends Modal {
 
 		const token = ++this.previewToken;
 		const img = this.previewImgEl;
-		
+
 		this.showPreview('fallback');
-		
+
 		// oxlint-disable-next-line unicorn/prefer-add-event-listener
 		img.onload = () => token === this.previewToken && this.showPreview('image');
 		img.onerror = () => token === this.previewToken && this.showPreview('fallback');
@@ -691,14 +691,14 @@ export class MovePairsModal extends Modal {
 
 		const from = wrapper.createSpan({ cls: ['resort-pair-row-from', 'reverse-ellipsis'], text: pair.from, title: pair.from });
 		const arrow = wrapper.createSpan({ cls: 'rpr-arrow' })
-		
+
 		let to: HTMLElement;
 		if (pair.to.length === 1) {
 			to = wrapper.createSpan({ cls: ['resort-pair-row-to', 'reverse-ellipsis'], text: toText, title: toText });
 		} else {
 			const select = wrapper.createEl('select', { cls: ['resort-pair-row-to', 'reverse-ellipsis'] });
 			for (let i = 0; i < pair.to.length; i++) {
-				const option = select.createEl('option', { 
+				const option = select.createEl('option', {
 					text: pair.to[i].attachFolder,
 					value: String(i)
 				});
@@ -729,7 +729,7 @@ export class MovePairsModal extends Modal {
 					this.selectPreviousRow(wrapper);
 				}
 			}
-			
+
 			wrapper.remove();
 			this.contentEl.focus();
 		})
@@ -763,9 +763,9 @@ export class MovePairsModal extends Modal {
 		header.createEl('h4', { text: 'Resort attachments' })
 		header.createSpan({ text: "Here are attachments that are in a different attachment folder than the one they belong in, and where they should be moved." })
 
-		const scroller = container.createDiv({ cls: 'resort-pairs-scroller'});
-		const bottomBar = container.createDiv({ cls: 'resort-pairs-bottom-bar'});
-		this.previewEl = container.createDiv({ cls: 'resort-pairs-preview'});
+		const scroller = container.createDiv({ cls: 'resort-pairs-scroller' });
+		const bottomBar = container.createDiv({ cls: 'resort-pairs-bottom-bar' });
+		this.previewEl = container.createDiv({ cls: 'resort-pairs-preview' });
 
 		for (const pair of this.pairs) {
 			this.renderRow(scroller, pair);
@@ -785,19 +785,19 @@ export class MovePairsModal extends Modal {
 				(this.selectedRow.querySelector('.rpr-btn-dismiss') as HTMLButtonElement)?.click();
 			}
 		})
-		
+
 		const yesButton = bottomBar.createEl('button', {
-				text: 'Move all attachments',
-				cls: 'mod-cta'
+			text: 'Move all attachments',
+			cls: 'mod-cta'
 		});
 
 		const cancelButton = bottomBar.createEl('button', {
-				text: 'Cancel',
-				cls: 'mod-cancel'
+			text: 'Cancel',
+			cls: 'mod-cancel'
 		});
 		cancelButton.addEventListener('click', () => {
-				this.resolveChoice(false);
-				this.close(); 
+			this.resolveChoice(false);
+			this.close();
 		});
 
 		contentEl.focus();
