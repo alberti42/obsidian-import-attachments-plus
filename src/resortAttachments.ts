@@ -118,7 +118,7 @@ export async function getAttachmentResortPairs(plugin: ImportAttachments) {
 	// first pass: check attachments in notes' expected attachment folders
 	for (const [note, attachFolder] of noteToAttachFolder.entries()) {
 		const folder = app.vault.getAbstractFileByPath(attachFolder.attachFolder) as TFolder;
-		if (!folder) {
+		if (folder == null) {
 			if (warnInConsole) console.warn("resort: could not resolve folder: ", attachFolder);
 			continue;
 		}
