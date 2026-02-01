@@ -598,6 +598,8 @@ export class MovePairsModal extends Modal {
 	private selectedRow: HTMLElement | null = null;
 	private selectedPair: AttachmentResortPair | null = null;
 	private rowToPair: Map<HTMLElement, AttachmentResortPair>;
+	private keydownHandler: ((e: KeyboardEvent) => void) | null = null;
+	private docBody: HTMLElement | null = null;
 
 	private static readonly imageExtensions = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif']);
 
@@ -670,7 +672,7 @@ export class MovePairsModal extends Modal {
 		if (doScroll) this.selectedRow.scrollIntoView({ behavior: 'auto', block: 'nearest' });
 		if (doRenderPreview) this.renderPreview();
 	}
-	
+
 	private selectNextRow(row: HTMLElement) {
 		if (row == null || !row.classList.contains(ROW_CLASSNAME)) return;
 		const target = row.nextElementSibling as HTMLElement;
@@ -803,7 +805,8 @@ export class MovePairsModal extends Modal {
 		}
 		this.renderPreview();
 
-		this.plugin.registerDomEvent(contentEl.ownerDocument.body, 'keydown', (e: KeyboardEvent) => {
+		this.docBody = contentEl.ownerDocument.body;
+		this.keydownHandler = (e: KeyboardEvent) => {
 			if (this.selectedRow == null) return;
 			if (e.key === "ArrowUp") {
 				e.preventDefault();
@@ -815,7 +818,8 @@ export class MovePairsModal extends Modal {
 				e.preventDefault();
 				(this.selectedRow.querySelector('.rpr-btn-dismiss') as HTMLButtonElement)?.click();
 			}
-		})
+		};
+		this.docBody.addEventListener('keydown', this.keydownHandler);
 
 		const yesButton = bottomBar.createEl('button', {
 			text: 'Move all attachments',
@@ -874,6 +878,11 @@ export class MovePairsModal extends Modal {
 	}
 
 	onClose() {
+		if (this.keydownHandler && this.docBody) {
+			this.docBody.removeEventListener('keydown', this.keydownHandler);
+			this.keydownHandler = null;
+			this.docBody = null;
+		}
 		this.contentEl.empty();
 	}
 }
