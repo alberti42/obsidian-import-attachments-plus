@@ -1,9 +1,9 @@
-import { TFile, TFolder, CachedMetadata, Notice } from 'obsidian';
+import { App, TFile, TFolder, CachedMetadata, Notice } from 'obsidian';
 import { parseFilePath, mapSoftSet, getAllFilesInFolder, joinPaths, findNewFilename, doesFileExist } from './utils';
 import type ImportAttachments from 'main';
 import { promises as fs } from 'fs';
 
-declare const app: any;
+declare const app: App;
 export type SomeLink = { text: string, dest: string, resolvedDest: TFile };
 export type DedupeFileList = {f: TFile, list: Map<string, TFile>};
 export type DedupeLinkList = {f: TFile, list: Map<string, SomeLink>};
@@ -15,6 +15,12 @@ export type AttachmentResortPair = {
 	fromPath: string, 
 	to: AttachFolder[] 
 }
+
+export type MovePairSelection = {
+	sourcePath: string;
+	destinationPath: string;
+	sourceFile: TFile;
+};
 
 const NOTE_EXTENSIONS = new Set(["md", "canvas"]);
 // const warnInConsole = process.env.NODE_ENV === "development";
@@ -145,12 +151,6 @@ export async function getAttachmentResortPairs(plugin: ImportAttachments) {
 
 	return attachmentResortPairs;
 }
-
-export type MovePairSelection = {
-	sourcePath: string;
-	destinationPath: string;
-	sourceFile: TFile;
-};
 
 export async function moveAttachmentPairs(plugin: ImportAttachments, selections: MovePairSelection[]) {
 	const vault = plugin.app.vault;
