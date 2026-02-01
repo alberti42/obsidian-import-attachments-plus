@@ -108,15 +108,15 @@ function buildReferenceMaps(plugin: ImportAttachments) {
 }
 
 export async function getAttachmentResortPairs(plugin: ImportAttachments) {
-	// rebuild updated maps
 	noteToAttachFolder.clear();
 	noteToAttachments.clear();
 	attachmentToNotes.clear();
-
 	buildReferenceMaps(plugin);
 
 	const attachmentResortPairs: AttachmentResortPair[] = [];
+	const processedAttachments = new Set<string>();
 
+	// first pass: check attachments in notes' expected attachment folders
 	for (const [note, attachFolder] of noteToAttachFolder.entries()) {
 		const folder = app.vault.getAbstractFileByPath(attachFolder.attachFolder) as TFolder;
 		if (!folder) {
@@ -132,20 +132,41 @@ export async function getAttachmentResortPairs(plugin: ImportAttachments) {
 			if (!noteToAttachments.get(note)?.list.has(attachment.path)) {
 				if (!attachmentToNotes.get(attachment.path)) continue;
 
-				const alternatives = Array.from(attachmentToNotes.get(attachment.path)!.list.values())
-					.map(ntf => noteToAttachFolder.get(ntf.path))
-					.filter(e => typeof e !== "undefined");
+			const alternatives = Array.from(attachmentToNotes.get(attachment.path)!.list.values())
+				.map(ntf => noteToAttachFolder.get(ntf.path))
+				.filter(e => typeof e !== "undefined");
 
-				if (alternatives.length === 0) continue; // file is an orphan
+			if (alternatives.length === 0) continue;
+			processedAttachments.add(attachment.path);
 
-				// save alternatives to where the attachment should be moved
-				attachmentResortPairs.push({ 
-					file: attachment, 
-					from: attachment.parent?.name ?? "no parent!", 
-					fromPath: attachment.path, 
-					to: alternatives 
-				});
-			}
+			attachmentResortPairs.push({ 
+				file: attachment, 
+				from: attachment.parent?.name ?? "no parent!", 
+				fromPath: attachment.path, 
+				to: alternatives 
+			});
+		}
+	}
+
+	// second pass: check all referenced attachments not yet processed
+	for (const [attachmentPath, notesList] of attachmentToNotes.entries()) {
+		if (processedAttachments.has(attachmentPath)) continue;
+
+		const attachment = notesList.f;
+		const alternatives = Array.from(notesList.list.values())
+			.map(ntf => noteToAttachFolder.get(ntf.path))
+			.filter(e => typeof e !== "undefined");
+
+		if (alternatives.length === 0) continue;
+
+		const isInCorrectFolder = alternatives.some(alt => alt.attachFolder === attachment.parent?.path);
+		if (!isInCorrectFolder) {
+			attachmentResortPairs.push({ 
+				file: attachment, 
+				from: attachment.parent?.name ?? "no parent!", 
+				fromPath: attachment.path, 
+				to: alternatives 
+			});
 		}
 	}
 
