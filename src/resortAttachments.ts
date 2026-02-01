@@ -22,8 +22,7 @@ export type MovePairSelection = {
 };
 
 const NOTE_EXTENSIONS = new Set(["md", "canvas"]);
-// const warnInConsole = process.env.NODE_ENV === "development";
-const warnInConsole = false;
+const warnInConsole = process.env.NODE_ENV === "development";
 
 const noteToAttachFolder = new Map<string, AttachFolder>();
 
