@@ -19,13 +19,6 @@ import { moveAttachmentPairs, type MovePairSelection } from 'resortAttachments';
 
 const MODAL_TITLE_HTML_EL='h4';
 
-export type MovePairsModalResult = {
-	selections: {
-		sourcePath: string;
-		destinationPath: string;
-	}[];
-} | null;
-
 export class ImportActionTypeModal extends Modal {
 	promise: Promise<ImportActionChoiceResult>;
 	private resolveChoice: (result: ImportActionChoiceResult) => void = () => {};  // To resolve the promise. Initialize with a no-op function
