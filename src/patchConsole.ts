@@ -1,5 +1,5 @@
-import { Platform } from "obsidian";
-import ImportAttachments from "main";
+import { Platform } from 'obsidian';
+import ImportAttachments from 'main';
 
 let originalConsole = {
 	debug: null as ((message?: unknown, ...optionalParams: unknown[]) => void) | null,
@@ -11,7 +11,7 @@ let originalConsole = {
 
 // Helper function to patch console logs on mobile
 export function monkeyPatchConsole(plugin: ImportAttachments) {
-	if (Platform.isDesktopApp) return;
+	if (Platform.isDesktopApp) {return;}
 
 	const logs: Record<string, string[]> = plugin.settings.logs || {};
 	const saveLogs = async () => {
@@ -24,7 +24,7 @@ export function monkeyPatchConsole(plugin: ImportAttachments) {
 			try {
 				return JSON.stringify(message, null, 2); // Pretty print with 2-space indentation
 			} catch {
-				return "[Object]";
+				return '[Object]';
 			}
 		}
 		return String(message);
@@ -58,11 +58,11 @@ export function monkeyPatchConsole(plugin: ImportAttachments) {
 		saveLogs();
 	};
 
-	if(originalConsole.debug) console.debug = logMessages(originalConsole.debug, "debug");
-	if(originalConsole.error) console.error = logMessages(originalConsole.error, "error");
-	if(originalConsole.info) console.info = logMessages(originalConsole.info, "info");
-	if(originalConsole.log) console.log = logMessages(originalConsole.log, "log");
-	if(originalConsole.warn) console.warn = logMessages(originalConsole.warn, "warn");
+	if(originalConsole.debug) {console.debug = logMessages(originalConsole.debug, 'debug');}
+	if(originalConsole.error) {console.error = logMessages(originalConsole.error, 'error');}
+	if(originalConsole.info) {console.info = logMessages(originalConsole.info, 'info');}
+	if(originalConsole.log) {console.log = logMessages(originalConsole.log, 'log');}
+	if(originalConsole.warn) {console.warn = logMessages(originalConsole.warn, 'warn');}
 }
 
 export function unpatchConsole() {

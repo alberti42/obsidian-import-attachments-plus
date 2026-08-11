@@ -31,8 +31,8 @@ export type StrayAttachmentMove = {
 	sourceFile: TFile;
 };
 
-const NOTE_EXTENSIONS = new Set(["md", "canvas"]);
-const warnInConsole = process.env.NODE_ENV === "development";
+const NOTE_EXTENSIONS = new Set(['md', 'canvas']);
+const warnInConsole = process.env.NODE_ENV === 'development';
 
 export type ReferenceMaps = {
 	noteToAttachFolder: Map<string, AttachFolder>,
@@ -94,7 +94,7 @@ function unifyLinkCaches(app: App, input: { f: TFile, m: CachedMetadata | null})
 	for (const elem of mergedLinks) {
 		const res = resolveLink(app, elem.link, input.f.path);
 		if (res === null) {
-			if (warnInConsole) { console.warn("stray attachments: could not resolve link:", elem.original, `(link field: '${elem.link}')`); }
+			if (warnInConsole) { console.warn('stray attachments: could not resolve link:', elem.original, `(link field: '${elem.link}')`); }
 			continue;
 		}
 		// we are not interested in notes linking to other notes
@@ -360,7 +360,7 @@ export function findStrayAttachments(plugin: ImportAttachments) {
 	for (const [note, attachFolder] of noteToAttachFolder.entries()) {
 		const folder = plugin.app.vault.getAbstractFileByPath(attachFolder.attachFolder);
 		if (!(folder instanceof TFolder)) {
-			if (warnInConsole) { console.warn("stray attachments: could not resolve folder: ", attachFolder); }
+			if (warnInConsole) { console.warn('stray attachments: could not resolve folder: ', attachFolder); }
 			continue;
 		}
 
@@ -398,7 +398,7 @@ export async function moveStrayAttachments(plugin: ImportAttachments, selections
 	for (const { sourcePath, destinationPath, sourceFile } of selections) {
 		try {
 			let destPath = joinPaths(destinationPath, sourceFile.name);
-			if (sourcePath === destPath) continue;
+			if (sourcePath === destPath) {continue;}
 
 			if (doesFileExist(vault, destPath)) {
 				const existingFile = vault.getAbstractFileByPath(destPath);
@@ -408,7 +408,7 @@ export async function moveStrayAttachments(plugin: ImportAttachments, selections
 			}
 
 			const destFolder = vault.getAbstractFileByPath(destinationPath);
-			if (!destFolder || !(destFolder instanceof TFolder)) await vault.createFolder(destinationPath);
+			if (!destFolder || !(destFolder instanceof TFolder)) {await vault.createFolder(destinationPath);}
 
 			const sourceFolder = sourceFile.parent;
 			await plugin.app.fileManager.renameFile(sourceFile, destPath);

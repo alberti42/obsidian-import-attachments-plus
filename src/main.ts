@@ -17,7 +17,7 @@ import {
     EditorPosition,
     WorkspaceWindow,
     WorkspaceLeaf,
-} from "obsidian";
+} from 'obsidian';
 
 // Import utility and modal components
 import { ImportActionTypeModal, OverwriteChoiceModal, ImportFromVaultChoiceModal, FolderImportErrorModal, CreateAttachmentFolderModal, StrayAttachmentsModal } from './ImportAttachmentsModal';
@@ -39,7 +39,7 @@ import {
     isSupportedMediaTag,
     MediaLabels,
 } from './types';
-import * as Utils from "utils";
+import * as Utils from 'utils';
 
 import { sep, posix } from 'path';
 
@@ -48,11 +48,11 @@ import { promises as fs } from 'fs';  // This imports the promises API from fs
 import { patchOpenFile, unpatchOpenFile, addKeyListeners, removeKeyListeners } from 'patchOpenFile';
 import { callPromptForDeletion, patchFilemanager, unpatchFilemanager } from 'patchFileManager';
 
-import { patchImportFunctions, unpatchImportFunctions } from "patchImportFunctions";
-import { patchFileExplorer, unpatchFileExplorer } from "patchFileExplorer";
-import { monkeyPatchConsole, unpatchConsole } from "patchConsole";
+import { patchImportFunctions, unpatchImportFunctions } from 'patchImportFunctions';
+import { patchFileExplorer, unpatchFileExplorer } from 'patchFileExplorer';
+import { monkeyPatchConsole, unpatchConsole } from 'patchConsole';
 
-import { DEFAULT_SETTINGS, DEFAULT_SETTINGS_1_3_0 } from "default";
+import { DEFAULT_SETTINGS, DEFAULT_SETTINGS_1_3_0 } from 'default';
 // import { debug } from "console";
 
 import { EditorSelection } from '@codemirror/state';
@@ -80,9 +80,9 @@ export default class ImportAttachments extends Plugin {
 	constructor(app: App, manifest: PluginManifest) {
 		super(app, manifest);
 
-		if (process.env.NODE_ENV === "development") {
+		if (process.env.NODE_ENV === 'development') {
 			monkeyPatchConsole(this);
-			console.log("Import Attachments+: development mode including extra logging and debug features");
+			console.log('Import Attachments+: development mode including extra logging and debug features');
 		}
 
 		this.settingsTab = new ImportAttachmentsSettingTab(this.app, this);
@@ -102,12 +102,12 @@ export default class ImportAttachments extends Plugin {
 			// store the vault path
 			const adapter = this.app.vault.adapter;
 			if (!(adapter instanceof FileSystemAdapter)) {
-				throw new Error("The vault folder could not be determined.");
+				throw new Error('The vault folder could not be determined.');
 			}
 			// Normalize to POSIX-style path
 			this.vaultPath = adapter.getBasePath().split(sep).join(posix.sep);
 		} else {
-			this.vaultPath = "";
+			this.vaultPath = '';
 		}
 	}
 
@@ -126,7 +126,7 @@ export default class ImportAttachments extends Plugin {
 		}
 
 		const folderPath = this.settings.attachmentFolderPath;
-		const placeholder = "${notename}";
+		const placeholder = '${notename}';
 
 		if(folderPath.includes(placeholder)) {
 			// Find the index of the first occurrence of the placeholder
@@ -176,7 +176,7 @@ export default class ImportAttachments extends Plugin {
 
                     if (match && match[1]) {
                         const noteName = normalizePath(Utils.joinPaths(dir,match[1]));
-                        return Utils.doesFileExist(this.app.vault,noteName+".md") || Utils.doesFileExist(this.app.vault,noteName+".canvas");
+                        return Utils.doesFileExist(this.app.vault,noteName+'.md') || Utils.doesFileExist(this.app.vault,noteName+'.canvas');
                     } else {
                         // No match found
                         return false;
@@ -208,7 +208,7 @@ export default class ImportAttachments extends Plugin {
 
 		// If the placeholder is not found, return the whole string as the first part and an empty string as the second part
 		if (firstIndex === -1) {
-			return [input, ""];
+			return [input, ''];
 		}
 
 		// Find the index of the last occurrence of the placeholder
@@ -332,7 +332,7 @@ export default class ImportAttachments extends Plugin {
         });
 
         // Add handler to keep track of opened windows
-        this.app.workspace.on("window-open", (_:WorkspaceWindow, window:Window) => {
+        this.app.workspace.on('window-open', (_:WorkspaceWindow, window:Window) => {
             const doc = window.document;
             if(!this.file_menu_embedded_cb_registered_docs.has(doc)) {
                 // Add the doc to the tracked docs
@@ -345,7 +345,7 @@ export default class ImportAttachments extends Plugin {
         });
 
         // Add handler to keep track of opened windows
-        this.app.workspace.on("window-close", (_:WorkspaceWindow, window:Window) => {
+        this.app.workspace.on('window-close', (_:WorkspaceWindow, window:Window) => {
             const doc = window.document;
             if(this.file_menu_embedded_cb_registered_docs.has(doc)) {
                 // Remove delete menu in context menu of embedded images
@@ -359,8 +359,8 @@ export default class ImportAttachments extends Plugin {
     addCommands() {
         // Command for importing as a standard link
         this.addCommand({
-            id: "move-file-to-vault-link",
-            name: "Move file to vault as linked attachment",
+            id: 'move-file-to-vault-link',
+            name: 'Move file to vault as linked attachment',
             callback: () => this.choose_file_to_import_cb({
                 embed: false,
                 action: ImportActionType.MOVE,
@@ -369,8 +369,8 @@ export default class ImportAttachments extends Plugin {
 
         // Command for importing as an embedded image/link
         this.addCommand({
-            id: "move-file-to-vault-embed",
-            name: "Move file to vault as embedded attachment",
+            id: 'move-file-to-vault-embed',
+            name: 'Move file to vault as embedded attachment',
             callback: () => this.choose_file_to_import_cb({
                 embed: true,
                 action: ImportActionType.MOVE,
@@ -379,8 +379,8 @@ export default class ImportAttachments extends Plugin {
 
         // Command for importing as a standard link
         this.addCommand({
-            id: "copy-file-to-vault-link",
-            name: "Copy file to vault as linked attachment",
+            id: 'copy-file-to-vault-link',
+            name: 'Copy file to vault as linked attachment',
             callback: () => this.choose_file_to_import_cb({
                 embed: false,
                 action: ImportActionType.COPY,
@@ -389,8 +389,8 @@ export default class ImportAttachments extends Plugin {
 
         // Command for importing as an embedded image/link
         this.addCommand({
-            id: "copy-file-to-vault-embed",
-            name: "Copy file to vault as embedded attachment",
+            id: 'copy-file-to-vault-embed',
+            name: 'Copy file to vault as embedded attachment',
             callback: () => this.choose_file_to_import_cb({
                 embed: true,
                 action: ImportActionType.COPY,
@@ -399,8 +399,8 @@ export default class ImportAttachments extends Plugin {
 
         // Register the command to open the attachments folder
         this.addCommand({
-            id: "open-attachments-folder",
-            name: "Open attachments folder",
+            id: 'open-attachments-folder',
+            name: 'Open attachments folder',
             callback: () => this.open_attachments_folder_cb(),
         });
 
@@ -410,7 +410,7 @@ export default class ImportAttachments extends Plugin {
     // work on mobile as well (manifest.json declares isDesktopOnly: false).
     addPlatformIndependentCommands() {
         this.addCommand({
-            id: "move-stray-attachments",
+            id: 'move-stray-attachments',
             name: "Move stray attachments to their note's folder",
             callback: () => this.move_stray_attachments_cb(),
         });
@@ -437,30 +437,30 @@ export default class ImportAttachments extends Plugin {
         this.addDeleteMenuForLinks(false);
 
         // remove delete menu for embedded graphics
-        this.removeDeleteMenuForEmbeddedImages("all");
+        this.removeDeleteMenuForEmbeddedImages('all');
 	}
 
     addDeleteMenuForLinks(status:boolean) {
         if(status && !this.file_menu_cb_registered) {
-            this.app.workspace.on("file-menu", this.file_menu_cb);
+            this.app.workspace.on('file-menu', this.file_menu_cb);
             this.file_menu_cb_registered = true;
         } else {
             if(this.file_menu_cb_registered) {
-                this.app.workspace.off("file-menu", this.file_menu_cb as (...data: unknown[]) => unknown);
+                this.app.workspace.off('file-menu', this.file_menu_cb as (...data: unknown[]) => unknown);
                 this.file_menu_cb_registered = false;
             }
         }
     }
 
-    addDeleteMenuForEmbeddedImages(doc:Document | "all") {
+    addDeleteMenuForEmbeddedImages(doc:Document | 'all') {
         const registerDoc = (d:Document) => {
-            d.addEventListener("contextmenu", this.context_menu_cb);
+            d.addEventListener('contextmenu', this.context_menu_cb);
             this.file_menu_embedded_cb_registered_docs.set(d,true);
             // console.log("REGISTERED");
             // console.log(d);
         };
 
-        if(doc==="all") {
+        if(doc==='all') {
             this.file_menu_embedded_cb_registered_docs.forEach((status:boolean, d:Document) => {
                 if(status===false) {  // then we register it
                     registerDoc(d);
@@ -474,15 +474,15 @@ export default class ImportAttachments extends Plugin {
         }
     }
 
-    removeDeleteMenuForEmbeddedImages(doc:Document|"all") {
+    removeDeleteMenuForEmbeddedImages(doc:Document|'all') {
         const unregisterDoc = (d:Document) => {
-            d.removeEventListener("contextmenu", this.context_menu_cb);
+            d.removeEventListener('contextmenu', this.context_menu_cb);
             this.file_menu_embedded_cb_registered_docs.set(d,false);
             // console.log("UNREGISTERED");
             // console.log(d);
         };
 
-        if(doc==="all") {
+        if(doc==='all') {
             this.file_menu_embedded_cb_registered_docs.forEach((status:boolean, d:Document) => {
                 if(status===true) {  // then we register it
                     unregisterDoc(d);
@@ -497,7 +497,7 @@ export default class ImportAttachments extends Plugin {
     }
 
     file_menu_cb(menu: Menu, file: TAbstractFile):void {
-        if(menu.sections.contains("canvas")) return;
+        if(menu.sections.contains('canvas')) {return;}
         
         if (file instanceof TFile) {
             // Inspect the currently available menu items
@@ -532,7 +532,7 @@ export default class ImportAttachments extends Plugin {
                     deleteMenu = item;
                 }
             }
-            if(renameMenu === null) renameMenu = first_action_menu;
+            if(renameMenu === null) {renameMenu = first_action_menu;}
             
             if(deleteMenu) {
                 // we do nothing if the delete menu is already present
@@ -544,13 +544,13 @@ export default class ImportAttachments extends Plugin {
             menu.addItem((item: MenuItem) => {
                 newDeleteMenu = item;
                 item
-                .setTitle("Delete link and file")
-                .setIcon("lucide-trash-2")
-                .setSection("danger")
+                .setTitle('Delete link and file')
+                .setIcon('lucide-trash-2')
+                .setSection('danger')
                 .onClick((_:MouseEvent | KeyboardEvent)=> {
                     this.delete_file_cb(file);
                 });
-                item.dom.classList.add("is-warning");
+                item.dom.classList.add('is-warning');
             });
 
             const moveDeleteOptionNextToRename = false;
@@ -577,7 +577,7 @@ export default class ImportAttachments extends Plugin {
         try {
             // Find the current Markdown editor where the click happened
             const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-            if(activeView===null) throw new DeleteLinkError("not active view of type 'MarkdownView' was found");
+            if(activeView===null) {throw new DeleteLinkError("not active view of type 'MarkdownView' was found");}
             const editorView = activeView.editor;
             
             // Get the CodeMirror instance
@@ -598,7 +598,7 @@ export default class ImportAttachments extends Plugin {
                 return pos;
             })();
 
-            if(cursorIdx===null) throw new DeleteLinkError("could not determine the link position in the MarkDown note");
+            if(cursorIdx===null) {throw new DeleteLinkError('could not determine the link position in the MarkDown note');}
 
             const line = doc.lineAt(cursorIdx);
             const lineContent = line.text;
@@ -674,14 +674,14 @@ export default class ImportAttachments extends Plugin {
         // Get a TFile reference from the clicked HTML element 
         const fileToBeDeleted:TFile|null = (():TFile|null=>{
             const parent = target.parentElement;
-            if(!parent) return null;
-            const src = parent.getAttribute("src");
-            if(!src) return null;
+            if(!parent) {return null;}
+            const src = parent.getAttribute('src');
+            if(!src) {return null;}
             const fileInVault = this.app.vault.getFileByPath(src);
             return fileInVault;
         })();
 
-        if(!fileToBeDeleted) return;
+        if(!fileToBeDeleted) {return;}
 
         this.delete_file_cb(fileToBeDeleted,target);
     }
@@ -691,7 +691,7 @@ export default class ImportAttachments extends Plugin {
         await this.loadSettings();
 
         const activeTab = this.app.setting.activeTab;
-        if(activeTab && activeTab instanceof ImportAttachmentsSettingTab) activeTab.display();
+        if(activeTab && activeTab instanceof ImportAttachmentsSettingTab) {activeTab.display();}
     }
 
 	async loadSettings() {
@@ -784,13 +784,13 @@ export default class ImportAttachments extends Plugin {
         if (md_file===undefined) {
             const md_active_file = this.app.workspace.getActiveFile();
             if (md_active_file === null) {
-                throw new Error("The active note could not be determined.");
+                throw new Error('The active note could not be determined.');
             }
             md_file = Utils.parseFilePath(md_active_file.path);
         }
 
-        if(md_file.ext !== ".md" && md_file.ext !== ".canvas") {
-            throw new Error("No Markdown file was provided.");
+        if(md_file.ext !== '.md' && md_file.ext !== '.canvas') {
+            throw new Error('No Markdown file was provided.');
         }
         
         const currentNoteFolderPath = md_file.dir;
@@ -831,7 +831,7 @@ export default class ImportAttachments extends Plugin {
                                         .replace(/\$\{uuid\}/g, Utils.uuidv4())
                                         .replace(/\$\{date\}/g, Utils.formatDateTime(dateFormat));
 
-        if(md_file) attachmentName = attachmentName.replace(/\$\{notename\}/g, md_file.filename);
+        if(md_file) {attachmentName = attachmentName.replace(/\$\{notename\}/g, md_file.filename);}
 
         if(namePattern.includes('${md5}')) {
             let hash = ''
@@ -859,16 +859,16 @@ export default class ImportAttachments extends Plugin {
         if (activeLeaf) {
             const view = activeLeaf.view;
             const viewType = view.getViewType();
-            if(viewType != 'markdown') return;
+            if(viewType != 'markdown') {return;}
         }
-        if(!(evt.target instanceof HTMLElement)) return;
+        if(!(evt.target instanceof HTMLElement)) {return;}
         const target:HTMLElement = evt.target;
         const tagName:string = target.tagName;
 
         // Check if the right-clicked element is an image
         if (isSupportedMediaTag(tagName)) {
             const parent = target.parentElement;
-            if(!parent) return;
+            if(!parent) {return;}
 
             evt.preventDefault(); // Prevent the default context menu
 
@@ -878,12 +878,12 @@ export default class ImportAttachments extends Plugin {
             // Add options to the menu
             menu.addItem((item) => {
                 item.setTitle(`Delete ${MediaLabels[tagName]}`)
-                    .setIcon("trash-2")
-                    .setSection("danger")
+                    .setIcon('trash-2')
+                    .setSection('danger')
                     .onClick(() => {
                         this.delete_img_cb(evt,target);
                     });
-                item.dom.classList.add("is-warning");
+                item.dom.classList.add('is-warning');
             });
 
             // Add more context menu items as needed
@@ -897,7 +897,7 @@ export default class ImportAttachments extends Plugin {
         if (!this.settings.autoRenameAttachmentFolder) { return }
 
             const oldPath_parsed = Utils.parseFilePath(oldPath);
-            if (oldPath_parsed.ext !== ".md" && oldPath_parsed.ext !== ".canvas") { return }
+            if (oldPath_parsed.ext !== '.md' && oldPath_parsed.ext !== '.canvas') { return }
 
             const oldAttachmentFolderPath = this.getAttachmentFolderOfMdNote(oldPath_parsed);
             if (!oldAttachmentFolderPath) { return }
@@ -912,9 +912,9 @@ export default class ImportAttachments extends Plugin {
                 } catch (error: unknown) {
                     const msg = 'Failed to rename the attachment folder';
                     console.error(msg);
-                    console.error("Original attachment folder:", oldPath);
-                    console.error("New attachment folder:", newPath);
-                    console.error("Error msg:", error);
+                    console.error('Original attachment folder:', oldPath);
+                    console.error('New attachment folder:', newPath);
+                    console.error('Error msg:', error);
                     new Notice(msg + '.');
                 }
             }
@@ -923,7 +923,7 @@ export default class ImportAttachments extends Plugin {
 
     async editor_paste_cb(evt: ClipboardEvent, editor: Editor, view: MarkdownView | MarkdownFileInfo) {
         // Check if the event has already been handled
-        if (evt.defaultPrevented) return;
+        if (evt.defaultPrevented) {return;}
 
         if (!(view instanceof MarkdownView)) {
             console.error('No view provided')
@@ -939,7 +939,7 @@ export default class ImportAttachments extends Plugin {
 
                 // Check if all files have a non-empty 'path' property
                 const filesArray = Array.from(files);
-                const allFilesHavePath = filesArray.every(file => file.path && file.path !== "");
+                const allFilesHavePath = filesArray.every(file => file.path && file.path !== '');
                 if(allFilesHavePath) {
                     evt.preventDefault();
 
@@ -968,14 +968,14 @@ export default class ImportAttachments extends Plugin {
         const editor = markdownView?.editor;
 
         if (!editor) {
-            const msg = "No active markdown editor found.";
+            const msg = 'No active markdown editor found.';
             console.error(msg);
             new Notice(msg);
             return;
         }
 
-        const input = document.createElement("input");
-        input.type = "file";
+        const input = document.createElement('input');
+        input.type = 'file';
         input.multiple = true; // Allow selection of multiple files
 
         input.onchange = async (e: Event) => {
@@ -986,7 +986,7 @@ export default class ImportAttachments extends Plugin {
                 // Directly pass the FileList to the processing function
                 await this.moveFileToAttachmentsFolder(Array.from(files), editor, markdownView, importSettings);
             } else {
-                const msg = "No files selected or file access error.";
+                const msg = 'No files selected or file access error.';
                 console.error(msg);
                 new Notice(msg);
             }
@@ -996,7 +996,7 @@ export default class ImportAttachments extends Plugin {
 
     async editor_drop_cb(evt: DragEvent, editor: Editor, view: MarkdownView | MarkdownFileInfo) {
         // Check if the event has already been handled
-        if (evt.defaultPrevented) return;
+        if (evt.defaultPrevented) {return;}
 
         if (!(view instanceof MarkdownView)) {
             console.error('No view provided')
@@ -1016,7 +1016,7 @@ export default class ImportAttachments extends Plugin {
 
         // Handle the dropped files
         const files = evt?.dataTransfer?.files;
-        if(!files) return;
+        if(!files) {return;}
         if (files.length > 0) {
 
             const dropPos = editor.cm.posAtCoords({ x: evt.clientX, y: evt.clientY });
@@ -1050,13 +1050,13 @@ export default class ImportAttachments extends Plugin {
             // `require` (rather than a static import) keeps electron out of the module
             // graph, so this file stays loadable where electron is unavailable.
             // eslint-disable-next-line @typescript-eslint/no-require-imports
-            const webUtils = require("electron").webUtils;
+            const webUtils = require('electron').webUtils;
 
             let files_array;
 
             if(!webUtils) {
                 // eslint-disable-next-line @typescript-eslint/no-require-imports
-                const installer_version = require("electron").remote.app.getVersion();
+                const installer_version = require('electron').remote.app.getVersion();
                 console.warn(`webUtils not available with the current Obsidian installer version ${installer_version}. Please replace your installation of Obsidian with a fresh new installation.`);
             
                 files_array = Array.from(files);
@@ -1110,7 +1110,7 @@ export default class ImportAttachments extends Plugin {
 			const modal = new ImportActionTypeModal(this, lastActionFilesOnImport, lastEmbedOption);
 			modal.open();
 			const choice = await modal.promise;
-			if (choice == null) return;
+			if (choice == null) {return;}
 			actionFilesOnImport = choice.action;
 			switch (importType) {
 				case ImportOperationType.DRAG_AND_DROP:
@@ -1154,7 +1154,7 @@ export default class ImportAttachments extends Plugin {
 		// }
 
 		const md_file = view.file;
-		if(md_file===null) { throw new Error("The active note could not be determined."); }
+		if(md_file===null) { throw new Error('The active note could not be determined.'); }
 
 		const md_file_parsed = Utils.parseFilePath(md_file.path)
 
@@ -1184,7 +1184,7 @@ export default class ImportAttachments extends Plugin {
 			if (relativePath) {
 
 				// If they are the same file, then skip copying/moving, we are alrady done
-				if (existingFile && Utils.arePathsSameFile(this.app.vault, relativePath, destFilePath)) return destFilePath;
+				if (existingFile && Utils.arePathsSameFile(this.app.vault, relativePath, destFilePath)) {return destFilePath;}
 
 				const modal = new ImportFromVaultChoiceModal(this, originalFilePath, relativePath, importSettings.action);
 				modal.open();
@@ -1233,9 +1233,9 @@ export default class ImportAttachments extends Plugin {
 						return relativePath;
 				}
 			} catch (error) {
-				const msg = "Failed to process the file";
-				new Notice(msg + ".");
-				console.error(msg + ":", originalFilePath, error);
+				const msg = 'Failed to process the file';
+				new Notice(msg + '.');
+				console.error(msg + ':', originalFilePath, error);
 				return null;  // Indicate failure in processing this file
 			}
 		});
@@ -1309,9 +1309,9 @@ export default class ImportAttachments extends Plugin {
         const file = Utils.createMockTFile(this.app.vault,importedFilePath);
         const filename = file.name;
         const customDisplayText = (():string=>{
-            let text="";
+            let text='';
             if(this.settings.customDisplayText) {
-                text = filename + (this.settings.hideExtForDisplayText ? "" : file.extension);
+                text = filename + (this.settings.hideExtForDisplayText ? '' : file.extension);
             }
             // if a single file is imported
             if(!counter)
@@ -1322,7 +1322,7 @@ export default class ImportAttachments extends Plugin {
                     const selectedText = editor.cm.state.doc.sliceString(main_selection.from, main_selection.to);
                     
                     // If the user has selected some text, this will be used for the display text 
-                    if(selectedText.length>0) text = selectedText;
+                    if(selectedText.length>0) {text = selectedText;}
                 }
             }
             return text;
@@ -1333,7 +1333,7 @@ export default class ImportAttachments extends Plugin {
         const MDLink_regex = new RegExp('^(!)?(\\[[^\\]]*\\])(.*)$');
         const WikiLink_regex = new RegExp('^(!)?(.*?)(|[^|]*)?$');
         
-        const useMarkdownLinks = this.app.vault.getConfig("useMarkdownLinks");
+        const useMarkdownLinks = this.app.vault.getConfig('useMarkdownLinks');
 
         let offset;
         let processedLink;
@@ -1346,7 +1346,7 @@ export default class ImportAttachments extends Plugin {
             processedLink = generatedLink;
             if(match) {
                 offset = 1;
-                processedLink = "[" + customDisplayText + "]" + match[3];
+                processedLink = '[' + customDisplayText + ']' + match[3];
                 selectDisplayedText = true;
             }
         } else { // Wiki links
@@ -1357,7 +1357,7 @@ export default class ImportAttachments extends Plugin {
             processedLink = generatedLink;
             if(match) {
                 offset = match[2].length;
-                processedLink = match[2] + (match[3] ? match[3] : "");
+                processedLink = match[2] + (match[3] ? match[3] : '');
                 selectDisplayedText = true;
             }
         }
@@ -1368,8 +1368,8 @@ export default class ImportAttachments extends Plugin {
 
         const linkText = prefix + processedLink + postfix;
 
-        const cursor_from = editor.getCursor("from");  // Get the current cursor position before insertion
-        const cursor_to = editor.getCursor("to");  // Get the current cursor position before insertion
+        const cursor_from = editor.getCursor('from');  // Get the current cursor position before insertion
+        const cursor_to = editor.getCursor('to');  // Get the current cursor position before insertion
         
         // Insert the link text at the current cursor position
         editor.replaceRange(linkText, cursor_from, cursor_to);
@@ -1417,7 +1417,7 @@ export default class ImportAttachments extends Plugin {
 		const md_active_file = this.app.workspace.getActiveFile();
 
 		if(!md_active_file) {
-			console.error("Cannot open the attachment folder. The user must first select a markdown note.")
+			console.error('Cannot open the attachment folder. The user must first select a markdown note.')
 			return;
 		}
 
@@ -1427,7 +1427,7 @@ export default class ImportAttachments extends Plugin {
 			const modal = new CreateAttachmentFolderModal(this, attachmentsFolderPath);
 			modal.open();
 			const choice = await modal.promise;
-			if (choice == false) return;
+			if (choice == false) {return;}
 			await Utils.createFolderIfNotExists(this.app.vault,attachmentsFolderPath);
 		}
 

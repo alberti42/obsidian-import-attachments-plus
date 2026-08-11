@@ -39,19 +39,19 @@ function unpatchFileExplorer() {
 }
 
 function patchAcceptRename(plugin: ImportAttachments, viewClass: FileExplorerViewConstructorType) {
-	if(originalAcceptRename) return;
+	if(originalAcceptRename) {return;}
 
 	originalAcceptRename = viewClass.prototype.acceptRename;
 	
 	viewClass.prototype.acceptRename = async function(this: FileExplorerView) {
-		if(!originalAcceptRename) throw new Error('Something went wrong in patching file-explorer plugin.');
+		if(!originalAcceptRename) {throw new Error('Something went wrong in patching file-explorer plugin.');}
 
 		const fileBeingRenamed = this.fileBeingRenamed;
 
 		if(fileBeingRenamed instanceof TFolder) {
 			const item = this.fileItems[fileBeingRenamed.path];
 			await originalAcceptRename.apply(this);
-			if(plugin.settings.hideAttachmentFolders && plugin.matchAttachmentFolder(item.file.path)) item.el.toggleClass("import-plugin-hidden",true);
+			if(plugin.settings.hideAttachmentFolders && plugin.matchAttachmentFolder(item.file.path)) {item.el.toggleClass('import-plugin-hidden',true);}
 		} else {
 			await originalAcceptRename.apply(this);
 		}
@@ -84,16 +84,16 @@ function patchOnCreate(plugin: ImportAttachments, viewClass: FileExplorerViewCon
 */
 
 function patchCreateFolderDom(plugin: ImportAttachments, viewClass: FileExplorerViewConstructorType) {
-	if(originalCreateFolderDom) return;
+	if(originalCreateFolderDom) {return;}
 
 	originalCreateFolderDom = viewClass.prototype.createFolderDom;
     
     viewClass.prototype.createFolderDom = function(this: FileExplorerView, folder: TFolder): FileExplorerItem {
-		if(!originalCreateFolderDom) throw new Error('Something went wrong in patching file-explorer plugin.');
+		if(!originalCreateFolderDom) {throw new Error('Something went wrong in patching file-explorer plugin.');}
 		
 		const item = originalCreateFolderDom.apply(this, [folder]);
 			
-		if(plugin.settings.hideAttachmentFolders && plugin.matchAttachmentFolder(item.file.path)) item.el.toggleClass("import-plugin-hidden",true);
+		if(plugin.settings.hideAttachmentFolders && plugin.matchAttachmentFolder(item.file.path)) {item.el.toggleClass('import-plugin-hidden',true);}
 
 		return item;
 	};
@@ -110,20 +110,20 @@ async function updateVisibilityAttachmentFolders(plugin: ImportAttachments){
 	const hide = plugin.settings.hideAttachmentFolders;
 	for (const leaf of leaves) {
         // We load the file explorer view if it is deferred - otherwise we cannot patch it
-        if (requireApiVersion('1.7.2') && leaf.isDeferred) await leaf.loadIfDeferred();
+        if (requireApiVersion('1.7.2') && leaf.isDeferred) {await leaf.loadIfDeferred();}
 
 		const viewInstance = leaf.view;
         if(isFileExplorerView(viewInstance)) {
             if(hide) {
                 Object.entries(viewInstance.fileItems).forEach(([folderPath, item]) => {
                     if(item.file instanceof TFolder) {
-                        item.el.toggleClass("import-plugin-hidden",plugin.matchAttachmentFolder(folderPath));
+                        item.el.toggleClass('import-plugin-hidden',plugin.matchAttachmentFolder(folderPath));
                     }
                 });
             } else {
                 Object.entries(viewInstance.fileItems).forEach(([folderPath, item]) => {
                     if(item.file instanceof TFolder) {
-                        item.el.toggleClass("import-plugin-hidden",false);
+                        item.el.toggleClass('import-plugin-hidden',false);
                     }
                 });
     		};
@@ -141,7 +141,7 @@ async function patchFileExplorer(plugin: ImportAttachments) {
     let patched = false;
     for (const leaf of leaves) {
         // We load the file explorer view if it is deferred - otherwise we cannot patch it
-        if (requireApiVersion('1.7.2') && leaf.isDeferred) await leaf.loadIfDeferred();
+        if (requireApiVersion('1.7.2') && leaf.isDeferred) {await leaf.loadIfDeferred();}
         
         const viewInstance = leaf.view;
         
@@ -178,7 +178,7 @@ async function patchFileExplorer(plugin: ImportAttachments) {
 
 	// Create a new factory function that wraps the original and patches the instance
 	const patchedViewFactory:ViewFactory = function(this: undefined, leaf: WorkspaceLeaf): FileExplorerView {
-		if(!originalViewFactory) throw new Error("Something went wrong when patching ViewFactory.");
+		if(!originalViewFactory) {throw new Error('Something went wrong when patching ViewFactory.');}
 
 		// Call the original factory to get the view instance
 		const viewInstance = originalViewFactory.apply(this, [leaf]);

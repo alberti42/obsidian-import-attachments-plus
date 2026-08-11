@@ -46,7 +46,7 @@ async function modifiedPromptForDeletion(this: FileManager, file: TAbstractFile)
             // In order to avoid deleting common attachment folders, shared between multiple notes
             if (plugin.settings.attachmentFolderPath.includes('${notename}')) {
                 const file_parsed = Utils.parseFilePath(file.path);
-                if (file_parsed.ext === ".md" || file_parsed.ext === ".canvas") {
+                if (file_parsed.ext === '.md' || file_parsed.ext === '.canvas') {
                     const attachmentFolder = plugin.app.vault.getAbstractFileByPath(plugin.getAttachmentFolderOfMdNote(file_parsed));
                     if(attachmentFolder instanceof TFolder) {
                         // Only the non-empty case is ever shown; an empty folder is
@@ -87,7 +87,7 @@ async function deleteAttachmentFolderAssociatedWithMdFile(plugin: ImportAttachme
 		const modal = new DeleteAttachmentFolderModal(plugin, attachmentFolder, preDescription, postDescription);
 		modal.open();
 		const choice = await modal.promise;
-		if (!choice) return;
+		if (!choice) {return;}
 	}
 
 	const filePathForDeletion = attachmentFolder;
@@ -96,14 +96,14 @@ async function deleteAttachmentFolderAssociatedWithMdFile(plugin: ImportAttachme
 		await plugin.trashFile(filePathForDeletion);
 	} catch (error: unknown) {
 		const msg = 'Failed to remove the attachment folder';
-		console.error(msg + ":", filePathForDeletion);
-		console.error("Error msg:", error);
+		console.error(msg + ':', filePathForDeletion);
+		console.error('Error msg:', error);
 		new Notice(msg + '.');
 	}
 }
 
 async function callOriginalPromptForDeletion(this:FileManager, file:TAbstractFile):Promise<boolean> {
-    if (!originalPromptForDeletion) return false;
+    if (!originalPromptForDeletion) {return false;}
 
     // Create a new promise and store the resolve and reject functions
     const registeredUserDecisionPromise = new Promise<boolean>((resolve, reject) => {

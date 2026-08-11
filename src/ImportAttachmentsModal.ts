@@ -11,7 +11,7 @@ import {
 		YesNoTypes,
 		// ImportOperationType,
 	} from './types';
-import * as Utils from "utils";
+import * as Utils from 'utils';
 import type ImportAttachments from 'main'; // Import the type of your plugin class if needed for type hinting
 import type { StrayAttachment } from 'strayAttachments';
 import { moveStrayAttachments, type StrayAttachmentMove } from 'strayAttachments';
@@ -300,7 +300,7 @@ export class DeleteAttachmentFolderModal extends Modal {
 
 		container.createEl(MODAL_TITLE_HTML_EL, { text: 'Delete the attachment folder?' });
 
-        if(this.preDescription) container.appendChild(this.preDescription);
+        if(this.preDescription) {container.appendChild(this.preDescription);}
 
 		const paragraph = container.createEl('p');
 		paragraph.append('Do you want to ' + (Platform.isDesktop ? 'move' : 'delete') + ' the attachment folder ');
@@ -327,7 +327,7 @@ export class DeleteAttachmentFolderModal extends Modal {
 			paragraph.append('?');
 		}
 
-        if(this.postDescription) container.appendChild(this.postDescription);
+        if(this.postDescription) {container.appendChild(this.postDescription);}
 		
 		const buttonContainer = container.createDiv({cls:'import-buttons'});
 		const deleteButton = buttonContainer.createEl('button', {
@@ -576,7 +576,7 @@ export class CreateAttachmentFolderModal extends Modal {
     }
 }
 
-const ROW_CLASSNAME = "stray-attachment-row";
+const ROW_CLASSNAME = 'stray-attachment-row';
 
 export class StrayAttachmentsModal extends Modal {
 	promise: Promise<boolean>;
@@ -625,7 +625,7 @@ export class StrayAttachmentsModal extends Modal {
 	}
 
 	private initPreviewElements() {
-		if (!this.previewEl || this.previewEmbedEl) return;
+		if (!this.previewEl || this.previewEmbedEl) {return;}
 
 		this.previewEmptyEl = this.previewEl.createDiv({ cls: 'import-preview-empty' });
 		setIcon(this.previewEmptyEl.createDiv({ cls: 'import-preview-icon' }), 'file-question');
@@ -639,7 +639,7 @@ export class StrayAttachmentsModal extends Modal {
 	}
 
 	private showPreview(show: 'embed' | 'fallback') {
-		if (!this.previewEmbedEl || !this.previewEmptyEl) return;
+		if (!this.previewEmbedEl || !this.previewEmptyEl) {return;}
 		const embedShown = show === 'embed';
 		this.previewEmbedEl.toggleClass('import-preview-shown', embedShown);
 		this.previewEmbedEl.toggleClass('import-preview-hidden', !embedShown);
@@ -650,7 +650,7 @@ export class StrayAttachmentsModal extends Modal {
 	private async renderPreview() {
 		this.initPreviewElements();
 		const embedEl = this.previewEmbedEl;
-		if (!embedEl || !this.previewEmptyEl) return;
+		if (!embedEl || !this.previewEmptyEl) {return;}
 
 		// Invalidate any render still in flight: selection can change faster than an
 		// embed loads, and a late one must not overwrite a newer preview.
@@ -690,22 +690,22 @@ export class StrayAttachmentsModal extends Modal {
 		this.selectedRow = target;
 		this.selectedRow.setAttribute('data-selected', 'true');
 		this.selectedStray = this.rowToStray.get(target)!
-		if (doScroll) this.selectedRow.scrollIntoView({ behavior: 'auto', block: 'nearest' });
-		if (doRenderPreview) this.renderPreview();
+		if (doScroll) {this.selectedRow.scrollIntoView({ behavior: 'auto', block: 'nearest' });}
+		if (doRenderPreview) {this.renderPreview();}
 	}
 
 	private selectNextRow(row: HTMLElement) {
-		if (row == null || !row.classList.contains(ROW_CLASSNAME)) return;
+		if (row == null || !row.classList.contains(ROW_CLASSNAME)) {return;}
 		const target = row.nextElementSibling as HTMLElement;
-		if (target == null || !target.classList.contains(ROW_CLASSNAME)) return;
+		if (target == null || !target.classList.contains(ROW_CLASSNAME)) {return;}
 
 		this.selectTargetRow(target, true, true);
 	}
 
 	private selectPreviousRow(row: HTMLElement) {
-		if (row == null || !row.classList.contains(ROW_CLASSNAME)) return;
+		if (row == null || !row.classList.contains(ROW_CLASSNAME)) {return;}
 		const target = row.previousElementSibling as HTMLElement;
-		if (target == null || !target.classList.contains(ROW_CLASSNAME)) return;
+		if (target == null || !target.classList.contains(ROW_CLASSNAME)) {return;}
 
 		this.selectTargetRow(target, true, true);
 	}
@@ -713,7 +713,7 @@ export class StrayAttachmentsModal extends Modal {
 	// The confirmation on 'Move all' quotes a count, so it has to be asked again
 	// whenever the user changes what would be moved.
 	private resetMoveAllConfirmation() {
-		if (!this.confirmedMoveAll) return;
+		if (!this.confirmedMoveAll) {return;}
 		this.confirmedMoveAll = false;
 		this.moveAllButtonEl?.setText('Move all attachments');
 		this.moveAllButtonEl?.removeClass('mod-warning');
@@ -721,7 +721,7 @@ export class StrayAttachmentsModal extends Modal {
 
 	private selectNextOrPreviousBeforeRemove(wrapper: HTMLElement) {
 		this.resetMoveAllConfirmation();
-		if (this.selectedRow !== wrapper) return;
+		if (this.selectedRow !== wrapper) {return;}
 		const next = wrapper.nextElementSibling as HTMLElement | null;
 		if (next && next.classList.contains(ROW_CLASSNAME)) {
 			this.selectNextRow(wrapper);
@@ -771,7 +771,7 @@ export class StrayAttachmentsModal extends Modal {
 
 		wrapper.createSpan({ cls: 'stray-attachment-row-name', text: stray.file.name, title: stray.file.name });
 		const destIndex = parseInt(wrapper.dataset.destIndex ?? '0');
-		const toText = stray.to[destIndex]?.attachFolder ?? "-";
+		const toText = stray.to[destIndex]?.attachFolder ?? '-';
 
 		// The folder the file sits in now, linked to the note that folder belongs to.
 		this.renderNoteLink(
@@ -804,7 +804,7 @@ export class StrayAttachmentsModal extends Modal {
 					text: stray.to[i].attachFolder,
 					value: String(i)
 				});
-				if (i === destIndex) option.selected = true;
+				if (i === destIndex) {option.selected = true;}
 			}
 			select.addEventListener('change', (e) => {
 				e.stopPropagation();
@@ -829,9 +829,9 @@ export class StrayAttachmentsModal extends Modal {
 		setIcon(arrow, 'arrow-right');
 
 		wrapper.createSpan({ cls: 'stray-attachment-spacer' });
-		const confirmButton = wrapper.createEl("button", { cls: ['clickable-icon', 'stray-attachment-row-btn', 'stray-attachment-confirm'] });
+		const confirmButton = wrapper.createEl('button', { cls: ['clickable-icon', 'stray-attachment-row-btn', 'stray-attachment-confirm'] });
 		setIcon(confirmButton, 'check');
-		confirmButton.addEventListener("click", async (e) => {
+		confirmButton.addEventListener('click', async (e) => {
 			e.stopPropagation();
 			const destFolder = stray.to[parseInt(wrapper.dataset.destIndex ?? '0')];
 			if (!destFolder) {
@@ -844,7 +844,7 @@ export class StrayAttachmentsModal extends Modal {
 					destinationPath: destFolder.attachFolder,
 					sourceFile: stray.file
 				}]);
-				if (count > 0) new Notice(`Successfully moved ${stray.file.name}`);
+				if (count > 0) {new Notice(`Successfully moved ${stray.file.name}`);}
 				this.selectNextOrPreviousBeforeRemove(wrapper);
 				wrapper.remove();
 				this.contentEl.focus();
@@ -854,8 +854,8 @@ export class StrayAttachmentsModal extends Modal {
 			}
 		});
 
-		const removeButton = wrapper.createEl("button", { cls: ['clickable-icon', 'stray-attachment-row-btn', 'stray-attachment-dismiss'] });
-		removeButton.addEventListener("click", (e) => {
+		const removeButton = wrapper.createEl('button', { cls: ['clickable-icon', 'stray-attachment-row-btn', 'stray-attachment-dismiss'] });
+		removeButton.addEventListener('click', (e) => {
 			e.stopPropagation();
 			this.selectNextOrPreviousBeforeRemove(wrapper);
 			wrapper.remove();
@@ -863,8 +863,8 @@ export class StrayAttachmentsModal extends Modal {
 		})
 		setIcon(removeButton, 'x');
 
-		wrapper.addEventListener("click", () => {
-			if (this.selectedRow) this.selectedRow.removeAttribute('data-selected');
+		wrapper.addEventListener('click', () => {
+			if (this.selectedRow) {this.selectedRow.removeAttribute('data-selected');}
 			this.selectedRow = wrapper;
 			this.selectedRow.setAttribute('data-selected', 'true');
 			this.selectedStray = stray;
@@ -906,14 +906,14 @@ export class StrayAttachmentsModal extends Modal {
 
 		// select the first row by default so keyboard navigation and preview work immediately
 		const firstRow = scroller.querySelector(`.${ROW_CLASSNAME}`) as HTMLElement | null;
-		if (firstRow) this.selectTargetRow(firstRow);
+		if (firstRow) {this.selectTargetRow(firstRow);}
 
 		// Modal.scope is scoped to this modal and torn down with it, unlike a listener on
 		// document.body. It also leaves the <select> alone: while a destination dropdown
 		// has focus, the arrow keys change the selection and Delete does nothing.
 		const rowKeyHandler = (action: (row: HTMLElement) => void) => (evt: KeyboardEvent) => {
-			if (this.selectedRow === null) return;
-			if (evt.target instanceof HTMLSelectElement) return;
+			if (this.selectedRow === null) {return;}
+			if (evt.target instanceof HTMLSelectElement) {return;}
 			evt.preventDefault();
 			action(this.selectedRow);
 		};
@@ -952,7 +952,7 @@ export class StrayAttachmentsModal extends Modal {
 		for (const rowEl of moveRows) {
 			const row = rowEl as HTMLElement;
 			const stray = this.rowToStray.get(row);
-			if (!stray) continue;
+			if (!stray) {continue;}
 			
 			const destFolder = stray.to[parseInt(row.dataset.destIndex ?? '0')];
 			if (!destFolder) {
@@ -982,7 +982,7 @@ export class StrayAttachmentsModal extends Modal {
 
 		try {
 			const count = await moveStrayAttachments(this.plugin, selections);
-			if (count > 0) new Notice(`Successfully moved ${count} attachment${count > 1 ? 's' : ''}`);
+			if (count > 0) {new Notice(`Successfully moved ${count} attachment${count > 1 ? 's' : ''}`);}
 			this.resolve(true);
 			this.close();
 		} catch (error) {
