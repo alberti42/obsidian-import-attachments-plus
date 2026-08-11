@@ -1,5 +1,5 @@
 // ImportAttachmentsModal.ts
-import { Component, MarkdownRenderer, Modal, Platform, TFolder, setIcon, Notice } from 'obsidian';
+import { Component, MarkdownRenderer, Modal, Platform, TFile, TFolder, setIcon, Notice } from 'obsidian';
 import {
 		ImportActionType,
 		ImportActionChoiceResult,
@@ -730,6 +730,39 @@ export class StrayAttachmentsModal extends Modal {
 		}
 	}
 
+	/**
+	 * A folder cell that is a link to the note owning that folder, or plain text when
+	 * the note is unknown (its folder could not be traced back to a note).
+	 */
+	private renderNoteLink(parent: HTMLElement, cls: string[], text: string, note: TFile | undefined, line: number | undefined, title: string) {
+		if (!note) {
+			parent.createSpan({ cls, text, title });
+			return;
+		}
+
+		const link = parent.createEl('a', { cls: [...cls, 'stray-attachment-note-link'], text, title, href: '#' });
+		link.addEventListener('click', (evt) => {
+			evt.preventDefault();
+			// Without this the click would also land on the row and change the selection.
+			evt.stopPropagation();
+			this.openNote(note, line);
+		});
+	}
+
+	/**
+	 * Open a note in a new tab, scrolled to `line` when one is known. The modal is left
+	 * open on purpose: dismissing rows is work the user would otherwise lose, and the
+	 * tab is waiting once they close it.
+	 */
+	private openNote(note: TFile, line?: number) {
+		const eState = line === undefined ? undefined : { line };
+		this.app.workspace.getLeaf('tab').openFile(note, { eState })
+			.catch(error => {
+				console.error('Failed to open note', note.path, error);
+				new Notice(`Could not open ${note.basename}`);
+			});
+	}
+
 	private renderRow(parent: HTMLElement, stray: StrayAttachment) {
 		const wrapper = parent.createDiv({ cls: ROW_CLASSNAME });
 		wrapper.dataset.destIndex = '0';
@@ -739,11 +772,30 @@ export class StrayAttachmentsModal extends Modal {
 		const destIndex = parseInt(wrapper.dataset.destIndex ?? '0');
 		const toText = stray.to[destIndex]?.attachFolder ?? "-";
 
-		wrapper.createSpan({ cls: ['stray-attachment-row-from', 'reverse-ellipsis'], text: stray.from, title: stray.from });
+		// The folder the file sits in now, linked to the note that folder belongs to.
+		this.renderNoteLink(
+			wrapper,
+			['stray-attachment-row-from', 'reverse-ellipsis'],
+			stray.from,
+			stray.fromNote,
+			undefined,
+			stray.fromNote
+				? `Open ${stray.fromNote.basename} — the note this attachment was filed under`
+				: stray.from
+		);
+
 		const arrow = wrapper.createSpan({ cls: 'stray-attachment-arrow' })
 
 		if (stray.to.length === 1) {
-			wrapper.createSpan({ cls: ['stray-attachment-row-to', 'reverse-ellipsis'], text: toText, title: toText });
+			const dest = stray.to[destIndex];
+			this.renderNoteLink(
+				wrapper,
+				['stray-attachment-row-to', 'reverse-ellipsis'],
+				toText,
+				dest?.note,
+				dest?.line,
+				dest ? `Open ${dest.note.basename} at the first use of this attachment` : toText
+			);
 		} else {
 			const select = wrapper.createEl('select', { cls: ['stray-attachment-row-to', 'reverse-ellipsis'] });
 			for (let i = 0; i < stray.to.length; i++) {
@@ -757,6 +809,19 @@ export class StrayAttachmentsModal extends Modal {
 				e.stopPropagation();
 				wrapper.dataset.destIndex = select.value;
 				this.contentEl.focus();
+			});
+
+			// A <select> cannot double as a link, so the way to inspect the chosen
+			// destination is a button beside it.
+			const openButton = wrapper.createEl('button', {
+				cls: ['clickable-icon', 'stray-attachment-row-btn', 'stray-attachment-open'],
+				attr: { 'aria-label': 'Open the selected note at the first use of this attachment' }
+			});
+			setIcon(openButton, 'square-arrow-out-up-right');
+			openButton.addEventListener('click', (e) => {
+				e.stopPropagation();
+				const dest = stray.to[parseInt(wrapper.dataset.destIndex ?? '0')];
+				if (dest) { this.openNote(dest.note, dest.line); }
 			});
 		}
 

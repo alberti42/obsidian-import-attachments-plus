@@ -1,17 +1,28 @@
-import { App, TFile, TFolder, CachedMetadata, Notice, getLinkpath } from 'obsidian';
+import { App, TFile, TFolder, CachedMetadata, Notice, ReferenceCache, FrontmatterLinkCache, getLinkpath } from 'obsidian';
 import { parseFilePath, mapSoftSet, joinPaths, findNewFilename, doesFileExist } from './utils';
 import type ImportAttachments from 'main';
 
-export type SomeLink = { text: string, dest: string, resolvedDest: TFile };
+// `line` is the 0-based line of this reference, used to jump straight to the place
+// in the note where the attachment is used.
+export type SomeLink = { text: string, dest: string, resolvedDest: TFile, line: number };
 export type DedupeFileList = {f: TFile, list: Map<string, TFile>};
 export type DedupeLinkList = {f: TFile, list: Map<string, SomeLink>};
 
 export type AttachFolder = { attachFolder: string, file: TFile };
-export type StrayAttachment = { 
+
+// A destination: the note that references the attachment, its attachment folder,
+// and where in that note the attachment is first used.
+export type StrayDestination = { attachFolder: string, note: TFile, line: number };
+
+export type StrayAttachment = {
 	from: string,
-	file: TFile, 
-	fromPath: string, 
-	to: AttachFolder[] 
+	file: TFile,
+	fromPath: string,
+	// The note whose attachment folder the file currently sits in, when it can be
+	// identified. Undefined if that note has no links at all, since the reference
+	// maps only cover notes that do.
+	fromNote?: TFile,
+	to: StrayDestination[]
 }
 
 export type StrayAttachmentMove = {
@@ -57,15 +68,28 @@ function resolveLink(app: App, link: string, sourcePath: string): TFile | null {
 	return null;
 }
 
+/** Where a cache entry sits in the file. FrontmatterLinkCache has no position. */
+function positionOf(elem: ReferenceCache | FrontmatterLinkCache): { offset: number, line: number } {
+	if ('position' in elem && elem.position) {
+		return { offset: elem.position.start.offset, line: elem.position.start.line };
+	}
+	return { offset: 0, line: 0 };
+}
+
 function unifyLinkCaches(app: App, input: { f: TFile, m: CachedMetadata | null}) {
 	const links: SomeLink[] = [];
 	if (!input.m) { return { f: input.f, links: []}; }
 
+	// Sorted by position so that the first entry for a given attachment really is its
+	// first occurrence in the note: the three caches are separate lists, so merging
+	// them without sorting would put every frontmatter link before every body link.
+	// Frontmatter links carry no position at all — they live at the top of the file,
+	// so offset 0 sorts them where they belong and line 0 is where to jump to.
 	const mergedLinks = [
 		...(input.m?.links ?? []),
 		...(input.m?.frontmatterLinks ?? []),
 		...(input.m?.embeds ?? [])
-	]
+	].sort((a, b) => positionOf(a).offset - positionOf(b).offset);
 
 	for (const elem of mergedLinks) {
 		const res = resolveLink(app, elem.link, input.f.path);
@@ -76,7 +100,12 @@ function unifyLinkCaches(app: App, input: { f: TFile, m: CachedMetadata | null})
 		// we are not interested in notes linking to other notes
 		if (NOTE_EXTENSIONS.has(res.extension.toLowerCase())) { continue; }
 
-		links.push({ text: elem.link, dest: elem.original, resolvedDest: res });
+		links.push({
+			text: elem.link,
+			dest: elem.original,
+			resolvedDest: res,
+			line: positionOf(elem).line
+		});
 	}
 
 	return { f: input.f, links };
@@ -149,12 +178,19 @@ function buildReferenceMaps(plugin: ImportAttachments): ReferenceMaps {
  *    the command correctly reports that there is nothing to do — instead of listing
  *    the whole vault once per note, each time offering to move a file to where it is.
  */
-function destinationsFor(attachment: TFile, notes: DedupeFileList, maps: ReferenceMaps): AttachFolder[] {
+function destinationsFor(attachment: TFile, notes: DedupeFileList, maps: ReferenceMaps): StrayDestination[] {
 	const currentFolder = attachment.parent?.path;
 
 	const candidates = Array.from(notes.list.values())
-		.map(ntf => maps.noteToAttachFolder.get(ntf.path))
-		.filter((e): e is AttachFolder => e !== undefined);
+		.map(note => {
+			const folder = maps.noteToAttachFolder.get(note.path);
+			if (!folder) { return undefined; }
+			// The reference maps keep the first occurrence of each attachment per note,
+			// so this is the line to jump to when opening the destination.
+			const line = maps.noteToAttachments.get(note.path)?.list.get(attachment.path)?.line ?? 0;
+			return { attachFolder: folder.attachFolder, note: folder.file, line };
+		})
+		.filter((e): e is StrayDestination => e !== undefined);
 
 	if (candidates.some(c => c.attachFolder === currentFolder)) { return []; }
 	return candidates;
@@ -167,7 +203,15 @@ export function findStrayAttachments(plugin: ImportAttachments) {
 	const strays: StrayAttachment[] = [];
 	const processedAttachments = new Set<string>();
 
-	const record = (attachment: TFile, alternatives: AttachFolder[]) => {
+	// Which note owns a given attachment folder, so a stray can be traced back to the
+	// note it was originally imported into. Only covers notes that have links, which
+	// is what the reference maps are built from.
+	const noteOwningFolder = new Map<string, TFile>();
+	for (const entry of noteToAttachFolder.values()) {
+		mapSoftSet(noteOwningFolder, entry.attachFolder, entry.file);
+	}
+
+	const record = (attachment: TFile, alternatives: StrayDestination[]) => {
 		if (alternatives.length === 0 || processedAttachments.has(attachment.path)) { return; }
 
 		// Only reorganise folders this plugin manages. A hand-curated shared folder
@@ -179,8 +223,9 @@ export function findStrayAttachments(plugin: ImportAttachments) {
 		processedAttachments.add(attachment.path);
 		strays.push({
 			file: attachment,
-			from: attachment.parent?.path ?? "no parent!",
+			from: parent,
 			fromPath: attachment.path,
+			fromNote: noteOwningFolder.get(parent),
 			to: alternatives
 		});
 	};
