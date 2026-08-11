@@ -383,8 +383,10 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName('Automatically remove attachment folders when empty:')
-            .setDesc("With this option enabled, after deleting an attachment, the plugin will check if the attachments folder \
-                is now empty, and if it is, it will delete the attachments folder as well.")
+            .setDesc("With this option enabled, whenever an attachment folder is left empty — after deleting an \
+                attachment, or after its contents were moved elsewhere — the folder itself is removed as well. \
+                An empty folder is removed without asking, since there is nothing in it to lose; it goes to the \
+                trash, according to your Obsidian deletion preference.")
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.deleteAttachmentFolderWhenEmpty)
                 .onChange(async (value: boolean) => {
@@ -432,8 +434,9 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName('Ask confirmation before deleting the attachment folder:')
-            .setDesc('If enabled, the user is asked each time whether to delete the attachment folder.')
+            .setName('Ask confirmation before deleting a non-empty attachment folder:')
+            .setDesc('If enabled, you are asked before an attachment folder that still contains files is deleted. \
+                Empty folders are never asked about — see the option above.')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.confirmDeleteAttachmentFolder)
                 .onChange(async (value: boolean) => {

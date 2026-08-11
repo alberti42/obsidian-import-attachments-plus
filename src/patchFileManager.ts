@@ -49,11 +49,12 @@ async function modifiedPromptForDeletion(this: FileManager, file: TAbstractFile)
                 if (file_parsed.ext === ".md" || file_parsed.ext === ".canvas") {
                     const attachmentFolder = plugin.app.vault.getAbstractFileByPath(plugin.getAttachmentFolderOfMdNote(file_parsed));
                     if(attachmentFolder instanceof TFolder) {
-                        const postDescription_text = attachmentFolder.children.length > 0 ?
-                            `Note that the folder associated with the MarkDown note you have \
-                                just deleted is not empty and still contains ${attachmentFolder.children.length} files.` 
-                            : "The attachment folder is empty, and it should be safe to delete it.";
-                        const postDescription = createEl('p', {text:postDescription_text});
+                        // Only the non-empty case is ever shown; an empty folder is
+                        // removed without asking.
+                        const postDescription = attachmentFolder.children.length > 0
+                            ? createEl('p', {text: `Note that the folder associated with the MarkDown note you have \
+                                just deleted is not empty and still contains ${attachmentFolder.children.length} files.`})
+                            : undefined;
                         await deleteAttachmentFolderAssociatedWithMdFile(plugin, attachmentFolder, undefined, postDescription);
                     }
                     
@@ -65,10 +66,7 @@ async function modifiedPromptForDeletion(this: FileManager, file: TAbstractFile)
             if(parent) {
                 if(plugin.matchAttachmentFolder(parent.path)){ // of the type of an attachment folder
                     if(parent.children.length===0) { // attachment folder is empty
-                        // const recursive = true;
-                        // plugin.app.vault.delete(parent,recursive);
-                        const postDescription = createEl('p',{text: "The attachment folder is now empty, and it should be safe to delete it."});
-                        await deleteAttachmentFolderAssociatedWithMdFile(plugin, parent, undefined, postDescription);
+                        await deleteAttachmentFolderAssociatedWithMdFile(plugin, parent);
                     }
                 }
             }
@@ -80,7 +78,12 @@ async function modifiedPromptForDeletion(this: FileManager, file: TAbstractFile)
 
 async function deleteAttachmentFolderAssociatedWithMdFile(plugin: ImportAttachments, attachmentFolder: TFolder, preDescription?:HTMLElement, postDescription?:HTMLElement) {
 
-	if(plugin.settings.confirmDeleteAttachmentFolder) {
+	// An empty attachment folder is removed without asking: there is nothing in it to
+	// lose, and 'deleteAttachmentFolderWhenEmpty' is already the user's answer to that
+	// question. Confirmation is reserved for a folder that still holds files.
+	const isEmpty = attachmentFolder.children.length === 0;
+
+	if(!isEmpty && plugin.settings.confirmDeleteAttachmentFolder) {
 		const modal = new DeleteAttachmentFolderModal(plugin, attachmentFolder, preDescription, postDescription);
 		modal.open();
 		const choice = await modal.promise;
