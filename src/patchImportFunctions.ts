@@ -3,7 +3,7 @@
 import { App, Vault, TFile } from 'obsidian';
 import ImportAttachments from 'main';
 
-import { parseFilePath } from 'utils';
+import { parseFilePath, doesFileExist, findNewFilename } from 'utils';
 
 // Save a reference to the original method for the monkey patch
 let originalGetAvailablePathForAttachments: ((fileName: string, extension: string, currentFile: TFile | null) => Promise<string>) | null = null;
@@ -35,7 +35,18 @@ function patchImportFunctions(plugin: ImportAttachments) {
 		
 		const currentFile_parsed = currentFile ? parseFilePath(currentFile.path) : undefined;
 		
-		return await plugin.createAttachmentName(fileName + '.' + extension, currentFile_parsed);
+		const attachmentPath = await plugin.createAttachmentName(fileName + '.' + extension, currentFile_parsed);
+
+		// Obsidian's own implementation ends with `getAvailablePath`, so it never returns a path
+		// that is already taken. Callers (`saveAttachment`, but also third-party plugins reaching us
+		// through `FileManager.getAvailablePathForAttachment`) create a file at the returned path
+		// without checking, so we have to honour the same contract or we silently overwrite
+		// attachments whenever the name pattern is not unique (e.g. `${original}` or `${notename}`).
+		if (doesFileExist(plugin.app.vault, attachmentPath)) {
+			return findNewFilename(plugin.app.vault, attachmentPath);
+		}
+
+		return attachmentPath;
 	};
 
 	if (!originalSaveAttachment) {
