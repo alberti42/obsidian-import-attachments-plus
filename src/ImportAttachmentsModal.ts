@@ -824,6 +824,8 @@ export class StrayAttachmentsModal extends Modal {
 		header.createEl('p', { text: 'Each row proposes the attachment folder of a note that does reference the file. \
 			Only folders managed by this plugin are considered, and an attachment already sitting in the folder of any \
 			note that references it is left alone. Links are updated automatically.' })
+		header.createEl('p', { text: 'Select a row — by clicking it or with the ↑ and ↓ keys — to preview that \
+			attachment on the right. Press Delete to drop a row from the list without moving its file.' })
 
 		const scroller = container.createDiv({ cls: 'stray-attachments-scroller' });
 		const bottomBar = container.createDiv({ cls: 'stray-attachments-bottom-bar' });
