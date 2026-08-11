@@ -135,18 +135,29 @@ function buildReferenceMaps(plugin: ImportAttachments): ReferenceMaps {
 
 /**
  * Candidate destinations for `attachment`: the attachment folder of every note that
- * references it, minus the folder the attachment already sits in.
+ * references it.
  *
- * Excluding the current folder is what keeps the command quiet in the configurations
- * where every note shares one attachment folder (ROOT / CURRENT / FOLDER without
- * `${notename}`): there the only candidate is the folder the file is already in, so
- * nothing is reported instead of the whole vault being listed once per note.
+ * An attachment is considered correctly placed as soon as it sits in the attachment
+ * folder of *any* note that references it, in which case there is nothing to propose
+ * and this returns an empty list. That rule does two things:
+ *
+ *  - An attachment shared by several notes can only live in one folder. Without this,
+ *    moving it into note A's folder would make the next run propose note B's folder,
+ *    and the run after that note A's again, for ever.
+ *  - Where every note maps to the same folder (ROOT, CURRENT, or FOLDER without
+ *    `${notename}`), the folder an attachment is already in is always a candidate, so
+ *    the command correctly reports that there is nothing to resort — instead of listing
+ *    the whole vault once per note, each time offering to move a file to where it is.
  */
 function destinationsFor(attachment: TFile, notes: DedupeFileList, maps: ReferenceMaps): AttachFolder[] {
 	const currentFolder = attachment.parent?.path;
-	return Array.from(notes.list.values())
+
+	const candidates = Array.from(notes.list.values())
 		.map(ntf => maps.noteToAttachFolder.get(ntf.path))
-		.filter((e): e is AttachFolder => e !== undefined && e.attachFolder !== currentFolder);
+		.filter((e): e is AttachFolder => e !== undefined);
+
+	if (candidates.some(c => c.attachFolder === currentFolder)) { return []; }
+	return candidates;
 }
 
 export function getAttachmentResortPairs(plugin: ImportAttachments) {
