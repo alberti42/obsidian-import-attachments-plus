@@ -9,9 +9,35 @@ Features include:
 - Configurable folder structures for attachments.
 - Customizable naming conventions for imported files.
 - Management tools for attachment folders.
+- Keeping attachments with the notes that use them when text is moved between notes.
 
 ## Usage
 Once enabled, the plugin will work automatically based on your configured preferences. You can adjust these settings through the plugin's settings tab under **Settings > Import Attachments+**.
+
+### Keeping attachments with their notes
+
+When you split a note — by extracting a selection, merging notes, or simply cutting and pasting text — the
+attachments referenced by that text stay behind in the original note's attachment folder. The plugin moves
+them into the attachment folder of the note that now uses them, updating all links.
+
+An attachment is only moved when the note it is currently filed under no longer references it; one that is
+still in use stays where it is, as does anything outside the attachment folders this plugin manages. This is
+controlled by the setting *"Let attachments follow the text that uses them"*, which is enabled by default.
+
+To tidy up a vault after the fact, or with that setting disabled, run the command
+**Move stray attachments to their note's folder**. It lists every attachment that is filed under one note but
+used by another, with a preview and a per-file confirmation, before moving anything.
+
+### Commands
+
+| Command | Description |
+| --- | --- |
+| Move file to vault as linked attachment | Pick a file and move it into the vault, inserting a link. |
+| Move file to vault as embedded attachment | As above, inserting an embed. |
+| Copy file to vault as linked attachment | Pick a file and copy it into the vault, inserting a link. |
+| Copy file to vault as embedded attachment | As above, inserting an embed. |
+| Open attachments folder | Open the current note's attachment folder in the system file manager. |
+| Move stray attachments to their note's folder | Review and relocate attachments that are filed under a note which no longer uses them. |
 
 ### Settings
 The plugin offers a comprehensive set of options for managing attachments.
@@ -37,7 +63,9 @@ The plugin offers a comprehensive set of options for managing attachments.
 
 4. **Attachment Management:**
    - Rename and delete attachment folders automatically.
-   - Confirm before deleting attachment folders.
+   - Remove attachment folders once they are left empty.
+   - Confirm before deleting an attachment folder that still contains files.
+   - Let attachments follow the text that uses them when it is moved to another note.
 
 5. **Display of Attachment Folders:**
    - Toggle the visibility of attachment folders in the file explorer.
