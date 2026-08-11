@@ -13,8 +13,8 @@ import {
 	} from './types';
 import * as Utils from "utils";
 import type ImportAttachments from 'main'; // Import the type of your plugin class if needed for type hinting
-import type { AttachmentResortPair } from 'resortAttachments';
-import { moveAttachmentPairs, type MovePairSelection } from 'resortAttachments';
+import type { StrayAttachment } from 'strayAttachments';
+import { moveStrayAttachments, type StrayAttachmentMove } from 'strayAttachments';
 
 const MODAL_TITLE_HTML_EL='h4';
 
@@ -576,9 +576,9 @@ export class CreateAttachmentFolderModal extends Modal {
     }
 }
 
-const ROW_CLASSNAME = "resort-pair-row";
+const ROW_CLASSNAME = "stray-attachment-row";
 
-export class MovePairsModal extends Modal {
+export class StrayAttachmentsModal extends Modal {
 	promise: Promise<boolean>;
 	private resolveChoice: (result: boolean) => void = () => { };  // To resolve the promise. Initialize with a no-op function
 	private isResolved = false;
@@ -587,16 +587,16 @@ export class MovePairsModal extends Modal {
 	private previewEmptyEl: HTMLElement | null = null;
 	private previewToken = 0;
 	private selectedRow: HTMLElement | null = null;
-	private selectedPair: AttachmentResortPair | null = null;
-	private rowToPair: Map<HTMLElement, AttachmentResortPair>;
+	private selectedStray: StrayAttachment | null = null;
+	private rowToStray: Map<HTMLElement, StrayAttachment>;
 	private moveAllButtonEl: HTMLButtonElement | null = null;
 	private confirmedMoveAll = false;
 
 	private static readonly imageExtensions = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif']);
 
-	constructor(private plugin: ImportAttachments, private pairs: AttachmentResortPair[]) {
+	constructor(private plugin: ImportAttachments, private strays: StrayAttachment[]) {
 		super(plugin.app);
-		this.rowToPair = new Map();
+		this.rowToStray = new Map();
 		this.promise = new Promise((resolve) => {
 			this.resolveChoice = resolve;
 		});
@@ -632,8 +632,8 @@ export class MovePairsModal extends Modal {
 		this.initPreviewElements();
 		if (!this.previewImgEl || !this.previewEmptyEl) return;
 
-		const pair = this.selectedPair;
-		if (!pair || !MovePairsModal.imageExtensions.has(pair.file.extension.toLowerCase())) {
+		const stray = this.selectedStray;
+		if (!stray || !StrayAttachmentsModal.imageExtensions.has(stray.file.extension.toLowerCase())) {
 			this.showPreview('fallback');
 			return;
 		}
@@ -646,13 +646,13 @@ export class MovePairsModal extends Modal {
 		// oxlint-disable-next-line unicorn/prefer-add-event-listener
 		img.onload = () => token === this.previewToken && this.showPreview('image');
 		img.onerror = () => token === this.previewToken && this.showPreview('fallback');
-		img.src = this.app.vault.getResourcePath(pair.file);
-		img.alt = pair.file.name;
+		img.src = this.app.vault.getResourcePath(stray.file);
+		img.alt = stray.file.name;
 	}
 
 	private selectTargetRow(target: HTMLElement, doRenderPreview = true, doScroll = false) {
-		if (this.rowToPair.get(target) == null) {
-			console.warn('trying to select row for which a pair does not exist!', target);
+		if (this.rowToStray.get(target) == null) {
+			console.warn('trying to select row for which an entry does not exist!', target);
 			return;
 		}
 		if (this.selectedRow != null) {
@@ -660,7 +660,7 @@ export class MovePairsModal extends Modal {
 		}
 		this.selectedRow = target;
 		this.selectedRow.setAttribute('data-selected', 'true');
-		this.selectedPair = this.rowToPair.get(target)!
+		this.selectedStray = this.rowToStray.get(target)!
 		if (doScroll) this.selectedRow.scrollIntoView({ behavior: 'auto', block: 'nearest' });
 		if (doRenderPreview) this.renderPreview();
 	}
@@ -701,25 +701,25 @@ export class MovePairsModal extends Modal {
 		}
 	}
 
-	private renderRow(parent: HTMLElement, pair: AttachmentResortPair) {
+	private renderRow(parent: HTMLElement, stray: StrayAttachment) {
 		const wrapper = parent.createDiv({ cls: ROW_CLASSNAME });
 		wrapper.dataset.destIndex = '0';
-		this.rowToPair.set(wrapper, pair);
+		this.rowToStray.set(wrapper, stray);
 
-		wrapper.createSpan({ cls: 'resort-pair-row-name', text: pair.file.name, title: pair.file.name });
+		wrapper.createSpan({ cls: 'stray-attachment-row-name', text: stray.file.name, title: stray.file.name });
 		const destIndex = parseInt(wrapper.dataset.destIndex ?? '0');
-		const toText = pair.to[destIndex]?.attachFolder ?? "-";
+		const toText = stray.to[destIndex]?.attachFolder ?? "-";
 
-		wrapper.createSpan({ cls: ['resort-pair-row-from', 'reverse-ellipsis'], text: pair.from, title: pair.from });
-		const arrow = wrapper.createSpan({ cls: 'rpr-arrow' })
+		wrapper.createSpan({ cls: ['stray-attachment-row-from', 'reverse-ellipsis'], text: stray.from, title: stray.from });
+		const arrow = wrapper.createSpan({ cls: 'stray-attachment-arrow' })
 
-		if (pair.to.length === 1) {
-			wrapper.createSpan({ cls: ['resort-pair-row-to', 'reverse-ellipsis'], text: toText, title: toText });
+		if (stray.to.length === 1) {
+			wrapper.createSpan({ cls: ['stray-attachment-row-to', 'reverse-ellipsis'], text: toText, title: toText });
 		} else {
-			const select = wrapper.createEl('select', { cls: ['resort-pair-row-to', 'reverse-ellipsis'] });
-			for (let i = 0; i < pair.to.length; i++) {
+			const select = wrapper.createEl('select', { cls: ['stray-attachment-row-to', 'reverse-ellipsis'] });
+			for (let i = 0; i < stray.to.length; i++) {
 				const option = select.createEl('option', {
-					text: pair.to[i].attachFolder,
+					text: stray.to[i].attachFolder,
 					value: String(i)
 				});
 				if (i === destIndex) option.selected = true;
@@ -733,33 +733,33 @@ export class MovePairsModal extends Modal {
 
 		setIcon(arrow, 'arrow-right');
 
-		wrapper.createSpan({ cls: 'rpr-spacer' });
-		const confirmButton = wrapper.createEl("button", { cls: ['clickable-icon', 'resort-pair-row-btn', 'rpr-btn-confirm'] });
+		wrapper.createSpan({ cls: 'stray-attachment-spacer' });
+		const confirmButton = wrapper.createEl("button", { cls: ['clickable-icon', 'stray-attachment-row-btn', 'stray-attachment-confirm'] });
 		setIcon(confirmButton, 'check');
 		confirmButton.addEventListener("click", async (e) => {
 			e.stopPropagation();
-			const destFolder = pair.to[parseInt(wrapper.dataset.destIndex ?? '0')];
+			const destFolder = stray.to[parseInt(wrapper.dataset.destIndex ?? '0')];
 			if (!destFolder) {
-				console.warn('No destination folder found for pair:', pair);
+				console.warn('No destination folder found for stray attachment:', stray);
 				return;
 			}
 			try {
-				const count = await moveAttachmentPairs(this.plugin, [{
-					sourcePath: pair.fromPath,
+				const count = await moveStrayAttachments(this.plugin, [{
+					sourcePath: stray.fromPath,
 					destinationPath: destFolder.attachFolder,
-					sourceFile: pair.file
+					sourceFile: stray.file
 				}]);
-				if (count > 0) new Notice(`Successfully moved ${pair.file.name}`);
+				if (count > 0) new Notice(`Successfully moved ${stray.file.name}`);
 				this.selectNextOrPreviousBeforeRemove(wrapper);
 				wrapper.remove();
 				this.contentEl.focus();
 			} catch (error) {
 				console.error('Error moving attachment:', error);
-				new Notice(`Failed to move ${pair.file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+				new Notice(`Failed to move ${stray.file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
 			}
 		});
 
-		const removeButton = wrapper.createEl("button", { cls: ['clickable-icon', 'resort-pair-row-btn', 'rpr-btn-dismiss'] });
+		const removeButton = wrapper.createEl("button", { cls: ['clickable-icon', 'stray-attachment-row-btn', 'stray-attachment-dismiss'] });
 		removeButton.addEventListener("click", (e) => {
 			e.stopPropagation();
 			this.selectNextOrPreviousBeforeRemove(wrapper);
@@ -772,7 +772,7 @@ export class MovePairsModal extends Modal {
 			if (this.selectedRow) this.selectedRow.removeAttribute('data-selected');
 			this.selectedRow = wrapper;
 			this.selectedRow.setAttribute('data-selected', 'true');
-			this.selectedPair = pair;
+			this.selectedStray = stray;
 			this.renderPreview();
 		})
 	}
@@ -780,21 +780,25 @@ export class MovePairsModal extends Modal {
 	onOpen() {
 		const { contentEl, modalEl } = this;
 
-		modalEl.addClass('resort-pairs-modal-el');
+		modalEl.addClass('stray-attachments-modal-el');
 		contentEl.tabIndex = -1;
 
-		const container = contentEl.createDiv({ cls: 'import-plugin resort-pairs-modal' });
+		const container = contentEl.createDiv({ cls: 'import-plugin stray-attachments-modal' });
 
-		const header = container.createEl('header', { cls: 'resort-pairs-header' })
-		header.createEl('h4', { text: 'Resort attachments' })
-		header.createSpan({ text: "Here are attachments that are in a different attachment folder than the one they belong in, and where they should be moved." })
+		const header = container.createEl('header', { cls: 'stray-attachments-header' })
+		header.createEl('h4', { text: 'Move stray attachments' })
+		header.createEl('p', { text: 'These attachments sit in one note’s attachment folder but are referenced only by \
+			a different note — usually because text was moved into a new note and the files stayed behind.' })
+		header.createEl('p', { text: 'Each row proposes the attachment folder of a note that does reference the file. \
+			Only folders managed by this plugin are considered, and an attachment already sitting in the folder of any \
+			note that references it is left alone. Links are updated automatically.' })
 
-		const scroller = container.createDiv({ cls: 'resort-pairs-scroller' });
-		const bottomBar = container.createDiv({ cls: 'resort-pairs-bottom-bar' });
-		this.previewEl = container.createDiv({ cls: 'resort-pairs-preview' });
+		const scroller = container.createDiv({ cls: 'stray-attachments-scroller' });
+		const bottomBar = container.createDiv({ cls: 'stray-attachments-bottom-bar' });
+		this.previewEl = container.createDiv({ cls: 'stray-attachments-preview' });
 
-		for (const pair of this.pairs) {
-			this.renderRow(scroller, pair);
+		for (const stray of this.strays) {
+			this.renderRow(scroller, stray);
 		}
 		this.renderPreview();
 
@@ -815,7 +819,7 @@ export class MovePairsModal extends Modal {
 		this.scope.register([], 'ArrowUp', rowKeyHandler(row => this.selectPreviousRow(row)));
 		this.scope.register([], 'ArrowDown', rowKeyHandler(row => this.selectNextRow(row)));
 		this.scope.register([], 'Delete', rowKeyHandler(row => {
-			(row.querySelector('.rpr-btn-dismiss') as HTMLButtonElement)?.click();
+			(row.querySelector('.stray-attachment-dismiss') as HTMLButtonElement)?.click();
 		}));
 
 		const yesButton = bottomBar.createEl('button', {
@@ -840,21 +844,21 @@ export class MovePairsModal extends Modal {
 	}
 
 	private async handleMoveAll() {
-		const selections: MovePairSelection[] = [];
+		const selections: StrayAttachmentMove[] = [];
 		const moveRows = Array.from(this.contentEl.querySelectorAll(`.${ROW_CLASSNAME}`));
 
 		for (const rowEl of moveRows) {
 			const row = rowEl as HTMLElement;
-			const pair = this.rowToPair.get(row);
-			if (!pair) continue;
+			const stray = this.rowToStray.get(row);
+			if (!stray) continue;
 			
-			const destFolder = pair.to[parseInt(row.dataset.destIndex ?? '0')];
+			const destFolder = stray.to[parseInt(row.dataset.destIndex ?? '0')];
 			if (!destFolder) {
-				console.warn('No destination folder found for pair:', pair);
+				console.warn('No destination folder found for stray attachment:', stray);
 				continue;
 			}
 			
-			selections.push({ sourcePath: pair.fromPath, destinationPath: destFolder.attachFolder, sourceFile: pair.file });
+			selections.push({ sourcePath: stray.fromPath, destinationPath: destFolder.attachFolder, sourceFile: stray.file });
 		}
 		
 		if (selections.length === 0) {
@@ -875,7 +879,7 @@ export class MovePairsModal extends Modal {
 		}
 
 		try {
-			const count = await moveAttachmentPairs(this.plugin, selections);
+			const count = await moveStrayAttachments(this.plugin, selections);
 			if (count > 0) new Notice(`Successfully moved ${count} attachment${count > 1 ? 's' : ''}`);
 			this.resolve(true);
 			this.close();

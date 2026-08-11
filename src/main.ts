@@ -20,7 +20,7 @@ import {
 } from "obsidian";
 
 // Import utility and modal components
-import { ImportActionTypeModal, OverwriteChoiceModal, ImportFromVaultChoiceModal, FolderImportErrorModal, CreateAttachmentFolderModal, MovePairsModal } from './ImportAttachmentsModal';
+import { ImportActionTypeModal, OverwriteChoiceModal, ImportFromVaultChoiceModal, FolderImportErrorModal, CreateAttachmentFolderModal, StrayAttachmentsModal } from './ImportAttachmentsModal';
 import {
 	ImportActionType,
 	MultipleFilesImportTypes,
@@ -58,7 +58,7 @@ import { DEFAULT_SETTINGS, DEFAULT_SETTINGS_1_3_0 } from "default";
 import { EditorSelection } from '@codemirror/state';
 
 import { ImportAttachmentsSettingTab } from 'settings';
-import { getAttachmentResortPairs } from "resortAttachments";
+import { findStrayAttachments } from "strayAttachments";
 
 
 class DeleteLinkError extends Error {}
@@ -386,9 +386,9 @@ export default class ImportAttachments extends Plugin {
     // work on mobile as well (manifest.json declares isDesktopOnly: false).
     addPlatformIndependentCommands() {
         this.addCommand({
-            id: "resort-attachments",
-            name: "Resort attachments into appropriate folders",
-            callback: () => this.resort_attachments_cb(),
+            id: "move-stray-attachments",
+            name: "Move stray attachments to their note's folder",
+            callback: () => this.move_stray_attachments_cb(),
         });
     }
 
@@ -1414,14 +1414,14 @@ export default class ImportAttachments extends Plugin {
 		require('electron').remote.shell.openPath(Utils.makePosixPathOScompatible(absAttachmentsFolderPath));
 	}
 
-    async resort_attachments_cb() {
-        const pairs = getAttachmentResortPairs(this);
+    async move_stray_attachments_cb() {
+        const pairs = findStrayAttachments(this);
         if (pairs.length === 0) {
-            new Notice('No attachments need resorting.');
+            new Notice('No stray attachments found.');
             return;
         }
 
-        const modal = new MovePairsModal(this, pairs);
+        const modal = new StrayAttachmentsModal(this, pairs);
         modal.open();
         await modal.promise;
     }

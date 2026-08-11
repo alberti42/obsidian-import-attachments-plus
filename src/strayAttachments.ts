@@ -7,14 +7,14 @@ export type DedupeFileList = {f: TFile, list: Map<string, TFile>};
 export type DedupeLinkList = {f: TFile, list: Map<string, SomeLink>};
 
 export type AttachFolder = { attachFolder: string, file: TFile };
-export type AttachmentResortPair = { 
+export type StrayAttachment = { 
 	from: string,
 	file: TFile, 
 	fromPath: string, 
 	to: AttachFolder[] 
 }
 
-export type MovePairSelection = {
+export type StrayAttachmentMove = {
 	sourcePath: string;
 	destinationPath: string;
 	sourceFile: TFile;
@@ -70,7 +70,7 @@ function unifyLinkCaches(app: App, input: { f: TFile, m: CachedMetadata | null})
 	for (const elem of mergedLinks) {
 		const res = resolveLink(app, elem.link, input.f.path);
 		if (res === null) {
-			if (warnInConsole) { console.warn("resort: could not resolve link:", elem.original, `(link field: '${elem.link}')`); }
+			if (warnInConsole) { console.warn("stray attachments: could not resolve link:", elem.original, `(link field: '${elem.link}')`); }
 			continue;
 		}
 		// we are not interested in notes linking to other notes
@@ -146,7 +146,7 @@ function buildReferenceMaps(plugin: ImportAttachments): ReferenceMaps {
  *    and the run after that note A's again, for ever.
  *  - Where every note maps to the same folder (ROOT, CURRENT, or FOLDER without
  *    `${notename}`), the folder an attachment is already in is always a candidate, so
- *    the command correctly reports that there is nothing to resort — instead of listing
+ *    the command correctly reports that there is nothing to do — instead of listing
  *    the whole vault once per note, each time offering to move a file to where it is.
  */
 function destinationsFor(attachment: TFile, notes: DedupeFileList, maps: ReferenceMaps): AttachFolder[] {
@@ -160,11 +160,11 @@ function destinationsFor(attachment: TFile, notes: DedupeFileList, maps: Referen
 	return candidates;
 }
 
-export function getAttachmentResortPairs(plugin: ImportAttachments) {
+export function findStrayAttachments(plugin: ImportAttachments) {
 	const maps = buildReferenceMaps(plugin);
 	const { noteToAttachFolder, noteToAttachments, attachmentToNotes } = maps;
 
-	const attachmentResortPairs: AttachmentResortPair[] = [];
+	const strays: StrayAttachment[] = [];
 	const processedAttachments = new Set<string>();
 
 	const record = (attachment: TFile, alternatives: AttachFolder[]) => {
@@ -177,7 +177,7 @@ export function getAttachmentResortPairs(plugin: ImportAttachments) {
 		if (parent === undefined || !plugin.matchAttachmentFolder(parent)) { return; }
 
 		processedAttachments.add(attachment.path);
-		attachmentResortPairs.push({
+		strays.push({
 			file: attachment,
 			from: attachment.parent?.path ?? "no parent!",
 			fromPath: attachment.path,
@@ -189,7 +189,7 @@ export function getAttachmentResortPairs(plugin: ImportAttachments) {
 	for (const [note, attachFolder] of noteToAttachFolder.entries()) {
 		const folder = plugin.app.vault.getAbstractFileByPath(attachFolder.attachFolder);
 		if (!(folder instanceof TFolder)) {
-			if (warnInConsole) { console.warn("resort: could not resolve folder: ", attachFolder); }
+			if (warnInConsole) { console.warn("stray attachments: could not resolve folder: ", attachFolder); }
 			continue;
 		}
 
@@ -217,10 +217,10 @@ export function getAttachmentResortPairs(plugin: ImportAttachments) {
 		record(notesList.f, destinationsFor(notesList.f, notesList, maps));
 	}
 
-	return attachmentResortPairs;
+	return strays;
 }
 
-export async function moveAttachmentPairs(plugin: ImportAttachments, selections: MovePairSelection[]) {
+export async function moveStrayAttachments(plugin: ImportAttachments, selections: StrayAttachmentMove[]) {
 	const vault = plugin.app.vault;
 	let successCount = 0;
 
