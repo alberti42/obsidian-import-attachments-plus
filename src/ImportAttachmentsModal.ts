@@ -1,5 +1,5 @@
 // ImportAttachmentsModal.ts
-import { Modal, Platform, TFolder, setIcon, Notice } from 'obsidian';
+import { Component, MarkdownRenderer, Modal, Platform, TFolder, setIcon, Notice } from 'obsidian';
 import {
 		ImportActionType,
 		ImportActionChoiceResult,
@@ -583,20 +583,31 @@ export class StrayAttachmentsModal extends Modal {
 	private resolveChoice: (result: boolean) => void = () => { };  // To resolve the promise. Initialize with a no-op function
 	private isResolved = false;
 	private previewEl: HTMLElement | null = null;
-	private previewImgEl: HTMLImageElement | null = null;
+	private previewEmbedEl: HTMLElement | null = null;
 	private previewEmptyEl: HTMLElement | null = null;
 	private previewToken = 0;
+	// MarkdownRenderer.render() needs a Component to own the lifecycle of whatever it
+	// creates (the pdf.js viewer, media players, ...). Modal is not a Component, so we
+	// keep one of our own and unload it in onClose().
+	private previewComponent = new Component();
 	private selectedRow: HTMLElement | null = null;
 	private selectedStray: StrayAttachment | null = null;
 	private rowToStray: Map<HTMLElement, StrayAttachment>;
 	private moveAllButtonEl: HTMLButtonElement | null = null;
 	private confirmedMoveAll = false;
 
-	// The preview is an <img>, so it can only show what the browser decodes natively.
-	// This is the same set Obsidian itself treats as images; PDFs, video and audio
-	// would each need a different element and are not previewed.
-	private static readonly imageExtensions = ['avif', 'bmp', 'gif', 'jpeg', 'jpg', 'png', 'svg', 'webp'];
-	private static readonly imageExtensionSet = new Set(StrayAttachmentsModal.imageExtensions);
+	// The preview is an Obsidian embed, rendered by MarkdownRenderer, so anything
+	// Obsidian can embed we get for free: images, PDFs (its own pdf.js viewer), and
+	// audio/video players. Kept as an explicit list only to decide whether to attempt
+	// an embed at all — for everything else we show the placeholder rather than let
+	// Obsidian render a broken-embed link.
+	private static readonly previewExtensions = [
+		'avif', 'bmp', 'gif', 'jpeg', 'jpg', 'png', 'svg', 'webp',   // images
+		'pdf',                                                       // pdf.js viewer
+		'flac', 'm4a', 'mp3', 'ogg', 'wav', '3gp',                   // audio
+		'mkv', 'mov', 'mp4', 'ogv', 'webm',                          // video
+	];
+	private static readonly previewExtensionSet = new Set(StrayAttachmentsModal.previewExtensions);
 
 	constructor(private plugin: ImportAttachments, private strays: StrayAttachment[]) {
 		super(plugin.app);
@@ -614,48 +625,58 @@ export class StrayAttachmentsModal extends Modal {
 	}
 
 	private initPreviewElements() {
-		if (!this.previewEl || this.previewImgEl) return;
+		if (!this.previewEl || this.previewEmbedEl) return;
 
 		this.previewEmptyEl = this.previewEl.createDiv({ cls: 'import-preview-empty' });
-		setIcon(this.previewEmptyEl.createDiv({ cls: 'import-preview-icon' }), 'image-off');
+		setIcon(this.previewEmptyEl.createDiv({ cls: 'import-preview-icon' }), 'file-question');
 		this.previewEmptyEl.createEl('div', { text: 'No preview', cls: 'import-preview-text' });
 		this.previewEmptyEl.createEl('div', {
-			text: `Previews are shown for ${StrayAttachmentsModal.imageExtensions.join(', ')}`,
+			text: 'Previews are shown for images, PDFs, audio and video.',
 			cls: 'import-preview-formats'
 		});
 
-		this.previewImgEl = this.previewEl.createEl('img', { cls: 'import-preview-image' });
+		this.previewEmbedEl = this.previewEl.createDiv({ cls: 'import-preview-embed' });
 	}
 
-	private showPreview(show: 'image' | 'fallback') {
-		if (!this.previewImgEl || !this.previewEmptyEl) return;
-		const imageShown = show === 'image';
-		this.previewImgEl.toggleClass('import-preview-shown', imageShown);
-		this.previewImgEl.toggleClass('import-preview-hidden', !imageShown);
-		this.previewEmptyEl.toggleClass('import-preview-shown', !imageShown);
-		this.previewEmptyEl.toggleClass('import-preview-hidden', imageShown);
+	private showPreview(show: 'embed' | 'fallback') {
+		if (!this.previewEmbedEl || !this.previewEmptyEl) return;
+		const embedShown = show === 'embed';
+		this.previewEmbedEl.toggleClass('import-preview-shown', embedShown);
+		this.previewEmbedEl.toggleClass('import-preview-hidden', !embedShown);
+		this.previewEmptyEl.toggleClass('import-preview-shown', !embedShown);
+		this.previewEmptyEl.toggleClass('import-preview-hidden', embedShown);
 	}
 
-	private renderPreview() {
+	private async renderPreview() {
 		this.initPreviewElements();
-		if (!this.previewImgEl || !this.previewEmptyEl) return;
+		const embedEl = this.previewEmbedEl;
+		if (!embedEl || !this.previewEmptyEl) return;
+
+		// Invalidate any render still in flight: selection can change faster than an
+		// embed loads, and a late one must not overwrite a newer preview.
+		const token = ++this.previewToken;
+		embedEl.empty();
 
 		const stray = this.selectedStray;
-		if (!stray || !StrayAttachmentsModal.imageExtensionSet.has(stray.file.extension.toLowerCase())) {
+		if (!stray || !StrayAttachmentsModal.previewExtensionSet.has(stray.file.extension.toLowerCase())) {
 			this.showPreview('fallback');
 			return;
 		}
 
-		const token = ++this.previewToken;
-		const img = this.previewImgEl;
+		// Let Obsidian render the embed rather than building an <img>/<video>/viewer
+		// ourselves. generateMarkdownLink handles escaping and the user's link-format
+		// preference; the leading '!' turns the link into an embed.
+		const link = this.app.fileManager.generateMarkdownLink(stray.file, stray.file.path);
+		try {
+			await MarkdownRenderer.render(this.app, `!${link}`, embedEl, stray.file.path, this.previewComponent);
+		} catch (error) {
+			console.error('Failed to render preview for', stray.file.path, error);
+			if (token === this.previewToken) { this.showPreview('fallback'); }
+			return;
+		}
 
-		this.showPreview('fallback');
-
-		// oxlint-disable-next-line unicorn/prefer-add-event-listener
-		img.onload = () => token === this.previewToken && this.showPreview('image');
-		img.onerror = () => token === this.previewToken && this.showPreview('fallback');
-		img.src = this.app.vault.getResourcePath(stray.file);
-		img.alt = stray.file.name;
+		if (token !== this.previewToken) { return; }
+		this.showPreview('embed');
 	}
 
 	private selectTargetRow(target: HTMLElement, doRenderPreview = true, doScroll = false) {
@@ -791,6 +812,9 @@ export class StrayAttachmentsModal extends Modal {
 		modalEl.addClass('stray-attachments-modal-el');
 		contentEl.tabIndex = -1;
 
+		// Anything MarkdownRenderer creates for a preview hangs off this component.
+		this.previewComponent.load();
+
 		const container = contentEl.createDiv({ cls: 'import-plugin stray-attachments-modal' });
 
 		const header = container.createEl('header', { cls: 'stray-attachments-header' })
@@ -901,6 +925,10 @@ export class StrayAttachmentsModal extends Modal {
 	onClose() {
 		// Ensure promise is resolved even if modal is closed via ESC/X button
 		this.resolve(false);
+		// Tear down media players and PDF viewers created for previews before the
+		// elements holding them are dropped.
+		this.previewToken++;
+		this.previewComponent.unload();
 		this.contentEl.empty();
 	}
 }
