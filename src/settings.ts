@@ -72,7 +72,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                         .onChange(async (value: string) => {
                             if (value in ImportActionType) {
                                 this.plugin.settings.actionDroppedFilesOnImport = value as ImportActionType;
-                                if (value != ImportActionType.ASK_USER) {
+                                if (value !== ImportActionType.ASK_USER) {
                                     this.plugin.settings.lastActionDroppedFilesOnImport = value as ImportActionType;
                                 }
                                 this.debouncedSaveSettings();
@@ -93,7 +93,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                         .onChange(async (value: string) => {
                             if (value in ImportActionType) {
                                 this.plugin.settings.actionPastedFilesOnImport = value as ImportActionType;
-                                if (value != ImportActionType.ASK_USER) {
+                                if (value !== ImportActionType.ASK_USER) {
                                     this.plugin.settings.lastActionPastedFilesOnImport = value as ImportActionType;
                                 }
                                 this.debouncedSaveSettings();
@@ -114,7 +114,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                         .onChange(async (value: string) => {
                             if (Object.values(YesNoTypes).includes(value as YesNoTypes)) {
                                 this.plugin.settings.embedFilesOnImport = value as YesNoTypes;
-                                if (value != YesNoTypes.ASK_USER) {
+                                if (value !== YesNoTypes.ASK_USER) {
                                     this.plugin.settings.lastEmbedFilesOnImport = value as YesNoTypes;
                                 }
                                 this.debouncedSaveSettings();
@@ -480,7 +480,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                     text.setPlaceholder('Enter attachment name');
                     text.setValue(this.plugin.settings.attachmentName);
                     text.onChange(async (value: string) => {
-                        if (value.trim() == '') {
+                        if (value.trim() === '') {
                             value = '${original}'; // TODO: improve checking the input by the user that it is not empty
                         }
                         this.plugin.settings.attachmentName = value;
@@ -535,13 +535,13 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
         const folderPath = normalizePath(this.plugin.settings.attachmentFolderPath).replace(/^(\.\/)*\.?/,'');  // map ./././path1/path2 to path1/path2
 
         if(this.plugin.settings.attachmentFolderLocation === AttachmentFolderLocationType.FOLDER) {
-            if(folderPath=='/') {
+            if(folderPath==='/') {
                 this.plugin.settings.attachmentFolderLocation = AttachmentFolderLocationType.ROOT;
             }
         }
 
         if(this.plugin.settings.attachmentFolderLocation === AttachmentFolderLocationType.SUBFOLDER) {
-            if(folderPath=='/') {
+            if(folderPath==='/') {
                 this.plugin.settings.attachmentFolderLocation = AttachmentFolderLocationType.CURRENT;
             }
         }

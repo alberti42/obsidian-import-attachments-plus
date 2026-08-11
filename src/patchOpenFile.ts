@@ -105,7 +105,7 @@ function patchOpenFile(plugin: ImportAttachments) {
 			}
 		}
 
-		const newEmptyLeave = this.getViewState()?.type == 'empty';
+		const newEmptyLeave = this.getViewState()?.type === 'empty';
 
 		if(plugin.settings.revealAttachment && metaKeyPressed && altKeyPressed){
 			window.require('electron').remote.shell.showItemInFolder(makePosixPathOScompatible(joinPaths(plugin.vaultPath,file.path)));

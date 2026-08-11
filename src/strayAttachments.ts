@@ -127,10 +127,13 @@ function buildReferenceMaps(plugin: ImportAttachments): ReferenceMaps {
 	const filesWithLinks = (app.vault.getFiles() as TFile[])
 		.filter(t => NOTE_EXTENSIONS.has(t.extension.toLowerCase()))
 		.map(t => ({ f: t, m: app.metadataCache.getFileCache(t) as CachedMetadata | null }))
+		// Keep notes that reference something. The caches are optional, so `== null`
+		// was doing real work here (it matches undefined, which `=== null` does not);
+		// `?.length ?? 0` says the same thing without depending on that.
 		.filter(e => e.m !== null && (
-			!(e.m.embeds == null || e.m.embeds.length == 0) ||
-			!(e.m.links == null || e.m.links.length === 0) ||
-			!(e.m.frontmatterLinks == null || e.m.frontmatterLinks.length === 0)
+			(e.m.embeds?.length ?? 0) > 0 ||
+			(e.m.links?.length ?? 0) > 0 ||
+			(e.m.frontmatterLinks?.length ?? 0) > 0
 		))
 		.map(e => unifyLinkCaches(app, e))
 		.filter(e => e.links.length > 0)

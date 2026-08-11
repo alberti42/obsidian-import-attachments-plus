@@ -52,7 +52,7 @@ export class ImportActionTypeModal extends Modal {
 		const td = tr.createEl('td');
 		const switchLabel = td.createEl('label', { cls: 'import-switch' });
 		const input = switchLabel.createEl('input', { type: 'checkbox' });
-		if(initialOption==CheckboxOptions.A) {
+		if(initialOption===CheckboxOptions.A) {
 			input.checked = false;
 		} else {
 			input.checked = true;
@@ -95,7 +95,7 @@ export class ImportActionTypeModal extends Modal {
 
 		// Creating action toggle
 		this.createToggle(table, 'Do you want to move or copy the files to the vault?', 'Move', 'Copy', initialOption, (selectedOption:CheckboxOptions) => {
-			if(selectedOption==CheckboxOptions.A){
+			if(selectedOption===CheckboxOptions.A){
 				this.selectedAction = ImportActionType.MOVE;
 			} else {
 				this.selectedAction = ImportActionType.COPY;
@@ -114,7 +114,7 @@ export class ImportActionTypeModal extends Modal {
 
 		// Creating action toggle
 		this.createToggle(table, 'Do you want to embed or link the files to the vault?', 'Embed', 'Link', initialOption, (selectedOption:CheckboxOptions) => {
-			if(selectedOption==CheckboxOptions.A){
+			if(selectedOption===CheckboxOptions.A){
 				this.selectedEmbedOption = YesNoTypes.YES;
 			} else {
 				this.selectedEmbedOption = YesNoTypes.NO;
@@ -123,7 +123,7 @@ export class ImportActionTypeModal extends Modal {
 
 		// Creating remember toggle
 		this.createToggle(table, 'Save this answer in the settings for the future?', 'Yes', 'No', CheckboxOptions.B, (selectedOption:CheckboxOptions) => {
-			if(selectedOption==CheckboxOptions.A){
+			if(selectedOption===CheckboxOptions.A){
 				this.rememberChoice = true;
 			} else {
 				this.rememberChoice = false;
@@ -395,7 +395,7 @@ export class ImportFromVaultChoiceModal extends Modal {
 
 		paragraph.append(' is already stored in the vault.');
 
-		if(this.importAction==ImportActionType.MOVE) {
+		if(this.importAction===ImportActionType.MOVE) {
 			container.createEl('p',{text: 'You intended to move the file. \
 					However, moving a file that is already in the vault to a new \
 					destination in the same vault is not supported; \
@@ -680,11 +680,12 @@ export class StrayAttachmentsModal extends Modal {
 	}
 
 	private selectTargetRow(target: HTMLElement, doRenderPreview = true, doScroll = false) {
-		if (this.rowToStray.get(target) == null) {
+		// `has`, not `get(...) === null`: the map yields undefined for a missing key.
+		if (!this.rowToStray.has(target)) {
 			console.warn('trying to select row for which an entry does not exist!', target);
 			return;
 		}
-		if (this.selectedRow != null) {
+		if (this.selectedRow !== null) {
 			this.selectedRow.removeAttribute('data-selected');
 		}
 		this.selectedRow = target;
@@ -695,17 +696,17 @@ export class StrayAttachmentsModal extends Modal {
 	}
 
 	private selectNextRow(row: HTMLElement) {
-		if (row == null || !row.classList.contains(ROW_CLASSNAME)) {return;}
+		if (row === null || !row.classList.contains(ROW_CLASSNAME)) {return;}
 		const target = row.nextElementSibling as HTMLElement;
-		if (target == null || !target.classList.contains(ROW_CLASSNAME)) {return;}
+		if (target === null || !target.classList.contains(ROW_CLASSNAME)) {return;}
 
 		this.selectTargetRow(target, true, true);
 	}
 
 	private selectPreviousRow(row: HTMLElement) {
-		if (row == null || !row.classList.contains(ROW_CLASSNAME)) {return;}
+		if (row === null || !row.classList.contains(ROW_CLASSNAME)) {return;}
 		const target = row.previousElementSibling as HTMLElement;
-		if (target == null || !target.classList.contains(ROW_CLASSNAME)) {return;}
+		if (target === null || !target.classList.contains(ROW_CLASSNAME)) {return;}
 
 		this.selectTargetRow(target, true, true);
 	}

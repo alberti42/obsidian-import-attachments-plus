@@ -859,7 +859,7 @@ export default class ImportAttachments extends Plugin {
         if (activeLeaf) {
             const view = activeLeaf.view;
             const viewType = view.getViewType();
-            if(viewType != 'markdown') {return;}
+            if(viewType !== 'markdown') {return;}
         }
         if(!(evt.target instanceof HTMLElement)) {return;}
         const target:HTMLElement = evt.target;
@@ -1106,11 +1106,11 @@ export default class ImportAttachments extends Plugin {
 		let embedOption = this.settings.embedFilesOnImport;
 		const lastEmbedOption = this.settings.lastEmbedFilesOnImport;
 
-		if (doForceAsking || actionFilesOnImport == ImportActionType.ASK_USER || embedOption == YesNoTypes.ASK_USER) {
+		if (doForceAsking || actionFilesOnImport === ImportActionType.ASK_USER || embedOption === YesNoTypes.ASK_USER) {
 			const modal = new ImportActionTypeModal(this, lastActionFilesOnImport, lastEmbedOption);
 			modal.open();
 			const choice = await modal.promise;
-			if (choice == null) {return;}
+			if (choice === null) {return;}
 			actionFilesOnImport = choice.action;
 			switch (importType) {
 				case ImportOperationType.DRAG_AND_DROP:
@@ -1134,7 +1134,7 @@ export default class ImportAttachments extends Plugin {
 			this.settingsTab.debouncedSaveSettings();
 		}
 
-		const doEmbed = (embedOption == YesNoTypes.YES);
+		const doEmbed = (embedOption === YesNoTypes.YES);
 
 		const importSettings = {
 			embed: doEmbed,
@@ -1160,7 +1160,7 @@ export default class ImportAttachments extends Plugin {
 
 		const cursor = editor.getCursor(); // Get the current cursor position before insertion
 
-		if (filesToImport.length > 1 && this.settings.multipleFilesImportType != MultipleFilesImportTypes.INLINE) {
+		if (filesToImport.length > 1 && this.settings.multipleFilesImportType !== MultipleFilesImportTypes.INLINE) {
 			// Check if the cursor is at the beginning of a line
 			if (cursor.ch !== 0) {
 				// If not, insert a newline before the link
@@ -1189,7 +1189,7 @@ export default class ImportAttachments extends Plugin {
 				const modal = new ImportFromVaultChoiceModal(this, originalFilePath, relativePath, importSettings.action);
 				modal.open();
 				const choice = await modal.promise;
-				if (choice == null) { return null; }
+				if (choice === null) { return null; }
 				switch (choice) {
 					case ImportFromVaultOptions.SKIP:
 						return null;
@@ -1203,11 +1203,11 @@ export default class ImportAttachments extends Plugin {
 			}
 			
 			// Decide what to do if a file with the same name already exists at the destination
-			if (existingFile && importSettings.action != ImportActionType.LINK) {
+			if (existingFile && importSettings.action !== ImportActionType.LINK) {
 				const modal = new OverwriteChoiceModal(this, originalFilePath, destFilePath);
 				modal.open();
 				const choice = await modal.promise;
-				if (choice == null) { return null; }
+				if (choice === null) { return null; }
 				switch (choice) {
 					case OverwriteChoiceOptions.OVERWRITE:
 						// continue
@@ -1374,7 +1374,7 @@ export default class ImportAttachments extends Plugin {
         // Insert the link text at the current cursor position
         editor.replaceRange(linkText, cursor_from, cursor_to);
 
-        if (counter == 0) {
+        if (counter === 0) {
             if (selectDisplayedText) {
                 // Define the start and end positions for selecting 'baseName' within the inserted link
                 const startCursorPos = {
@@ -1427,7 +1427,7 @@ export default class ImportAttachments extends Plugin {
 			const modal = new CreateAttachmentFolderModal(this, attachmentsFolderPath);
 			modal.open();
 			const choice = await modal.promise;
-			if (choice == false) {return;}
+			if (!choice) {return;}
 			await Utils.createFolderIfNotExists(this.app.vault,attachmentsFolderPath);
 		}
 
