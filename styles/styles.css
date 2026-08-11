@@ -125,8 +125,11 @@ input:checked+.import-slider:before {
 
 	display: grid;
 	grid-template-rows: min-content minmax(0, 1fr) min-content;
-	/* The list takes the room it needs; the preview column is a fixed sidebar. */
-	grid-template-columns: minmax(0, 1fr) 14rem;
+	/* 70/30 split between the list and the preview. Expressed in fr rather than
+	   percentages so the 1rem gap comes out of the free space instead of pushing
+	   the total past 100%. The preview keeps a floor of 14rem so it stays usable
+	   when the modal is at its 60ch minimum. */
+	grid-template-columns: minmax(0, 7fr) minmax(14rem, 3fr);
 	gap: 1rem;
 	grid-template-areas:
 		"header header"
