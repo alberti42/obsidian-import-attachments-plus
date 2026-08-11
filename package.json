@@ -17,7 +17,6 @@
 		"@types/node": "^16.18.96",
 		"@types/react": "^18.3.1",
 		"@types/react-dom": "^18.3.0",
-		"@types/uuid": "^9.0.8",
 		"@typescript-eslint/eslint-plugin": "^8.0.0",
 		"@typescript-eslint/parser": "^8.0.0",
 		"builtin-modules": "3.3.0",
@@ -26,8 +25,5 @@
 		"obsidian": "^1.11.4",
 		"tslib": "2.4.0",
 		"typescript": "^4.7.4"
-	},
-	"dependencies": {
-		"uuid": "^10.0.0"
 	}
 }

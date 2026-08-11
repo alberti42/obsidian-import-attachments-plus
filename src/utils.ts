@@ -2,7 +2,6 @@
 import { promises as fs } from 'fs';  // This imports the promises API from fs
 import * as crypto from 'crypto';
 
-import { v4 as uuidv4 } from 'uuid';
 import { Vault, normalizePath, TAbstractFile, TFile, TFolder, Editor, FileExplorerView } from 'obsidian';
 
 import { ParsedPath as ParsedFilePath, ParsedFolderPath } from 'types';
@@ -276,6 +275,11 @@ export function getAllFilesInFolder(folder: TFolder): TFile[] {
 
 	traverse(folder);
 	return files;
+}
+
+// Random RFC 4122 v4 UUID; replaces the former `uuid` package dependency.
+function uuidv4(): string {
+	return crypto.randomUUID();
 }
 
 export { uuidv4, formatDateTime };
