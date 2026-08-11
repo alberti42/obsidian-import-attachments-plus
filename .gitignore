@@ -24,6 +24,3 @@ obsidian-import-attachments-plus.sublime-workspace
 
 # iCLoud
 *.nosync
-
-pnpm-lock.yaml
-pnpm-workspace.yaml
