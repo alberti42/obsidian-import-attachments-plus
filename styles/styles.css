@@ -255,13 +255,36 @@ input:checked+.import-slider:before {
 	& audio {
 		width: 100%;
 	}
-	/* The PDF viewer has no intrinsic size and would otherwise collapse. */
+	/* The PDF viewer has no intrinsic size and would otherwise collapse. Let it
+	   scroll rather than be clipped: a page fitted to the panel width is taller
+	   than the panel, and clipping would hide the bottom of every document. */
 	& .pdf-embed,
 	& iframe {
 		width: 100%;
 		height: 100%;
 		min-height: 12rem;
 		border: 0;
+		overflow: auto;
+		align-self: stretch;
+	}
+
+	/* pdf.js writes the page size into inline styles computed from the viewport,
+	   which in a panel this narrow comes out wider than the panel — centred, so
+	   it was clipped on both sides. Override to fit the width and let the height
+	   follow. !important is required: these are inline styles. */
+	& .pdf-embed .page,
+	& .pdf-embed .canvasWrapper,
+	& .pdf-embed canvas {
+		max-width: 100% !important;
+		width: 100% !important;
+		height: auto !important;
+	}
+	/* The text and annotation overlays are positioned for the original scale and
+	   would sit off-register once the canvas is rescaled; they serve no purpose
+	   in a preview. */
+	& .pdf-embed .textLayer,
+	& .pdf-embed .annotationLayer {
+		display: none;
 	}
 }
 
