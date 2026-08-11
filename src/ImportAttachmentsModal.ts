@@ -592,7 +592,11 @@ export class StrayAttachmentsModal extends Modal {
 	private moveAllButtonEl: HTMLButtonElement | null = null;
 	private confirmedMoveAll = false;
 
-	private static readonly imageExtensions = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif']);
+	// The preview is an <img>, so it can only show what the browser decodes natively.
+	// This is the same set Obsidian itself treats as images; PDFs, video and audio
+	// would each need a different element and are not previewed.
+	private static readonly imageExtensions = ['avif', 'bmp', 'gif', 'jpeg', 'jpg', 'png', 'svg', 'webp'];
+	private static readonly imageExtensionSet = new Set(StrayAttachmentsModal.imageExtensions);
 
 	constructor(private plugin: ImportAttachments, private strays: StrayAttachment[]) {
 		super(plugin.app);
@@ -614,7 +618,11 @@ export class StrayAttachmentsModal extends Modal {
 
 		this.previewEmptyEl = this.previewEl.createDiv({ cls: 'import-preview-empty' });
 		setIcon(this.previewEmptyEl.createDiv({ cls: 'import-preview-icon' }), 'image-off');
-		this.previewEmptyEl.createEl('div', { text: 'No preview available', cls: 'import-preview-text' });
+		this.previewEmptyEl.createEl('div', { text: 'No preview', cls: 'import-preview-text' });
+		this.previewEmptyEl.createEl('div', {
+			text: `Previews are shown for ${StrayAttachmentsModal.imageExtensions.join(', ')}`,
+			cls: 'import-preview-formats'
+		});
 
 		this.previewImgEl = this.previewEl.createEl('img', { cls: 'import-preview-image' });
 	}
@@ -633,7 +641,7 @@ export class StrayAttachmentsModal extends Modal {
 		if (!this.previewImgEl || !this.previewEmptyEl) return;
 
 		const stray = this.selectedStray;
-		if (!stray || !StrayAttachmentsModal.imageExtensions.has(stray.file.extension.toLowerCase())) {
+		if (!stray || !StrayAttachmentsModal.imageExtensionSet.has(stray.file.extension.toLowerCase())) {
 			this.showPreview('fallback');
 			return;
 		}

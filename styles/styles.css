@@ -125,11 +125,12 @@ input:checked+.import-slider:before {
 
 	display: grid;
 	grid-template-rows: min-content minmax(0, 1fr) min-content;
-	grid-template-columns: 1fr 1fr;
+	/* The list takes the room it needs; the preview column is a fixed sidebar. */
+	grid-template-columns: minmax(0, 1fr) 14rem;
 	gap: 1rem;
-	grid-template-areas: 
-		"header preview"
-		"scroller scroller"
+	grid-template-areas:
+		"header header"
+		"scroller preview"
 		"bottom bottom"
 	;
 	width: 100%;
@@ -152,12 +153,13 @@ input:checked+.import-slider:before {
 		min-height: 6rem;
 		display: flex;
 		align-items: center;
-		justify-content: end;
+		justify-content: center;
 		overflow: hidden;
 		position: relative;
-		padding-inline: 1rem;
-
-		/* background: teal; */
+		padding: 0.5rem;
+		border: 1px solid var(--background-modifier-border);
+		border-radius: var(--radius-s);
+		background: var(--background-primary-alt);
 	}
 	& .stray-attachments-scroller {
 		grid-area: scroller;
@@ -203,10 +205,19 @@ input:checked+.import-slider:before {
 	font-size: 0.85rem;
 }
 
+.import-preview-formats {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-faint);
+	text-align: center;
+	padding-inline: 0.5rem;
+	line-height: 1.3;
+}
+
 .import-preview-image {
 	max-width: 100%;
-	height: 7rem;
+	max-height: 100%;
 	width: auto;
+	height: auto;
 	object-fit: contain;
 	object-position: center;
 	display: block;
