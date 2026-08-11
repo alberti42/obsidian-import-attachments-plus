@@ -851,11 +851,18 @@ export default class ImportAttachments extends Plugin {
         if(md_file) {attachmentName = attachmentName.replace(/\$\{notename\}/g, md_file.filename);}
 
         if(namePattern.includes('${md5}')) {
-            let hash = ''
+            let hash: string;
             try {
                 hash = await Utils.hashFile(originalFilePath);
             } catch (err: unknown) {
-                console.error('Error hashing the file:', err);
+                // The content is not (yet) on disk. This happens when we are called through the
+                // patched `Vault.getAvailablePathForAttachments`, i.e. when Obsidian or another
+                // plugin asks for a destination path *before* creating the file: there are no
+                // bytes to hash anywhere at that moment. Fall back to a uuid, which preserves the
+                // uniqueness that ${md5} is chosen for; leaving the token empty would produce
+                // names such as `.png` when the pattern is just `${md5}`.
+                hash = Utils.uuidv4();
+                console.warn(`Import Attachments+: could not compute \${md5} for '${originalFilePath}'; using a uuid instead.`, err);
             }
             attachmentName = attachmentName.replace(/\$\{md5\}/g, hash);
         }
