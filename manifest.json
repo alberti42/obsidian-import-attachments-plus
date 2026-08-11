@@ -1,11 +1,11 @@
 {
-  "id": "import-attachments-plus",
-  "name": "Import Attachments+",
-  "version": "1.5.12",
-  "minAppVersion": "1.5.0",
-  "description": "Move and link the attachments into the vault.",
-  "author": "Andrea Alberti",
-  "authorUrl": "https://www.linkedin.com/in/dr-andrea-alberti/",
-  "fundingUrl": "https://buymeacoffee.com/alberti",
-  "isDesktopOnly": false
+	"id": "import-attachments-plus",
+	"name": "Import Attachments+",
+	"version": "1.6.0",
+	"minAppVersion": "1.5.0",
+	"description": "Move and link the attachments into the vault.",
+	"author": "Andrea Alberti",
+	"authorUrl": "https://www.linkedin.com/in/dr-andrea-alberti/",
+	"fundingUrl": "https://buymeacoffee.com/alberti",
+	"isDesktopOnly": false
 }
