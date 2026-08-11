@@ -1452,7 +1452,7 @@ export default class ImportAttachments extends Plugin {
 
     // A note has been created. Covers 'extract selection' when it targets a new note.
     note_created_cb(file: TAbstractFile) {
-        if (!this.settings.moveStrayAttachmentsOnNoteCreation) { return; }
+        if (!this.settings.moveStrayAttachmentsAutomatically) { return; }
         if (!(file instanceof TFile)) { return; }
         if (file.extension !== 'md' && file.extension !== 'canvas') { return; }
         this.notes_awaiting_stray_check.add(file.path);
@@ -1466,7 +1466,7 @@ export default class ImportAttachments extends Plugin {
     // yet, and until it has it still appears to reference the attachment, so nothing
     // would look like a stray.
     note_changed_cb(file: TFile) {
-        if (!this.settings.moveStrayAttachmentsOnNoteChange) { return; }
+        if (!this.settings.moveStrayAttachmentsAutomatically) { return; }
         if (file.extension !== 'md' && file.extension !== 'canvas') { return; }
         this.notes_awaiting_stray_check.add(file.path);
     }
@@ -1479,7 +1479,7 @@ export default class ImportAttachments extends Plugin {
         const pending = Array.from(this.notes_awaiting_stray_check);
         this.notes_awaiting_stray_check.clear();
 
-        if (!this.settings.moveStrayAttachmentsOnNoteCreation && !this.settings.moveStrayAttachmentsOnNoteChange) { return; }
+        if (!this.settings.moveStrayAttachmentsAutomatically) { return; }
 
         for (const path of pending) {
             const note = this.app.vault.getAbstractFileByPath(path);

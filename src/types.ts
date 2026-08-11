@@ -63,8 +63,7 @@ export interface ImportAttachmentsSettings {
 	autoRenameAttachmentFolder: boolean;
 	autoDeleteAttachmentFolder: boolean;
     deleteAttachmentFolderWhenEmpty: boolean;
-    moveStrayAttachmentsOnNoteCreation: boolean;
-    moveStrayAttachmentsOnNoteChange: boolean;
+    moveStrayAttachmentsAutomatically: boolean;
     showDeleteMenu: boolean;
     showDeleteMenuForEmbedded: boolean;
     removeWikilinkOnFileDeletion: boolean;

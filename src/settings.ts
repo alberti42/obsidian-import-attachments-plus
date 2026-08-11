@@ -393,30 +393,18 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName('Move stray attachments when a note is created:')
-            .setDesc('With this option enabled, when a new note is created that references attachments still filed \
-                under another note which no longer uses them — what "extract selection to new note" leaves behind — \
-                those attachments are moved into the new note’s attachment folder straight away. The same rules as \
-                the "Move stray attachments" command apply: only folders managed by this plugin are touched, and an \
-                attachment still used by the note it is filed under is left alone.')
+            .setName('Let attachments follow the text that uses them:')
+            .setDesc('With this option enabled, when text containing attachment links is moved into another note — \
+                by extracting a selection, merging notes, or an ordinary cut-and-paste — the attachments are moved \
+                into that note’s attachment folder instead of being left behind. The same rules as the \
+                "Move stray attachments" command apply: only folders managed by this plugin are touched, and an \
+                attachment still used by the note it is filed under stays where it is. Because this reacts to any \
+                edit that adds such a link, an attachment can move a moment after you type one by hand. Leave it \
+                off to run the "Move stray attachments" command yourself instead.')
             .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.moveStrayAttachmentsOnNoteCreation)
+                .setValue(this.plugin.settings.moveStrayAttachmentsAutomatically)
                 .onChange(async (value: boolean) => {
-                    this.plugin.settings.moveStrayAttachmentsOnNoteCreation = value;
-                    this.debouncedSaveSettings();
-                }));
-
-        new Setting(containerEl)
-            .setName('Move stray attachments when an existing note changes:')
-            .setDesc('As above, but also when an existing note gains links to stray attachments. This covers \
-                extracting a selection into an existing note, merging one note into another, and plain \
-                cut-and-paste, none of which create a note. Note that it reacts to any edit that adds such a link, \
-                so an attachment can move while you are typing. Leave it off if you would rather run the \
-                "Move stray attachments" command yourself.')
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.moveStrayAttachmentsOnNoteChange)
-                .onChange(async (value: boolean) => {
-                    this.plugin.settings.moveStrayAttachmentsOnNoteChange = value;
+                    this.plugin.settings.moveStrayAttachmentsAutomatically = value;
                     this.debouncedSaveSettings();
                 }));
 
