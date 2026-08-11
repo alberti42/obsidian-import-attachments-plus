@@ -4,6 +4,13 @@ import { TFolder,WorkspaceLeaf, FileExplorerItem, View, FileExplorerView, requir
 import ImportAttachments from 'main';
 import { FileExplorerViewConstructorType, isFileExplorerView } from 'types';
 
+// Dev-only tracing of the monkey patches on the file explorer's private API. The
+// define for process.env.NODE_ENV is substituted at build time, so these calls are
+// removed entirely from a production bundle.
+const trace = process.env.NODE_ENV === 'development'
+	? (...args: unknown[]) => { console.log('[file-explorer patch]', ...args); }
+	: () => { /* no-op in production */ };
+
 // Define the type for the factory function
 type ViewFactory = (leaf: WorkspaceLeaf) => FileExplorerView;
 let fileExplorerViews: ({ [viewType: string]: (leaf: WorkspaceLeaf) => View }) | null = null;
@@ -41,12 +48,14 @@ function unpatchFileExplorer() {
 function patchAcceptRename(plugin: ImportAttachments, viewClass: FileExplorerViewConstructorType) {
 	if(originalAcceptRename) {return;}
 
+	trace('acceptRename exists on prototype:', typeof viewClass.prototype.acceptRename);
 	originalAcceptRename = viewClass.prototype.acceptRename;
-	
+
 	viewClass.prototype.acceptRename = async function(this: FileExplorerView) {
 		if(!originalAcceptRename) {throw new Error('Something went wrong in patching file-explorer plugin.');}
 
 		const fileBeingRenamed = this.fileBeingRenamed;
+		trace('acceptRename called for', fileBeingRenamed?.path, 'isFolder:', fileBeingRenamed instanceof TFolder);
 
 		if(fileBeingRenamed instanceof TFolder) {
 			const item = this.fileItems[fileBeingRenamed.path];
@@ -86,14 +95,17 @@ function patchOnCreate(plugin: ImportAttachments, viewClass: FileExplorerViewCon
 function patchCreateFolderDom(plugin: ImportAttachments, viewClass: FileExplorerViewConstructorType) {
 	if(originalCreateFolderDom) {return;}
 
+	trace('createFolderDom exists on prototype:', typeof viewClass.prototype.createFolderDom);
 	originalCreateFolderDom = viewClass.prototype.createFolderDom;
-    
+
     viewClass.prototype.createFolderDom = function(this: FileExplorerView, folder: TFolder): FileExplorerItem {
 		if(!originalCreateFolderDom) {throw new Error('Something went wrong in patching file-explorer plugin.');}
-		
+
 		const item = originalCreateFolderDom.apply(this, [folder]);
-			
-		if(plugin.settings.hideAttachmentFolders && plugin.matchAttachmentFolder(item.file.path)) {item.el.toggleClass('import-plugin-hidden',true);}
+
+		const hide = plugin.settings.hideAttachmentFolders && plugin.matchAttachmentFolder(item.file.path);
+		trace('createFolderDom called for', item.file.path, '-> hide:', hide);
+		if(hide) {item.el.toggleClass('import-plugin-hidden',true);}
 
 		return item;
 	};
@@ -114,10 +126,13 @@ async function updateVisibilityAttachmentFolders(plugin: ImportAttachments){
 
 		const viewInstance = leaf.view;
         if(isFileExplorerView(viewInstance)) {
+            trace('sweep over', Object.keys(viewInstance.fileItems).length, 'items, hide:', hide);
             if(hide) {
                 Object.entries(viewInstance.fileItems).forEach(([folderPath, item]) => {
                     if(item.file instanceof TFolder) {
-                        item.el.toggleClass('import-plugin-hidden',plugin.matchAttachmentFolder(folderPath));
+                        const match = plugin.matchAttachmentFolder(folderPath);
+                        if(match) {trace('sweep hiding', folderPath);}
+                        item.el.toggleClass('import-plugin-hidden',match);
                     }
                 });
             } else {
