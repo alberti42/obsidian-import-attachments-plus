@@ -836,7 +836,9 @@ export default class ImportAttachments extends Plugin {
         return attachmentsFolderPath;           
     }
 
-    async createAttachmentName(originalFilePath:string, md_file: ParsedPath | undefined): Promise<string> {
+    // `data`, when given, is the content of an attachment that does not exist on disk yet (e.g. an
+    // image pasted from the clipboard). It is only used to resolve ${md5}.
+    async createAttachmentName(originalFilePath:string, md_file: ParsedPath | undefined, data?: ArrayBuffer): Promise<string> {
 
         const originalFilePath_parsed = Utils.parseFilePath(originalFilePath);
         const namePattern = this.settings.attachmentName;
@@ -853,13 +855,13 @@ export default class ImportAttachments extends Plugin {
         if(namePattern.includes('${md5}')) {
             let hash: string;
             try {
-                hash = await Utils.hashFile(originalFilePath);
+                hash = data ? Utils.hashBuffer(data) : await Utils.hashFile(originalFilePath);
             } catch (err: unknown) {
-                // The content is not (yet) on disk. This happens when we are called through the
-                // patched `Vault.getAvailablePathForAttachments`, i.e. when Obsidian or another
-                // plugin asks for a destination path *before* creating the file: there are no
-                // bytes to hash anywhere at that moment. Fall back to a uuid, which preserves the
-                // uniqueness that ${md5} is chosen for; leaving the token empty would produce
+                // The content is neither on disk nor in hand. This happens when we are called
+                // through the patched `Vault.getAvailablePathForAttachments`, i.e. when Obsidian or
+                // another plugin asks for a destination path *before* creating the file: there are
+                // no bytes to hash anywhere at that moment. Fall back to a uuid, which preserves
+                // the uniqueness that ${md5} is chosen for; leaving the token empty would produce
                 // names such as `.png` when the pattern is just `${md5}`.
                 hash = Utils.uuidv4();
                 console.warn(`Import Attachments+: could not compute \${md5} for '${originalFilePath}'; using a uuid instead.`, err);

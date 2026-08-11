@@ -76,6 +76,12 @@ export async function hashFile(filePath: string): Promise<string> {
 	}
 }
 
+// Hashes data we already hold in memory, e.g. an image coming from the clipboard, which has no
+// path to hash yet. Kept next to hashFile so the two ${md5} sources stay side by side.
+export function hashBuffer(data: ArrayBuffer): string {
+	return crypto.createHash('md5').update(new Uint8Array(data)).digest('hex');
+}
+
 function formatDateTime(dateFormat:string):string {
 	try {
 		// use of Moment.js to format the current date
