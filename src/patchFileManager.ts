@@ -1,14 +1,12 @@
 // patchFileManager.ts
 
-/* eslint-disable @typescript-eslint/no-inferrable-types */
-
 import { FileManager, TAbstractFile, Notice, TFolder } from 'obsidian';
 import ImportAttachments from 'main';
 import * as Utils from 'utils';
 import { DeleteAttachmentFolderModal } from './ImportAttachmentsModal';
 
 // Save a reference to the original method for the monkey patch
-let originalPromptForDeletion: ((file: TAbstractFile) => Promise<void>) | null = null;
+let originalPromptForDeletion: ((file: TAbstractFile) => Promise<boolean>) | null = null;
 let plugin:ImportAttachments;
 let fileManager: FileManager;
 let modalResolvePromise: ((wasDeleted: boolean) => void) | null;
@@ -31,8 +29,8 @@ function patchFilemanager(p: ImportAttachments) {
     FileManager.prototype.promptForDeletion = patchedPromptForDeletion.bind(fileManager);
 }
 
-async function patchedPromptForDeletion(this: FileManager, file: TAbstractFile): Promise<void> {
-    await modifiedPromptForDeletion.call(this,file);
+async function patchedPromptForDeletion(this: FileManager, file: TAbstractFile): Promise<boolean> {
+    return await modifiedPromptForDeletion.call(this,file);
 }
 
 async function modifiedPromptForDeletion(this: FileManager, file: TAbstractFile): Promise<boolean> {

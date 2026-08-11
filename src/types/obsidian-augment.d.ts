@@ -51,7 +51,8 @@ declare module 'obsidian' {
 	}
 
 	interface FileManager {
-		promptForDeletion(file: TAbstractFile): Promise<void>;
+		// `promptForDeletion` became part of the public API in Obsidian 1.13
+		// (returning whether the deletion was confirmed), so it is no longer declared here.
         promptForFileRename(file: TAbstractFile): Promise<void>;
 	}
 
