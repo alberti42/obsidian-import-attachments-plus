@@ -104,6 +104,20 @@ input:checked+.import-slider:before {
 }
 
 /* resort pairs modal */
+
+/* applied to the modal container itself (modalEl) */
+.resort-pairs-modal-el {
+	min-width: 60ch;
+	width: max-content;
+	max-width: 90vw;
+	height: 100%;
+	max-height: 60vh;
+}
+
+.resort-pairs-modal-el .modal-content {
+	height: 98%;
+}
+
 .resort-pairs-modal {
 	top: 0;
 	box-sizing: border-box;
@@ -173,15 +187,10 @@ input:checked+.import-slider:before {
 	transition: opacity 0.15s ease;
 }
 
-.import-preview-icon {
+.import-preview-icon .svg-icon {
 	width: 32px;
 	height: 32px;
-	background-repeat: no-repeat;
-	background-position: center;
-	background-size: 32px 32px;
 	color: var(--text-normal);
-	/* icon credit to Lucide icons: https://github.com/lucide-icons/lucide under the ISC/MIT license */
-	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='currentColor' stroke-linecap='round' stroke-linejoin='round' stroke-width='2'%3E%3Cpath d='m2 2l20 20M10.41 10.41a2 2 0 1 1-2.83-2.83m5.92 5.92L6 21m12-9l3 3'/%3E%3Cpath d='M3.59 3.59A2 2 0 0 0 3 5v14a2 2 0 0 0 2 2h14c.55 0 1.052-.22 1.41-.59M21 15V5a2 2 0 0 0-2-2H9'/%3E%3C/g%3E%3C/svg%3E");
 }
 
 .import-preview-text {
@@ -196,6 +205,18 @@ input:checked+.import-slider:before {
 	object-position: center;
 	display: block;
 	transition: opacity 0.15s ease;
+}
+
+/* Which of the two stacked preview layers is visible. Toggled by class rather
+   than by writing element.style from JS, per the community-plugin guidelines. */
+.import-preview-hidden {
+	opacity: 0;
+	visibility: hidden;
+}
+
+.import-preview-shown {
+	opacity: 1;
+	visibility: visible;
 }
 .reverse-ellipsis {
 	direction: rtl;

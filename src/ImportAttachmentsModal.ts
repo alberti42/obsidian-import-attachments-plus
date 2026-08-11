@@ -1,5 +1,5 @@
 // ImportAttachmentsModal.ts
-import { App, Modal, Platform, TFolder, setIcon, Notice } from 'obsidian';
+import { Modal, Platform, TFolder, setIcon, Notice } from 'obsidian';
 import {
 		ImportActionType,
 		ImportActionChoiceResult,
@@ -198,7 +198,6 @@ export class OverwriteChoiceModal extends Modal {
 	}
 
 	onOpen() {
-		void this.plugin;
 		const { contentEl } = this;
 
 		const container = contentEl.createDiv({ cls: 'import-plugin' });
@@ -583,7 +582,6 @@ export class MovePairsModal extends Modal {
 	promise: Promise<boolean>;
 	private resolveChoice: (result: boolean) => void = () => { };  // To resolve the promise. Initialize with a no-op function
 	private isResolved = false;
-	private rows: HTMLElement[] = [];
 	private previewEl: HTMLElement | null = null;
 	private previewImgEl: HTMLImageElement | null = null;
 	private previewEmptyEl: HTMLElement | null = null;
@@ -591,8 +589,8 @@ export class MovePairsModal extends Modal {
 	private selectedRow: HTMLElement | null = null;
 	private selectedPair: AttachmentResortPair | null = null;
 	private rowToPair: Map<HTMLElement, AttachmentResortPair>;
-	private keydownHandler: ((e: KeyboardEvent) => void) | null = null;
-	private docBody: HTMLElement | null = null;
+	private moveAllButtonEl: HTMLButtonElement | null = null;
+	private confirmedMoveAll = false;
 
 	private static readonly imageExtensions = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif']);
 
@@ -615,7 +613,7 @@ export class MovePairsModal extends Modal {
 		if (!this.previewEl || this.previewImgEl) return;
 
 		this.previewEmptyEl = this.previewEl.createDiv({ cls: 'import-preview-empty' });
-		this.previewEmptyEl.createDiv({ cls: 'import-preview-icon' });
+		setIcon(this.previewEmptyEl.createDiv({ cls: 'import-preview-icon' }), 'image-off');
 		this.previewEmptyEl.createEl('div', { text: 'No preview available', cls: 'import-preview-text' });
 
 		this.previewImgEl = this.previewEl.createEl('img', { cls: 'import-preview-image' });
@@ -623,17 +621,11 @@ export class MovePairsModal extends Modal {
 
 	private showPreview(show: 'image' | 'fallback') {
 		if (!this.previewImgEl || !this.previewEmptyEl) return;
-		if (show === 'image') {
-			this.previewImgEl.style.opacity = '1';
-			this.previewImgEl.style.visibility = 'visible';
-			this.previewEmptyEl.style.opacity = '0';
-			this.previewEmptyEl.style.visibility = 'hidden';
-		} else {
-			this.previewImgEl.style.opacity = '0';
-			this.previewImgEl.style.visibility = 'hidden';
-			this.previewEmptyEl.style.opacity = '1';
-			this.previewEmptyEl.style.visibility = 'visible';
-		}
+		const imageShown = show === 'image';
+		this.previewImgEl.toggleClass('import-preview-shown', imageShown);
+		this.previewImgEl.toggleClass('import-preview-hidden', !imageShown);
+		this.previewEmptyEl.toggleClass('import-preview-shown', !imageShown);
+		this.previewEmptyEl.toggleClass('import-preview-hidden', imageShown);
 	}
 
 	private renderPreview() {
@@ -654,7 +646,7 @@ export class MovePairsModal extends Modal {
 		// oxlint-disable-next-line unicorn/prefer-add-event-listener
 		img.onload = () => token === this.previewToken && this.showPreview('image');
 		img.onerror = () => token === this.previewToken && this.showPreview('fallback');
-		img.src = this.app.vault.adapter.getResourcePath(pair.file.path);
+		img.src = this.app.vault.getResourcePath(pair.file);
 		img.alt = pair.file.name;
 	}
 
@@ -689,7 +681,17 @@ export class MovePairsModal extends Modal {
 		this.selectTargetRow(target, true, true);
 	}
 
+	// The confirmation on 'Move all' quotes a count, so it has to be asked again
+	// whenever the user changes what would be moved.
+	private resetMoveAllConfirmation() {
+		if (!this.confirmedMoveAll) return;
+		this.confirmedMoveAll = false;
+		this.moveAllButtonEl?.setText('Move all attachments');
+		this.moveAllButtonEl?.removeClass('mod-warning');
+	}
+
 	private selectNextOrPreviousBeforeRemove(wrapper: HTMLElement) {
+		this.resetMoveAllConfirmation();
 		if (this.selectedRow !== wrapper) return;
 		const next = wrapper.nextElementSibling as HTMLElement | null;
 		if (next && next.classList.contains(ROW_CLASSNAME)) {
@@ -704,16 +706,15 @@ export class MovePairsModal extends Modal {
 		wrapper.dataset.destIndex = '0';
 		this.rowToPair.set(wrapper, pair);
 
-		const name = wrapper.createSpan({ cls: 'resort-pair-row-name', text: pair.file.name, title: pair.file.name });
+		wrapper.createSpan({ cls: 'resort-pair-row-name', text: pair.file.name, title: pair.file.name });
 		const destIndex = parseInt(wrapper.dataset.destIndex ?? '0');
 		const toText = pair.to[destIndex]?.attachFolder ?? "-";
 
-		const from = wrapper.createSpan({ cls: ['resort-pair-row-from', 'reverse-ellipsis'], text: pair.from, title: pair.from });
+		wrapper.createSpan({ cls: ['resort-pair-row-from', 'reverse-ellipsis'], text: pair.from, title: pair.from });
 		const arrow = wrapper.createSpan({ cls: 'rpr-arrow' })
 
-		let to: HTMLElement;
 		if (pair.to.length === 1) {
-			to = wrapper.createSpan({ cls: ['resort-pair-row-to', 'reverse-ellipsis'], text: toText, title: toText });
+			wrapper.createSpan({ cls: ['resort-pair-row-to', 'reverse-ellipsis'], text: toText, title: toText });
 		} else {
 			const select = wrapper.createEl('select', { cls: ['resort-pair-row-to', 'reverse-ellipsis'] });
 			for (let i = 0; i < pair.to.length; i++) {
@@ -728,7 +729,6 @@ export class MovePairsModal extends Modal {
 				wrapper.dataset.destIndex = select.value;
 				this.contentEl.focus();
 			});
-			to = select;
 		}
 
 		setIcon(arrow, 'arrow-right');
@@ -780,14 +780,7 @@ export class MovePairsModal extends Modal {
 	onOpen() {
 		const { contentEl, modalEl } = this;
 
-		modalEl.style.minWidth = '60ch';
-		modalEl.style.width = "max-content";
-		modalEl.style.maxWidth = '90vh';
-
-		modalEl.style.height = '100%';
-		modalEl.style.maxHeight = '60vh';
-
-		contentEl.style.height = '98%';
+		modalEl.addClass('resort-pairs-modal-el');
 		contentEl.tabIndex = -1;
 
 		const container = contentEl.createDiv({ cls: 'import-plugin resort-pairs-modal' });
@@ -809,26 +802,27 @@ export class MovePairsModal extends Modal {
 		const firstRow = scroller.querySelector(`.${ROW_CLASSNAME}`) as HTMLElement | null;
 		if (firstRow) this.selectTargetRow(firstRow);
 
-		this.docBody = contentEl.ownerDocument.body;
-		this.keydownHandler = (e: KeyboardEvent) => {
-			if (this.selectedRow == null) return;
-			if (e.key === "ArrowUp") {
-				e.preventDefault();
-				this.selectPreviousRow(this.selectedRow);
-			} else if (e.key === "ArrowDown") {
-				e.preventDefault();
-				this.selectNextRow(this.selectedRow);
-			} else if (e.key === "Delete") {
-				e.preventDefault();
-				(this.selectedRow.querySelector('.rpr-btn-dismiss') as HTMLButtonElement)?.click();
-			}
+		// Modal.scope is scoped to this modal and torn down with it, unlike a listener on
+		// document.body. It also leaves the <select> alone: while a destination dropdown
+		// has focus, the arrow keys change the selection and Delete does nothing.
+		const rowKeyHandler = (action: (row: HTMLElement) => void) => (evt: KeyboardEvent) => {
+			if (this.selectedRow === null) return;
+			if (evt.target instanceof HTMLSelectElement) return;
+			evt.preventDefault();
+			action(this.selectedRow);
 		};
-		this.docBody.addEventListener('keydown', this.keydownHandler);
+
+		this.scope.register([], 'ArrowUp', rowKeyHandler(row => this.selectPreviousRow(row)));
+		this.scope.register([], 'ArrowDown', rowKeyHandler(row => this.selectNextRow(row)));
+		this.scope.register([], 'Delete', rowKeyHandler(row => {
+			(row.querySelector('.rpr-btn-dismiss') as HTMLButtonElement)?.click();
+		}));
 
 		const yesButton = bottomBar.createEl('button', {
 			text: 'Move all attachments',
 			cls: 'mod-cta'
 		});
+		this.moveAllButtonEl = yesButton;
 		yesButton.addEventListener('click', async () => {
 			await this.handleMoveAll();
 		});
@@ -868,7 +862,18 @@ export class MovePairsModal extends Modal {
 			this.close();
 			return;
 		}
-		
+
+		// Moving is not undoable, so make the user confirm the size of what they asked for.
+		if (!this.confirmedMoveAll) {
+			this.confirmedMoveAll = true;
+			const button = this.moveAllButtonEl;
+			if (button) {
+				button.setText(`Confirm: move ${selections.length} attachment${selections.length > 1 ? 's' : ''}`);
+				button.addClass('mod-warning');
+				return;
+			}
+		}
+
 		try {
 			const count = await moveAttachmentPairs(this.plugin, selections);
 			if (count > 0) new Notice(`Successfully moved ${count} attachment${count > 1 ? 's' : ''}`);
@@ -884,12 +889,6 @@ export class MovePairsModal extends Modal {
 	onClose() {
 		// Ensure promise is resolved even if modal is closed via ESC/X button
 		this.resolve(false);
-		
-		if (this.keydownHandler && this.docBody) {
-			this.docBody.removeEventListener('keydown', this.keydownHandler);
-			this.keydownHandler = null;
-			this.docBody = null;
-		}
 		this.contentEl.empty();
 	}
 }
