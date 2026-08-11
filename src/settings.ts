@@ -22,7 +22,7 @@ import {
     isHotkeysSettingTab,
 } from './types';
 
-import { updateVisibilityAttachmentFolders } from 'patchFileExplorer';
+import { updateVisibilityAttachmentFolders } from 'hideAttachmentFolders';
 
 // Plugin settings tab
 export class ImportAttachmentsSettingTab extends PluginSettingTab {

@@ -1,7 +1,7 @@
 // types.ts
 
 import { DEFAULT_SETTINGS } from 'default';
-import { FileExplorerView, HotkeysSettingTab, WorkspaceLeaf } from 'obsidian';
+import { FileExplorerView, HotkeysSettingTab } from 'obsidian';
 
 export enum ImportActionType {
 	MOVE='MOVE',
@@ -195,20 +195,11 @@ export function isFileExplorerView(obj: unknown): obj is FileExplorerView {
         return false;
     }
 
-    if (!('fileBeingRenamed' in obj)) {
-        return false;
-    }
-
-    // Additional checks for specific properties if needed
-    // if (typeof fileExplorerView.createFolderDom !== 'function') {
-    //     return false;
-    // }
-    
-    // All checks passed, this is a FileExplorerView
+    // `fileItems` is the only thing we use, so it is the only thing worth requiring.
+    // This used to demand `fileBeingRenamed` as well, which nothing reads any more:
+    // the day Obsidian dropped it, folder hiding would have stopped altogether.
     return true;
 }
-
-export type FileExplorerViewConstructorType = { new(leaf: WorkspaceLeaf): FileExplorerView };
 
 /* Format version 1.3.0 */
 

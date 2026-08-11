@@ -50,7 +50,7 @@ import { patchOpenFile, unpatchOpenFile, addKeyListeners, removeKeyListeners } f
 import { callPromptForDeletion, patchFilemanager, unpatchFilemanager } from 'patchFileManager';
 
 import { patchImportFunctions, unpatchImportFunctions } from 'patchImportFunctions';
-import { patchFileExplorer, unpatchFileExplorer, updateVisibilityAttachmentFolders } from 'patchFileExplorer';
+import { updateVisibilityAttachmentFolders, revealAllAttachmentFolders } from 'hideAttachmentFolders';
 import { monkeyPatchConsole, unpatchConsole } from 'patchConsole';
 
 import { DEFAULT_SETTINGS, DEFAULT_SETTINGS_1_3_0 } from 'default';
@@ -95,6 +95,8 @@ export default class ImportAttachments extends Plugin {
         this.editor_rename_cb = this.editor_rename_cb.bind(this);
         this.context_menu_cb = this.context_menu_cb.bind(this);
         this.folder_created_cb = this.folder_created_cb.bind(this);
+        this.folder_renamed_cb = this.folder_renamed_cb.bind(this);
+        this.layout_change_cb = this.layout_change_cb.bind(this);
         this.note_created_cb = this.note_created_cb.bind(this);
         this.note_changed_cb = this.note_changed_cb.bind(this);
         this.metadata_resolved_cb = this.metadata_resolved_cb.bind(this);
@@ -253,8 +255,12 @@ export default class ImportAttachments extends Plugin {
 		patchFilemanager(this);
 
         this.app.workspace.onLayoutReady(() => {
-            // Monkey-path file explorer to hide attachment folders
-            patchFileExplorer(this);
+            // Hide attachment folders in the file explorer, and again whenever the
+            // layout changes, which covers an explorer opened after startup.
+            updateVisibilityAttachmentFolders(this);
+            this.registerEvent(
+                this.app.workspace.on('layout-change', this.layout_change_cb)
+            );
         });
 
 		// Commands for moving or copying files to the vault
@@ -297,10 +303,13 @@ export default class ImportAttachments extends Plugin {
 				this.app.metadataCache.on('resolved', this.metadata_resolved_cb)
 			);
 
-			// A newly created attachment folder is not picked up by the createFolderDom
-			// patch, so hide it here instead.
+			// Keep folder visibility in step with the vault: a folder can start or stop
+			// qualifying as an attachment folder by being created or renamed.
 			this.registerEvent(
 				this.app.vault.on('create', this.folder_created_cb)
+			);
+			this.registerEvent(
+				this.app.vault.on('rename', this.folder_renamed_cb)
 			);
 		});
 	   
@@ -436,7 +445,7 @@ export default class ImportAttachments extends Plugin {
 		unpatchImportFunctions();
 
 		// unpatch file-explorer plugin
-		unpatchFileExplorer();
+		revealAllAttachmentFolders(this);
 
 		// unpatch console
 		unpatchConsole();
@@ -1419,7 +1428,7 @@ export default class ImportAttachments extends Plugin {
 	async open_attachments_folder_cb() {
 
 		// // Monkey-path file explorer to hide attachment folders
-		// patchFileExplorer(this);
+		// updateVisibilityAttachmentFolders(this);
 		// return;
 
 		const md_active_file = this.app.workspace.getActiveFile();
@@ -1458,17 +1467,27 @@ export default class ImportAttachments extends Plugin {
         await modal.promise;
     }
 
-    // A folder has been created. The createFolderDom patch only fires for folders the
-    // file explorer builds from scratch, so an attachment folder created while Obsidian
-    // is running stays visible until the next restart — when the explorer is rebuilt and
-    // patchFileExplorer()'s own visibility pass catches it. Run that pass here instead.
+    // A file explorer may be opened long after startup, so sweep on layout changes.
+    layout_change_cb() {
+        updateVisibilityAttachmentFolders(this);
+    }
+
+    // A folder has been created. The explorer builds its item from this same event and
+    // the order the two handlers run in is not ours to choose, so defer the sweep by a
+    // tick to be sure the item exists.
     folder_created_cb(file: TAbstractFile) {
         if (!(file instanceof TFolder)) { return; }
         if (!this.settings.hideAttachmentFolders) { return; }
         if (!this.matchAttachmentFolder(file.path)) { return; }
 
-        // The file explorer builds its own item from this same event, and the order the
-        // two handlers run in is not ours to choose; defer so the item exists.
+        window.setTimeout(() => { updateVisibilityAttachmentFolders(this); }, 0);
+    }
+
+    // A rename can change whether a folder qualifies in either direction: a note renamed
+    // so that its attachment folder no longer matches must become visible again, which a
+    // one-way 'hide it' patch never did.
+    folder_renamed_cb(file: TAbstractFile) {
+        if (!(file instanceof TFolder)) { return; }
         window.setTimeout(() => { updateVisibilityAttachmentFolders(this); }, 0);
     }
 
