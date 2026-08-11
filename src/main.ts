@@ -94,6 +94,7 @@ export default class ImportAttachments extends Plugin {
         this.editor_rename_cb = this.editor_rename_cb.bind(this);
         this.context_menu_cb = this.context_menu_cb.bind(this);
         this.note_created_cb = this.note_created_cb.bind(this);
+        this.note_changed_cb = this.note_changed_cb.bind(this);
         this.metadata_resolved_cb = this.metadata_resolved_cb.bind(this);
         
 		// Store the path to the vault
@@ -277,12 +278,18 @@ export default class ImportAttachments extends Plugin {
 			this.app.vault.on('rename', this.editor_rename_cb)
 		);
 
-		// Repair a newly created note's attachments (issue #24). 'create' fires for
-		// every file while the vault is being indexed at startup, so the handler is
-		// registered only once the layout is ready and ignores anything queued before.
+		// Repair attachments left behind when text moves between notes (issue #24).
+		// 'changed' rather than 'create': 'extract selection' can target an existing
+		// note, 'merge file' always does, and a plain cut-and-paste creates nothing at
+		// all — but every one of them changes the receiving note's links. Registered
+		// inside onLayoutReady because both events fire freely while the vault is
+		// being indexed at startup.
 		this.app.workspace.onLayoutReady(() => {
 			this.registerEvent(
 				this.app.vault.on('create', this.note_created_cb)
+			);
+			this.registerEvent(
+				this.app.metadataCache.on('changed', this.note_changed_cb)
 			);
 			this.registerEvent(
 				this.app.metadataCache.on('resolved', this.metadata_resolved_cb)
@@ -1443,9 +1450,7 @@ export default class ImportAttachments extends Plugin {
         await modal.promise;
     }
 
-    // A note has just been created. Its metadata is not resolved yet, and neither is
-    // that of the note it may have been extracted from, so only remember it here and
-    // act once the cache has settled.
+    // A note has been created. Covers 'extract selection' when it targets a new note.
     note_created_cb(file: TAbstractFile) {
         if (!this.settings.moveStrayAttachmentsOnNoteCreation) { return; }
         if (!(file instanceof TFile)) { return; }
@@ -1453,16 +1458,28 @@ export default class ImportAttachments extends Plugin {
         this.notes_awaiting_stray_check.add(file.path);
     }
 
-    // Fired when the metadata cache has finished resolving everything it had queued.
-    // By this point both the new note and the note it was extracted from reflect their
-    // final link sets, so an attachment left behind can be identified reliably.
+    // An existing note's links have changed. Covers 'extract selection' into an
+    // existing note, 'merge file', and an ordinary cut-and-paste — none of which
+    // create anything, so none of which the 'create' event above would see.
+    //
+    // Only records the path: the note the text came from may not have been re-indexed
+    // yet, and until it has it still appears to reference the attachment, so nothing
+    // would look like a stray.
+    note_changed_cb(file: TFile) {
+        if (!this.settings.moveStrayAttachmentsOnNoteChange) { return; }
+        if (file.extension !== 'md' && file.extension !== 'canvas') { return; }
+        this.notes_awaiting_stray_check.add(file.path);
+    }
+
+    // Fired once the metadata cache has finished resolving everything it had queued,
+    // i.e. when both sides of the move reflect their final link sets.
     metadata_resolved_cb() {
         if (this.notes_awaiting_stray_check.size === 0) { return; }
 
         const pending = Array.from(this.notes_awaiting_stray_check);
         this.notes_awaiting_stray_check.clear();
 
-        if (!this.settings.moveStrayAttachmentsOnNoteCreation) { return; }
+        if (!this.settings.moveStrayAttachmentsOnNoteCreation && !this.settings.moveStrayAttachmentsOnNoteChange) { return; }
 
         for (const path of pending) {
             const note = this.app.vault.getAbstractFileByPath(path);

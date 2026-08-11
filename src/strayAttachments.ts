@@ -197,23 +197,51 @@ function destinationsFor(attachment: TFile, notes: DedupeFileList, maps: Referen
 }
 
 /**
+ * Could this note possibly have strays? Answered without building the reference maps,
+ * because this runs on every metadata change and the maps cost a pass over the vault.
+ *
+ * A stray must be an attachment sitting in a plugin-managed folder that is not this
+ * note's own. Ordinary editing references attachments already in the right place, so
+ * this rejects almost every call.
+ */
+function couldHaveStrays(plugin: ImportAttachments, note: TFile): boolean {
+	const cache = plugin.app.metadataCache.getFileCache(note);
+	if (!cache) { return false; }
+
+	const references = [
+		...(cache.links ?? []),
+		...(cache.frontmatterLinks ?? []),
+		...(cache.embeds ?? [])
+	];
+	if (references.length === 0) { return false; }
+
+	const ownFolder = plugin.getAttachmentFolderOfMdNote(parseFilePath(note.path));
+
+	for (const elem of references) {
+		const resolved = resolveLink(plugin.app, elem.link, note.path);
+		if (!resolved || NOTE_EXTENSIONS.has(resolved.extension.toLowerCase())) { continue; }
+
+		const parent = resolved.parent?.path;
+		if (parent === undefined || parent === ownFolder) { continue; }
+		if (plugin.matchAttachmentFolder(parent)) { return true; }
+	}
+
+	return false;
+}
+
+/**
  * Strays among the attachments referenced by one note.
  *
  * This is the second pass of findStrayAttachments() restricted to a single note, and
  * it applies exactly the same rules — an attachment already sitting in the folder of
  * any note that references it is not a stray, and only plugin-managed folders are
- * touched. Used to repair a note right after it is created, which is what 'extract
- * selection to new note' leaves behind (issue #24).
+ * touched. Used to repair a note as soon as text carrying attachment links lands in
+ * it, whether by 'extract selection', 'merge file' or an ordinary paste (issue #24).
  *
- * Returns an empty array cheaply when the note references no attachments at all.
+ * Returns an empty array cheaply when there is nothing that could possibly qualify.
  */
 export function findStrayAttachmentsOfNote(plugin: ImportAttachments, note: TFile): StrayAttachment[] {
-	const cache = plugin.app.metadataCache.getFileCache(note);
-	if (!cache) { return []; }
-	const hasReferences = (cache.links?.length ?? 0) > 0
-		|| (cache.embeds?.length ?? 0) > 0
-		|| (cache.frontmatterLinks?.length ?? 0) > 0;
-	if (!hasReferences) { return []; }
+	if (!couldHaveStrays(plugin, note)) { return []; }
 
 	const maps = buildReferenceMaps(plugin);
 	const referenced = maps.noteToAttachments.get(note.path);
