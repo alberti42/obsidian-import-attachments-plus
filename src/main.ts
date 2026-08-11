@@ -12,6 +12,7 @@ import {
 	PluginManifest,
 	normalizePath,
     Menu,
+    TFolder,
     TFile,
     MenuItem,
     EditorPosition,
@@ -49,7 +50,7 @@ import { patchOpenFile, unpatchOpenFile, addKeyListeners, removeKeyListeners } f
 import { callPromptForDeletion, patchFilemanager, unpatchFilemanager } from 'patchFileManager';
 
 import { patchImportFunctions, unpatchImportFunctions } from 'patchImportFunctions';
-import { patchFileExplorer, unpatchFileExplorer } from 'patchFileExplorer';
+import { patchFileExplorer, unpatchFileExplorer, updateVisibilityAttachmentFolders } from 'patchFileExplorer';
 import { monkeyPatchConsole, unpatchConsole } from 'patchConsole';
 
 import { DEFAULT_SETTINGS, DEFAULT_SETTINGS_1_3_0 } from 'default';
@@ -93,6 +94,7 @@ export default class ImportAttachments extends Plugin {
         this.editor_paste_cb = this.editor_paste_cb.bind(this);
         this.editor_rename_cb = this.editor_rename_cb.bind(this);
         this.context_menu_cb = this.context_menu_cb.bind(this);
+        this.folder_created_cb = this.folder_created_cb.bind(this);
         this.note_created_cb = this.note_created_cb.bind(this);
         this.note_changed_cb = this.note_changed_cb.bind(this);
         this.metadata_resolved_cb = this.metadata_resolved_cb.bind(this);
@@ -293,6 +295,12 @@ export default class ImportAttachments extends Plugin {
 			);
 			this.registerEvent(
 				this.app.metadataCache.on('resolved', this.metadata_resolved_cb)
+			);
+
+			// A newly created attachment folder is not picked up by the createFolderDom
+			// patch, so hide it here instead.
+			this.registerEvent(
+				this.app.vault.on('create', this.folder_created_cb)
 			);
 		});
 	   
@@ -1448,6 +1456,20 @@ export default class ImportAttachments extends Plugin {
         const modal = new StrayAttachmentsModal(this, pairs);
         modal.open();
         await modal.promise;
+    }
+
+    // A folder has been created. The createFolderDom patch only fires for folders the
+    // file explorer builds from scratch, so an attachment folder created while Obsidian
+    // is running stays visible until the next restart — when the explorer is rebuilt and
+    // patchFileExplorer()'s own visibility pass catches it. Run that pass here instead.
+    folder_created_cb(file: TAbstractFile) {
+        if (!(file instanceof TFolder)) { return; }
+        if (!this.settings.hideAttachmentFolders) { return; }
+        if (!this.matchAttachmentFolder(file.path)) { return; }
+
+        // The file explorer builds its own item from this same event, and the order the
+        // two handlers run in is not ours to choose; defer so the item exists.
+        window.setTimeout(() => { updateVisibilityAttachmentFolders(this); }, 0);
     }
 
     // A note has been created. Covers 'extract selection' when it targets a new note.
