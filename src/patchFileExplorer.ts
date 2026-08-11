@@ -1,7 +1,5 @@
 // patchImportFunctions.ts
 
-/* eslint-disable @typescript-eslint/no-inferrable-types */
-
 import { TFolder,WorkspaceLeaf, FileExplorerItem, View, FileExplorerView, requireApiVersion, TAbstractFile } from 'obsidian';
 import ImportAttachments from 'main';
 import { FileExplorerViewConstructorType, isFileExplorerView } from 'types';

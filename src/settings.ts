@@ -326,7 +326,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
 
         new Setting(containerEl).setName('Managing').setHeading();
 
-         const embedded_delete_menu_setting = new Setting(containerEl)
+        new Setting(containerEl)
             .setName('Show option in context menu of embedded images to delete them:')
             .setDesc("With this option enabled, when you right click on an embedded image in your note, an option 'Delete image' \
                 will be shown in the context menu.")
@@ -345,7 +345,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                 })
             });
 
-        const delete_menu_setting = new Setting(containerEl)
+        new Setting(containerEl)
             .setName('Show option in context menu to delete attachment files:')
             .setDesc("With this option enabled, when you right click on a Wikilink in your note, an 'Delete file' \
                 will be shown in the context menu.")
@@ -359,7 +359,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                 })
             });
             
-        const remove_wikilink_setting = new Setting(containerEl)
+        new Setting(containerEl)
             .setName('Remove Wikilink when deleting an attachment file:')
             .setDesc("With this option enabled, when you right click on a Wikilink or MarkDown link in your note to delete the attachment, \
                 not only the attachment will be deleted, but also the Wikilink or MarkDown link, respectively, will be removed from your note.")
@@ -513,7 +513,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
     }
 
     cleanUpAttachmentFolderSettings(): void {
-        let folderPath = normalizePath(this.plugin.settings.attachmentFolderPath).replace(/^(\.\/)*\.?/,'');  // map ./././path1/path2 to path1/path2
+        const folderPath = normalizePath(this.plugin.settings.attachmentFolderPath).replace(/^(\.\/)*\.?/,'');  // map ./././path1/path2 to path1/path2
 
         if(this.plugin.settings.attachmentFolderLocation === AttachmentFolderLocationType.FOLDER) {
             if(folderPath=='/') {

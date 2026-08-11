@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-inferrable-types */
 // ImportAttachmentsModal.ts
 import { App, Modal, Platform, TFolder, setIcon, Notice } from 'obsidian';
 import {

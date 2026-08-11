@@ -2,7 +2,7 @@
 import { promises as fs } from 'fs';  // This imports the promises API from fs
 import * as crypto from 'crypto';
 
-import { Vault, normalizePath, TAbstractFile, TFile, TFolder, Editor, FileExplorerView } from 'obsidian';
+import { Vault, normalizePath, TAbstractFile, TFile, TFolder } from 'obsidian';
 
 import { ParsedPath as ParsedFilePath, ParsedFolderPath } from 'types';
 import * as path from 'path';
@@ -140,7 +140,7 @@ export function findNewFilename(vault: Vault, destFilePath: string): string
 
 	let counter = 1;
 	let fileExists;
-	let newFilename = null;
+	let newFilename: string;
 	do {
 		newFilename=joinPaths(destFilePath_parse.dir,`${destFilePath_parse.filename} (${counter})${destFilePath_parse.ext}`);
 		fileExists = doesFileExist(vault,newFilename);
@@ -247,17 +247,17 @@ export async function filterOutFolders(filesArray: File[]) {
 }
 
 export async function createFolderIfNotExists(vault: Vault, folderPath: string) {
-	if(doesFolderExist(vault,folderPath)) return;
+	if(doesFolderExist(vault,folderPath)) { return; }
 
 	try {
 		await vault.createFolder(folderPath);
 	} catch (error) {
-		throw new Error(`Failed to create folder at ${folderPath}: ${error}`);
+		throw new Error(`Failed to create folder at ${folderPath}`, { cause: error });
 	}
 }
 
 export function mapSoftSet<K, V>(map: Map<K, V>, key: K, value: V) {
-	if (!map.has(key)) map.set(key, value);
+	if (!map.has(key)) { map.set(key, value); }
 }
 
 export function getAllFilesInFolder(folder: TFolder): TFile[] {

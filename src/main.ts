@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-inferrable-types */
-
 // Import necessary Obsidian API components
 import {
 	App,
@@ -581,7 +579,7 @@ export default class ImportAttachments extends Plugin {
             };
 
             // Regular expression to match Markdown image/external links
-            const regex = /\!?\[\[\s*(.*?)\s*(?:\|.*?)?\]\]|\!?\[.*?\]\(([^\s]+)\)/g;
+            const regex = /!?\[\[\s*(.*?)\s*(?:\|.*?)?\]\]|!?\[.*?\]\(([^\s]+)\)/g;
             let match;
 
             // Loop through all links in the line
@@ -691,7 +689,6 @@ export default class ImportAttachments extends Plugin {
 				const attachmentFolderPath = folderPath;
 
 				// Exclude folderPath and relativeLocation from oldSettings
-				// eslint-disable-next-line @typescript-eslint/no-unused-vars
 				const { folderPath: _, relativeLocation: __, linkFormat: ___, ...filteredOldSettings } = oldSettings;
 				
 				// Update the data with the new format
@@ -1019,12 +1016,16 @@ export default class ImportAttachments extends Plugin {
                 });
             }
 
-            // Using Electron's webFrameUtils to get the file path
+            // Using Electron's webFrameUtils to get the file path.
+            // `require` (rather than a static import) keeps electron out of the module
+            // graph, so this file stays loadable where electron is unavailable.
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
             const webUtils = require("electron").webUtils;
 
             let files_array;
 
             if(!webUtils) {
+                // eslint-disable-next-line @typescript-eslint/no-require-imports
                 const installer_version = require("electron").remote.app.getVersion();
                 console.warn(`webUtils not available with the current Obsidian installer version ${installer_version}. Please replace your installation of Obsidian with a fresh new installation.`);
             
@@ -1403,7 +1404,7 @@ export default class ImportAttachments extends Plugin {
 		const absAttachmentsFolderPath = Utils.joinPaths(this.vaultPath,attachmentsFolderPath);
 
 		// Open the folder in the system's default file explorer
-		// eslint-disable-next-line @typescript-eslint/no-var-requires
+		// eslint-disable-next-line @typescript-eslint/no-require-imports
 		require('electron').remote.shell.openPath(Utils.makePosixPathOScompatible(absAttachmentsFolderPath));
 	}
 

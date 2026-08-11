@@ -1,7 +1,5 @@
 // patchImportFunctions.ts
 
-/* eslint-disable @typescript-eslint/no-inferrable-types */
-
 import { App, Vault, TFile } from 'obsidian';
 import ImportAttachments from 'main';
 
