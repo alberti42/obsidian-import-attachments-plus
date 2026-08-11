@@ -7,9 +7,9 @@ import {
     Platform,
     TextComponent,
     normalizePath,
-} from "obsidian";
+} from 'obsidian';
 
-import ImportAttachments from "main"
+import ImportAttachments from 'main'
 
 import {
     ImportActionType,
@@ -22,7 +22,7 @@ import {
     isHotkeysSettingTab,
 } from './types';
 
-import { updateVisibilityAttachmentFolders } from "patchFileExplorer";
+import { updateVisibilityAttachmentFolders } from 'patchFileExplorer';
 
 // Plugin settings tab
 export class ImportAttachmentsSettingTab extends PluginSettingTab {
@@ -72,7 +72,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                         .onChange(async (value: string) => {
                             if (value in ImportActionType) {
                                 this.plugin.settings.actionDroppedFilesOnImport = value as ImportActionType;
-                                if (value != ImportActionType.ASK_USER) {
+                                if (value !== ImportActionType.ASK_USER) {
                                     this.plugin.settings.lastActionDroppedFilesOnImport = value as ImportActionType;
                                 }
                                 this.debouncedSaveSettings();
@@ -93,7 +93,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                         .onChange(async (value: string) => {
                             if (value in ImportActionType) {
                                 this.plugin.settings.actionPastedFilesOnImport = value as ImportActionType;
-                                if (value != ImportActionType.ASK_USER) {
+                                if (value !== ImportActionType.ASK_USER) {
                                     this.plugin.settings.lastActionPastedFilesOnImport = value as ImportActionType;
                                 }
                                 this.debouncedSaveSettings();
@@ -114,7 +114,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                         .onChange(async (value: string) => {
                             if (Object.values(YesNoTypes).includes(value as YesNoTypes)) {
                                 this.plugin.settings.embedFilesOnImport = value as YesNoTypes;
-                                if (value != YesNoTypes.ASK_USER) {
+                                if (value !== YesNoTypes.ASK_USER) {
                                     this.plugin.settings.lastEmbedFilesOnImport = value as YesNoTypes;
                                 }
                                 this.debouncedSaveSettings();
@@ -186,14 +186,14 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                     this.addWarningGeneralSettings(frag);
                 }));
             wikilinksSetting.addToggle(toggle => {
-                const useMarkdownLinks = this.app.vault.getConfig("useMarkdownLinks");
+                const useMarkdownLinks = this.app.vault.getConfig('useMarkdownLinks');
                 if (!isBoolean(useMarkdownLinks)) {
                     wikilinksSetting.settingEl.remove();
                     return;
                 }
                 toggle.setValue(!useMarkdownLinks)
                     .onChange(async (value: boolean) => {
-                        this.app.vault.setConfig("useMarkdownLinks", !value);
+                        this.app.vault.setConfig('useMarkdownLinks', !value);
                     });
             });
         
@@ -205,7 +205,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                     this.addWarningGeneralSettings(frag);
                 }))
             newLinkFormatSetting.addDropdown(dropdown => {
-                const newLinkFormat = this.app.vault.getConfig("newLinkFormat");
+                const newLinkFormat = this.app.vault.getConfig('newLinkFormat');
                 if (!isLinkType(newLinkFormat)) {
                     newLinkFormatSetting.settingEl.remove();
                     return;
@@ -217,7 +217,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                 dropdown.setValue(newLinkFormat)
                     .onChange(async (value: string) => {
                         if (isLinkType(value)) {
-                            this.app.vault.setConfig("newLinkFormat", value);
+                            this.app.vault.setConfig('newLinkFormat', value);
                         } else {
                             console.error('Invalid option selection:', value);
                         }
@@ -273,7 +273,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                 });
 
             // Initially set the visibility based on the current setting
-            external_exclude_ext.settingEl.style.display = this.plugin.settings.openAttachmentExternal ? "" : "none";
+            external_exclude_ext.settingEl.style.display = this.plugin.settings.openAttachmentExternal ? '' : 'none';
 
             external_toggle.addToggle(toggle => toggle
                 .setValue(this.plugin.settings.openAttachmentExternal)
@@ -281,7 +281,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                     // Hide external_exclude_ext if the toggle is off
                     this.plugin.settings.openAttachmentExternal = value;
                     this.debouncedSaveSettings();
-                    external_exclude_ext.settingEl.style.display = value ? "" : "none";
+                    external_exclude_ext.settingEl.style.display = value ? '' : 'none';
                 }));
 
             if (Platform.isMacOS) {
@@ -312,7 +312,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                 });
 
             // Initially set the visibility based on the current setting
-            reveal_exclude_ext.settingEl.style.display = this.plugin.settings.revealAttachment ? "" : "none";
+            reveal_exclude_ext.settingEl.style.display = this.plugin.settings.revealAttachment ? '' : 'none';
 
             reveal_toggle.addToggle(toggle => toggle
                 .setValue(this.plugin.settings.revealAttachment)
@@ -320,13 +320,13 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                     // Hide reveal_exclude_ext if the toggle is off
                     this.plugin.settings.revealAttachment = value;
                     this.debouncedSaveSettings();
-                    reveal_exclude_ext.settingEl.style.display = value ? "" : "none"; 
+                    reveal_exclude_ext.settingEl.style.display = value ? '' : 'none'; 
                 }));
         }
 
         new Setting(containerEl).setName('Managing').setHeading();
 
-         const embedded_delete_menu_setting = new Setting(containerEl)
+        new Setting(containerEl)
             .setName('Show option in context menu of embedded images to delete them:')
             .setDesc("With this option enabled, when you right click on an embedded image in your note, an option 'Delete image' \
                 will be shown in the context menu.")
@@ -336,16 +336,16 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                 .onChange(async (value: boolean) => {
                     this.plugin.settings.showDeleteMenuForEmbedded = value;
                     if(value) {
-                        this.plugin.addDeleteMenuForEmbeddedImages("all");   
+                        this.plugin.addDeleteMenuForEmbeddedImages('all');   
                     } else {
-                        this.plugin.removeDeleteMenuForEmbeddedImages("all");
+                        this.plugin.removeDeleteMenuForEmbeddedImages('all');
                     }
                     
                     this.debouncedSaveSettings();
                 })
             });
 
-        const delete_menu_setting = new Setting(containerEl)
+        new Setting(containerEl)
             .setName('Show option in context menu to delete attachment files:')
             .setDesc("With this option enabled, when you right click on a Wikilink in your note, an 'Delete file' \
                 will be shown in the context menu.")
@@ -359,10 +359,10 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                 })
             });
             
-        const remove_wikilink_setting = new Setting(containerEl)
+        new Setting(containerEl)
             .setName('Remove Wikilink when deleting an attachment file:')
-            .setDesc("With this option enabled, when you right click on a Wikilink or MarkDown link in your note to delete the attachment, \
-                not only the attachment will be deleted, but also the Wikilink or MarkDown link, respectively, will be removed from your note.")
+            .setDesc('With this option enabled, when you right click on a Wikilink or MarkDown link in your note to delete the attachment, \
+                not only the attachment will be deleted, but also the Wikilink or MarkDown link, respectively, will be removed from your note.')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.removeWikilinkOnFileDeletion)
                 .onChange(async (value: boolean) => {
@@ -383,12 +383,30 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName('Automatically remove attachment folders when empty:')
-            .setDesc("With this option enabled, after deleting an attachment, the plugin will check if the attachments folder \
-                is now empty, and if it is, it will delete the attachments folder as well.")
+            .setDesc('With this option enabled, whenever an attachment folder is left empty — after deleting an \
+                attachment, or after its contents were moved elsewhere — the folder itself is removed as well. \
+                An empty folder is removed without asking, since there is nothing in it to lose; it goes to the \
+                trash, according to your Obsidian deletion preference.')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.deleteAttachmentFolderWhenEmpty)
                 .onChange(async (value: boolean) => {
                     this.plugin.settings.deleteAttachmentFolderWhenEmpty = value;
+                    this.debouncedSaveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('Let attachments follow the text that uses them:')
+            .setDesc('With this option enabled, when text containing attachment links is moved into another note — \
+                by extracting a selection, merging notes, or an ordinary cut-and-paste — the attachments are moved \
+                into that note’s attachment folder instead of being left behind. The same rules as the \
+                "Move stray attachments" command apply: only folders managed by this plugin are touched, and an \
+                attachment still used by the note it is filed under stays where it is. Because this reacts to any \
+                edit that adds such a link, an attachment can move a moment after you type one by hand. Leave it \
+                off to run the "Move stray attachments" command yourself instead.')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.moveStrayAttachmentsAutomatically)
+                .onChange(async (value: boolean) => {
+                    this.plugin.settings.moveStrayAttachmentsAutomatically = value;
                     this.debouncedSaveSettings();
                 }));
 
@@ -416,8 +434,9 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName('Ask confirmation before deleting the attachment folder:')
-            .setDesc('If enabled, the user is asked each time whether to delete the attachment folder.')
+            .setName('Ask confirmation before deleting a non-empty attachment folder:')
+            .setDesc('If enabled, you are asked before an attachment folder that still contains files is deleted. \
+                Empty folders are never asked about — see the option above.')
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.confirmDeleteAttachmentFolder)
                 .onChange(async (value: boolean) => {
@@ -461,7 +480,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                     text.setPlaceholder('Enter attachment name');
                     text.setValue(this.plugin.settings.attachmentName);
                     text.onChange(async (value: string) => {
-                        if (value.trim() == '') {
+                        if (value.trim() === '') {
                             value = '${original}'; // TODO: improve checking the input by the user that it is not empty
                         }
                         this.plugin.settings.attachmentName = value;
@@ -494,8 +513,8 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
             new Setting(containerEl).setName('Commands and hotkeys').setHeading();
 
             new Setting(containerEl).setName(createFragment((frag:DocumentFragment) => {
-                    frag.appendText("The plugin offers a range of commands to import attachments as well. \
-                        You can review the commands and customize them with hotkeys by visiting the ");
+                    frag.appendText('The plugin offers a range of commands to import attachments as well. \
+                        You can review the commands and customize them with hotkeys by visiting the ');
                     const em = createEl('em');
                     const link = frag.createEl('a', { href: '#', text: 'Hotkeys'});
                     link.onclick = () => {
@@ -513,16 +532,16 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
     }
 
     cleanUpAttachmentFolderSettings(): void {
-        let folderPath = normalizePath(this.plugin.settings.attachmentFolderPath).replace(/^(\.\/)*\.?/,'');  // map ./././path1/path2 to path1/path2
+        const folderPath = normalizePath(this.plugin.settings.attachmentFolderPath).replace(/^(\.\/)*\.?/,'');  // map ./././path1/path2 to path1/path2
 
         if(this.plugin.settings.attachmentFolderLocation === AttachmentFolderLocationType.FOLDER) {
-            if(folderPath=='/') {
+            if(folderPath==='/') {
                 this.plugin.settings.attachmentFolderLocation = AttachmentFolderLocationType.ROOT;
             }
         }
 
         if(this.plugin.settings.attachmentFolderLocation === AttachmentFolderLocationType.SUBFOLDER) {
-            if(folderPath=='/') {
+            if(folderPath==='/') {
                 this.plugin.settings.attachmentFolderLocation = AttachmentFolderLocationType.CURRENT;
             }
         }
@@ -604,7 +623,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
 
     addWarningGeneralSettings(frag: DocumentFragment): HTMLElement {
         // Create the warning span
-        const warning = frag.createSpan({text: 'Be aware that this setting is a mirror of the corresponding setting in the vault preference pane ', cls: "mod-warning" });
+        const warning = frag.createSpan({text: 'Be aware that this setting is a mirror of the corresponding setting in the vault preference pane ', cls: 'mod-warning' });
         
         // Create the link
         const link = warning.createEl('a', { text: 'Files and links', href: '#' });

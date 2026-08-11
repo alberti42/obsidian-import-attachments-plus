@@ -1,7 +1,7 @@
 // types.ts
 
-import { DEFAULT_SETTINGS } from "default";
-import { FileExplorerView, HotkeysSettingTab, WorkspaceLeaf } from "obsidian";
+import { DEFAULT_SETTINGS } from 'default';
+import { FileExplorerView, HotkeysSettingTab, WorkspaceLeaf } from 'obsidian';
 
 export enum ImportActionType {
 	MOVE='MOVE',
@@ -33,9 +33,9 @@ export enum RelativeLocation {
 }
 
 export const MediaLabels = {
-    IMG: "image file",
-    AUDIO: "audio file",
-    VIDEO: "video file",
+    IMG: 'image file',
+    AUDIO: 'audio file',
+    VIDEO: 'video file',
 } as const;
 
 export type SupportedMediaTag = keyof typeof MediaLabels;
@@ -63,6 +63,7 @@ export interface ImportAttachmentsSettings {
 	autoRenameAttachmentFolder: boolean;
 	autoDeleteAttachmentFolder: boolean;
     deleteAttachmentFolderWhenEmpty: boolean;
+    moveStrayAttachmentsAutomatically: boolean;
     showDeleteMenu: boolean;
     showDeleteMenuForEmbedded: boolean;
     removeWikilinkOnFileDeletion: boolean;

@@ -1,7 +1,5 @@
 // patchImportFunctions.ts
 
-/* eslint-disable @typescript-eslint/no-inferrable-types */
-
 import { App, Vault, TFile } from 'obsidian';
 import ImportAttachments from 'main';
 
@@ -33,14 +31,14 @@ function patchImportFunctions(plugin: ImportAttachments) {
 	// Monkey patch the getAvailablePathForAttachments method
 	Vault.prototype.getAvailablePathForAttachments = async function patchedGetAvailablePathForAttachments(fileName: string, extension: string, currentFile: TFile | null): Promise<string> {
 		if (!originalGetAvailablePathForAttachments) {
-			throw new Error("Could not execute the original getAvailablePathForAttachments function.");
+			throw new Error('Could not execute the original getAvailablePathForAttachments function.');
 		}
 
-		if(!data) throw new Error("The variable data is unexpectedly null.")
+		if(!data) {throw new Error('The variable data is unexpectedly null.')}
 		
 		const currentFile_parsed = currentFile ? parseFilePath(currentFile.path) : undefined;
 		
-		return await plugin.createAttachmentName(fileName + "." + extension,data,currentFile_parsed);
+		return await plugin.createAttachmentName(fileName + '.' + extension,data,currentFile_parsed);
 	};
 
 	if (!originalSaveAttachment) {
@@ -50,7 +48,7 @@ function patchImportFunctions(plugin: ImportAttachments) {
 	// Function to save an attachment
 	App.prototype.saveAttachment = async function patchedSaveAttachment(fileName: string, fileExtension: string, fileData: ArrayBuffer): Promise<TFile> {
 		if (!originalSaveAttachment) {
-			throw new Error("Could not execute the original saveAttachment function.");
+			throw new Error('Could not execute the original saveAttachment function.');
 		}
 
 		// Save `data` in the module variable. This allows getAvailablePathForAttachments, which is called from `originalsaveAttachment`, to use `data`

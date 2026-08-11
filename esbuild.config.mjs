@@ -1,7 +1,7 @@
 import esbuild from "esbuild";
 import process from "process";
+import { copyFile } from "fs/promises";
 import builtins from "builtin-modules";
-import copy from 'esbuild-plugin-copy';
 
 // Banner message for the generated/bundled files
 const banner = `
@@ -17,11 +17,25 @@ const prod = (process.argv[2] === "production");
 // Get the output directory
 const outdir = 'dist';
 
+// manifest.json is not part of the bundle graph, so copy it after every build.
+const copyManifest = {
+	name: 'copy-manifest',
+	setup(build) {
+		build.onEnd(() => copyFile('manifest.json', `${outdir}/manifest.json`));
+	},
+};
+
 const context = await esbuild.context({
 	banner: {
 		js: banner,
 	},
-	entryPoints: ["src/main.ts"],
+	// styles.css is a second entry point (rather than a copied asset) so that
+	// `npm run dev` watches and rebuilds it too. The object form names the outputs,
+	// keeping the results flat in dist/ instead of mirroring src/ and styles/.
+	entryPoints: {
+		main: "src/main.ts",
+		styles: "styles/styles.css"
+	},
 	bundle: true,
 	external: [
 		"obsidian",
@@ -52,20 +66,7 @@ const context = await esbuild.context({
 	},
 	minify: prod,
 	treeShaking: prod,
-	plugins: [
-		copy({
-			assets: {
-				from: ['./manifest.json'],
-				to: ['./manifest.json']
-			}
-		}),
-		copy({
-			assets: {
-				from: ['./styles/styles.css'],
-				to: ['./styles.css']
-			}
-		})
-	],
+	plugins: [copyManifest],
 });
 
 // Rebuild or watch based on the mode

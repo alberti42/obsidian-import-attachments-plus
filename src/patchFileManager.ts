@@ -1,14 +1,12 @@
 // patchFileManager.ts
 
-/* eslint-disable @typescript-eslint/no-inferrable-types */
-
 import { FileManager, TAbstractFile, Notice, TFolder } from 'obsidian';
 import ImportAttachments from 'main';
 import * as Utils from 'utils';
 import { DeleteAttachmentFolderModal } from './ImportAttachmentsModal';
 
 // Save a reference to the original method for the monkey patch
-let originalPromptForDeletion: ((file: TAbstractFile) => Promise<void>) | null = null;
+let originalPromptForDeletion: ((file: TAbstractFile) => Promise<boolean>) | null = null;
 let plugin:ImportAttachments;
 let fileManager: FileManager;
 let modalResolvePromise: ((wasDeleted: boolean) => void) | null;
@@ -31,8 +29,8 @@ function patchFilemanager(p: ImportAttachments) {
     FileManager.prototype.promptForDeletion = patchedPromptForDeletion.bind(fileManager);
 }
 
-async function patchedPromptForDeletion(this: FileManager, file: TAbstractFile): Promise<void> {
-    await modifiedPromptForDeletion.call(this,file);
+async function patchedPromptForDeletion(this: FileManager, file: TAbstractFile): Promise<boolean> {
+    return await modifiedPromptForDeletion.call(this,file);
 }
 
 async function modifiedPromptForDeletion(this: FileManager, file: TAbstractFile): Promise<boolean> {
@@ -48,14 +46,15 @@ async function modifiedPromptForDeletion(this: FileManager, file: TAbstractFile)
             // In order to avoid deleting common attachment folders, shared between multiple notes
             if (plugin.settings.attachmentFolderPath.includes('${notename}')) {
                 const file_parsed = Utils.parseFilePath(file.path);
-                if (file_parsed.ext === ".md" || file_parsed.ext === ".canvas") {
+                if (file_parsed.ext === '.md' || file_parsed.ext === '.canvas') {
                     const attachmentFolder = plugin.app.vault.getAbstractFileByPath(plugin.getAttachmentFolderOfMdNote(file_parsed));
                     if(attachmentFolder instanceof TFolder) {
-                        const postDescription_text = attachmentFolder.children.length > 0 ?
-                            `Note that the folder associated with the MarkDown note you have \
-                                just deleted is not empty and still contains ${attachmentFolder.children.length} files.` 
-                            : "The attachment folder is empty, and it should be safe to delete it.";
-                        const postDescription = createEl('p', {text:postDescription_text});
+                        // Only the non-empty case is ever shown; an empty folder is
+                        // removed without asking.
+                        const postDescription = attachmentFolder.children.length > 0
+                            ? createEl('p', {text: `Note that the folder associated with the MarkDown note you have \
+                                just deleted is not empty and still contains ${attachmentFolder.children.length} files.`})
+                            : undefined;
                         await deleteAttachmentFolderAssociatedWithMdFile(plugin, attachmentFolder, undefined, postDescription);
                     }
                     
@@ -67,10 +66,7 @@ async function modifiedPromptForDeletion(this: FileManager, file: TAbstractFile)
             if(parent) {
                 if(plugin.matchAttachmentFolder(parent.path)){ // of the type of an attachment folder
                     if(parent.children.length===0) { // attachment folder is empty
-                        // const recursive = true;
-                        // plugin.app.vault.delete(parent,recursive);
-                        const postDescription = createEl('p',{text: "The attachment folder is now empty, and it should be safe to delete it."});
-                        await deleteAttachmentFolderAssociatedWithMdFile(plugin, parent, undefined, postDescription);
+                        await deleteAttachmentFolderAssociatedWithMdFile(plugin, parent);
                     }
                 }
             }
@@ -82,11 +78,16 @@ async function modifiedPromptForDeletion(this: FileManager, file: TAbstractFile)
 
 async function deleteAttachmentFolderAssociatedWithMdFile(plugin: ImportAttachments, attachmentFolder: TFolder, preDescription?:HTMLElement, postDescription?:HTMLElement) {
 
-	if(plugin.settings.confirmDeleteAttachmentFolder) {
+	// An empty attachment folder is removed without asking: there is nothing in it to
+	// lose, and 'deleteAttachmentFolderWhenEmpty' is already the user's answer to that
+	// question. Confirmation is reserved for a folder that still holds files.
+	const isEmpty = attachmentFolder.children.length === 0;
+
+	if(!isEmpty && plugin.settings.confirmDeleteAttachmentFolder) {
 		const modal = new DeleteAttachmentFolderModal(plugin, attachmentFolder, preDescription, postDescription);
 		modal.open();
 		const choice = await modal.promise;
-		if (!choice) return;
+		if (!choice) {return;}
 	}
 
 	const filePathForDeletion = attachmentFolder;
@@ -95,14 +96,14 @@ async function deleteAttachmentFolderAssociatedWithMdFile(plugin: ImportAttachme
 		await plugin.trashFile(filePathForDeletion);
 	} catch (error: unknown) {
 		const msg = 'Failed to remove the attachment folder';
-		console.error(msg + ":", filePathForDeletion);
-		console.error("Error msg:", error);
+		console.error(msg + ':', filePathForDeletion);
+		console.error('Error msg:', error);
 		new Notice(msg + '.');
 	}
 }
 
 async function callOriginalPromptForDeletion(this:FileManager, file:TAbstractFile):Promise<boolean> {
-    if (!originalPromptForDeletion) return false;
+    if (!originalPromptForDeletion) {return false;}
 
     // Create a new promise and store the resolve and reject functions
     const registeredUserDecisionPromise = new Promise<boolean>((resolve, reject) => {
