@@ -253,6 +253,7 @@ export default class ImportAttachments extends Plugin {
 		if (Platform.isDesktopApp) {
 			this.addCommands();
 		}
+		this.addPlatformIndependentCommands();
 
 		// Register event handlers for drag-and-drop and paste events
 		if (Platform.isDesktopApp) {
@@ -379,6 +380,11 @@ export default class ImportAttachments extends Plugin {
             callback: () => this.open_attachments_folder_cb(),
         });
 
+    }
+
+    // Commands that rely only on the vault and the metadata cache, and therefore
+    // work on mobile as well (manifest.json declares isDesktopOnly: false).
+    addPlatformIndependentCommands() {
         this.addCommand({
             id: "resort-attachments",
             name: "Resort attachments into appropriate folders",

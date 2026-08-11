@@ -169,6 +169,13 @@ export function getAttachmentResortPairs(plugin: ImportAttachments) {
 
 	const record = (attachment: TFile, alternatives: AttachFolder[]) => {
 		if (alternatives.length === 0 || processedAttachments.has(attachment.path)) { return; }
+
+		// Only reorganise folders this plugin manages. A hand-curated shared folder
+		// ('assets/', 'Media/', ...) is the user's own filing system, and reporting it
+		// as misplaced on every run would make the command unusable for them.
+		const parent = attachment.parent?.path;
+		if (parent === undefined || !plugin.matchAttachmentFolder(parent)) { return; }
+
 		processedAttachments.add(attachment.path);
 		attachmentResortPairs.push({
 			file: attachment,
