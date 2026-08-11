@@ -196,65 +196,92 @@ function destinationsFor(attachment: TFile, notes: DedupeFileList, maps: Referen
 	return candidates;
 }
 
+/** The attachments this note currently resolves to, as vault paths. */
+function referencedAttachments(plugin: ImportAttachments, note: TFile): Set<string> {
+	const cache = plugin.app.metadataCache.getFileCache(note);
+	const paths = new Set<string>();
+	if (!cache) { return paths; }
+
+	for (const elem of [...(cache.links ?? []), ...(cache.frontmatterLinks ?? []), ...(cache.embeds ?? [])]) {
+		const resolved = resolveLink(plugin.app, elem.link, note.path);
+		if (!resolved || NOTE_EXTENSIONS.has(resolved.extension.toLowerCase())) { continue; }
+		paths.add(resolved.path);
+	}
+	return paths;
+}
+
 /**
  * Could this note possibly have strays? Answered without building the reference maps,
  * because this runs on every metadata change and the maps cost a pass over the vault.
  *
- * A stray must be an attachment sitting in a plugin-managed folder that is not this
- * note's own. Ordinary editing references attachments already in the right place, so
- * this rejects almost every call.
+ * Two ways a note can be involved in a move, corresponding to the two passes below:
+ * it can have received text (it references an attachment filed elsewhere), or it can
+ * have given text away (its own folder holds an attachment it no longer references).
+ *
+ * Ordinary editing is neither, so this rejects almost every call.
  */
-function couldHaveStrays(plugin: ImportAttachments, note: TFile): boolean {
-	const cache = plugin.app.metadataCache.getFileCache(note);
-	if (!cache) { return false; }
-
-	const references = [
-		...(cache.links ?? []),
-		...(cache.frontmatterLinks ?? []),
-		...(cache.embeds ?? [])
-	];
-	if (references.length === 0) { return false; }
-
-	const ownFolder = plugin.getAttachmentFolderOfMdNote(parseFilePath(note.path));
-
-	for (const elem of references) {
-		const resolved = resolveLink(plugin.app, elem.link, note.path);
-		if (!resolved || NOTE_EXTENSIONS.has(resolved.extension.toLowerCase())) { continue; }
-
-		const parent = resolved.parent?.path;
+function couldHaveStrays(plugin: ImportAttachments, ownFolder: string, referenced: Set<string>): boolean {
+	// Received: something it points at lives in another managed folder.
+	for (const path of referenced) {
+		const parent = plugin.app.vault.getAbstractFileByPath(path)?.parent?.path;
 		if (parent === undefined || parent === ownFolder) { continue; }
 		if (plugin.matchAttachmentFolder(parent)) { return true; }
+	}
+
+	// Gave away: its own folder holds something it no longer points at.
+	const folder = plugin.app.vault.getAbstractFileByPath(ownFolder);
+	if (folder instanceof TFolder) {
+		for (const child of folder.children) {
+			if (child instanceof TFile && !referenced.has(child.path)) { return true; }
+		}
 	}
 
 	return false;
 }
 
 /**
- * Strays among the attachments referenced by one note.
+ * Strays connected to one note, from either side of a move.
  *
- * This is the second pass of findStrayAttachments() restricted to a single note, and
- * it applies exactly the same rules — an attachment already sitting in the folder of
- * any note that references it is not a stray, and only plugin-managed folders are
- * touched. Used to repair a note as soon as text carrying attachment links lands in
- * it, whether by 'extract selection', 'merge file' or an ordinary paste (issue #24).
+ * findStrayAttachments() restricted to a single note, applying exactly the same rules:
+ * an attachment already sitting in the folder of any note that references it is not a
+ * stray, and only plugin-managed folders are touched.
+ *
+ * Both directions have to be checked, because which note is re-indexed first is not
+ * ours to control. Cut-and-paste updates the source first, so by the time the receiving
+ * note resolves the attachment already looks stray. 'Extract selection' into an existing
+ * note writes the target first: at that point the source still references the
+ * attachment, so nothing looks stray, and the source's own change resolves a moment
+ * later. Checking only the receiving side made that case silently do nothing.
  *
  * Returns an empty array cheaply when there is nothing that could possibly qualify.
  */
 export function findStrayAttachmentsOfNote(plugin: ImportAttachments, note: TFile): StrayAttachment[] {
-	if (!couldHaveStrays(plugin, note)) { return []; }
+	const ownFolder = plugin.getAttachmentFolderOfMdNote(parseFilePath(note.path));
+	const referenced = referencedAttachments(plugin, note);
+
+	if (!couldHaveStrays(plugin, ownFolder, referenced)) { return []; }
 
 	const maps = buildReferenceMaps(plugin);
-	const referenced = maps.noteToAttachments.get(note.path);
-	if (!referenced) { return []; }
-
 	const strays: StrayAttachment[] = [];
 	const record = makeRecorder(plugin, maps, strays);
 
-	for (const link of referenced.list.values()) {
-		const attachment = link.resolvedDest;
+	const consider = (attachment: TFile) => {
 		const notes = maps.attachmentToNotes.get(attachment.path);
-		if (!notes) { continue; }
+		if (!notes) { return; }
 		record(attachment, destinationsFor(attachment, notes, maps));
+	};
+
+	// Received text: attachments this note points at that are filed under another note.
+	for (const link of maps.noteToAttachments.get(note.path)?.list.values() ?? []) {
+		consider(link.resolvedDest);
+	}
+
+	// Gave text away: attachments in this note's own folder that it no longer points at.
+	const folder = plugin.app.vault.getAbstractFileByPath(ownFolder);
+	if (folder instanceof TFolder) {
+		for (const child of folder.children) {
+			if (child instanceof TFile && !referenced.has(child.path)) { consider(child); }
+		}
 	}
 
 	return strays;
