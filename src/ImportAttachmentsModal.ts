@@ -750,9 +750,9 @@ export class StrayAttachmentsModal extends Modal {
 	}
 
 	/**
-	 * Open a note in a new tab, scrolled to `line` when one is known. The modal is left
-	 * open on purpose: dismissing rows is work the user would otherwise lose, and the
-	 * tab is waiting once they close it.
+	 * Open a note in a new tab, scrolled to `line` when one is known, and close the
+	 * modal so the note is actually visible — a modal covering the note it just opened
+	 * would defeat the point. Nothing is lost: re-running the command rebuilds the list.
 	 */
 	private openNote(note: TFile, line?: number) {
 		const eState = line === undefined ? undefined : { line };
@@ -761,6 +761,7 @@ export class StrayAttachmentsModal extends Modal {
 				console.error('Failed to open note', note.path, error);
 				new Notice(`Could not open ${note.basename}`);
 			});
+		this.close();
 	}
 
 	private renderRow(parent: HTMLElement, stray: StrayAttachment) {
@@ -780,7 +781,7 @@ export class StrayAttachmentsModal extends Modal {
 			stray.fromNote,
 			undefined,
 			stray.fromNote
-				? `Open ${stray.fromNote.basename} — the note this attachment was filed under`
+				? `Open ${stray.fromNote.basename} — the note this attachment was filed under (closes this dialog)`
 				: stray.from
 		);
 
@@ -794,7 +795,7 @@ export class StrayAttachmentsModal extends Modal {
 				toText,
 				dest?.note,
 				dest?.line,
-				dest ? `Open ${dest.note.basename} at the first use of this attachment` : toText
+				dest ? `Open ${dest.note.basename} at the first use of this attachment (closes this dialog)` : toText
 			);
 		} else {
 			const select = wrapper.createEl('select', { cls: ['stray-attachment-row-to', 'reverse-ellipsis'] });
@@ -815,7 +816,7 @@ export class StrayAttachmentsModal extends Modal {
 			// destination is a button beside it.
 			const openButton = wrapper.createEl('button', {
 				cls: ['clickable-icon', 'stray-attachment-row-btn', 'stray-attachment-open'],
-				attr: { 'aria-label': 'Open the selected note at the first use of this attachment' }
+				attr: { 'aria-label': 'Open the selected note at the first use of this attachment (closes this dialog)' }
 			});
 			setIcon(openButton, 'square-arrow-out-up-right');
 			openButton.addEventListener('click', (e) => {
@@ -890,7 +891,9 @@ export class StrayAttachmentsModal extends Modal {
 			Only folders managed by this plugin are considered, and an attachment already sitting in the folder of any \
 			note that references it is left alone. Links are updated automatically.' })
 		header.createEl('p', { text: 'Select a row — by clicking it or with the ↑ and ↓ keys — to preview that \
-			attachment on the right. Press Delete to drop a row from the list without moving its file.' })
+			attachment on the right. Press Delete to drop a row from the list without moving its file. Clicking \
+			either folder opens the note it belongs to and closes this dialog; re-running the command rebuilds \
+			the list.' })
 
 		const scroller = container.createDiv({ cls: 'stray-attachments-scroller' });
 		const bottomBar = container.createDiv({ cls: 'stray-attachments-bottom-bar' });
