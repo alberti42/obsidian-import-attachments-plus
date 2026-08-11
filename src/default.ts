@@ -21,6 +21,7 @@ export const DEFAULT_SETTINGS: ImportAttachmentsSettings = {
 	autoRenameAttachmentFolder: true,
 	autoDeleteAttachmentFolder: true,
     deleteAttachmentFolderWhenEmpty: true,
+    moveStrayAttachmentsOnNoteCreation: false,
     showDeleteMenu: true,
     showDeleteMenuForEmbedded: true,
     removeWikilinkOnFileDeletion: true,

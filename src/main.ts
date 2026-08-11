@@ -58,7 +58,7 @@ import { DEFAULT_SETTINGS, DEFAULT_SETTINGS_1_3_0 } from "default";
 import { EditorSelection } from '@codemirror/state';
 
 import { ImportAttachmentsSettingTab } from 'settings';
-import { findStrayAttachments } from "strayAttachments";
+import { findStrayAttachments, findStrayAttachmentsOfNote, moveStrayAttachments, type StrayAttachmentMove } from 'strayAttachments';
 
 
 class DeleteLinkError extends Error {}
@@ -69,6 +69,9 @@ export default class ImportAttachments extends Plugin {
 	vaultPath: string;
 	private settingsTab: ImportAttachmentsSettingTab;
 	public matchAttachmentFolder: ((str:string)=>boolean) = (_:string) => true;
+
+    // Notes created since the metadata cache last settled, awaiting a stray check.
+    private notes_awaiting_stray_check: Set<string> = new Set<string>();
 
     // mechanism to prevent calling the callback multiple times when renaming attachments associated with a markdown note
     private file_menu_cb_registered: boolean = false;
@@ -90,6 +93,8 @@ export default class ImportAttachments extends Plugin {
         this.editor_paste_cb = this.editor_paste_cb.bind(this);
         this.editor_rename_cb = this.editor_rename_cb.bind(this);
         this.context_menu_cb = this.context_menu_cb.bind(this);
+        this.note_created_cb = this.note_created_cb.bind(this);
+        this.metadata_resolved_cb = this.metadata_resolved_cb.bind(this);
         
 		// Store the path to the vault
 		if (Platform.isDesktopApp) {
@@ -271,6 +276,18 @@ export default class ImportAttachments extends Plugin {
 		this.registerEvent(
 			this.app.vault.on('rename', this.editor_rename_cb)
 		);
+
+		// Repair a newly created note's attachments (issue #24). 'create' fires for
+		// every file while the vault is being indexed at startup, so the handler is
+		// registered only once the layout is ready and ignores anything queued before.
+		this.app.workspace.onLayoutReady(() => {
+			this.registerEvent(
+				this.app.vault.on('create', this.note_created_cb)
+			);
+			this.registerEvent(
+				this.app.metadataCache.on('resolved', this.metadata_resolved_cb)
+			);
+		});
 	   
         // Add delete menu in context menu of links
 	    this.addDeleteMenuForLinks(this.settings.showDeleteMenu);
@@ -1424,5 +1441,58 @@ export default class ImportAttachments extends Plugin {
         const modal = new StrayAttachmentsModal(this, pairs);
         modal.open();
         await modal.promise;
+    }
+
+    // A note has just been created. Its metadata is not resolved yet, and neither is
+    // that of the note it may have been extracted from, so only remember it here and
+    // act once the cache has settled.
+    note_created_cb(file: TAbstractFile) {
+        if (!this.settings.moveStrayAttachmentsOnNoteCreation) { return; }
+        if (!(file instanceof TFile)) { return; }
+        if (file.extension !== 'md' && file.extension !== 'canvas') { return; }
+        this.notes_awaiting_stray_check.add(file.path);
+    }
+
+    // Fired when the metadata cache has finished resolving everything it had queued.
+    // By this point both the new note and the note it was extracted from reflect their
+    // final link sets, so an attachment left behind can be identified reliably.
+    metadata_resolved_cb() {
+        if (this.notes_awaiting_stray_check.size === 0) { return; }
+
+        const pending = Array.from(this.notes_awaiting_stray_check);
+        this.notes_awaiting_stray_check.clear();
+
+        if (!this.settings.moveStrayAttachmentsOnNoteCreation) { return; }
+
+        for (const path of pending) {
+            const note = this.app.vault.getAbstractFileByPath(path);
+            if (!(note instanceof TFile)) { continue; }  // created and removed again
+            void this.repairStrayAttachmentsOfNote(note);
+        }
+    }
+
+    private async repairStrayAttachmentsOfNote(note: TFile) {
+        const strays = findStrayAttachmentsOfNote(this, note);
+        if (strays.length === 0) { return; }
+
+        // Where an attachment could go to several notes, prefer the note just created:
+        // it is the one the user was acting on.
+        const selections: StrayAttachmentMove[] = strays.map(stray => {
+            const destination = stray.to.find(d => d.note.path === note.path) ?? stray.to[0];
+            return {
+                sourcePath: stray.fromPath,
+                destinationPath: destination.attachFolder,
+                sourceFile: stray.file
+            };
+        });
+
+        try {
+            const count = await moveStrayAttachments(this, selections);
+            if (count > 0) {
+                new Notice(`Moved ${count} attachment${count > 1 ? 's' : ''} into the folder of ${note.basename}.`);
+            }
+        } catch (error: unknown) {
+            console.error('Failed to move stray attachments for', note.path, error);
+        }
     }
 }

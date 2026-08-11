@@ -196,6 +196,77 @@ function destinationsFor(attachment: TFile, notes: DedupeFileList, maps: Referen
 	return candidates;
 }
 
+/**
+ * Strays among the attachments referenced by one note.
+ *
+ * This is the second pass of findStrayAttachments() restricted to a single note, and
+ * it applies exactly the same rules — an attachment already sitting in the folder of
+ * any note that references it is not a stray, and only plugin-managed folders are
+ * touched. Used to repair a note right after it is created, which is what 'extract
+ * selection to new note' leaves behind (issue #24).
+ *
+ * Returns an empty array cheaply when the note references no attachments at all.
+ */
+export function findStrayAttachmentsOfNote(plugin: ImportAttachments, note: TFile): StrayAttachment[] {
+	const cache = plugin.app.metadataCache.getFileCache(note);
+	if (!cache) { return []; }
+	const hasReferences = (cache.links?.length ?? 0) > 0
+		|| (cache.embeds?.length ?? 0) > 0
+		|| (cache.frontmatterLinks?.length ?? 0) > 0;
+	if (!hasReferences) { return []; }
+
+	const maps = buildReferenceMaps(plugin);
+	const referenced = maps.noteToAttachments.get(note.path);
+	if (!referenced) { return []; }
+
+	const strays: StrayAttachment[] = [];
+	const record = makeRecorder(plugin, maps, strays);
+
+	for (const link of referenced.list.values()) {
+		const attachment = link.resolvedDest;
+		const notes = maps.attachmentToNotes.get(attachment.path);
+		if (!notes) { continue; }
+		record(attachment, destinationsFor(attachment, notes, maps));
+	}
+
+	return strays;
+}
+
+/**
+ * The shared gate for both entry points: skips duplicates and anything outside a
+ * plugin-managed folder, and stamps the note a stray was filed under.
+ */
+function makeRecorder(plugin: ImportAttachments, maps: ReferenceMaps, strays: StrayAttachment[]) {
+	const processedAttachments = new Set<string>();
+
+	// Which note owns a given attachment folder, so a stray can be traced back to the
+	// note it was originally imported into. Only covers notes that have links, which
+	// is what the reference maps are built from.
+	const noteOwningFolder = new Map<string, TFile>();
+	for (const entry of maps.noteToAttachFolder.values()) {
+		mapSoftSet(noteOwningFolder, entry.attachFolder, entry.file);
+	}
+
+	return (attachment: TFile, alternatives: StrayDestination[]) => {
+		if (alternatives.length === 0 || processedAttachments.has(attachment.path)) { return; }
+
+		// Only reorganise folders this plugin manages. A hand-curated shared folder
+		// ('assets/', 'Media/', ...) is the user's own filing system, and reporting it
+		// as misplaced on every run would make the command unusable for them.
+		const parent = attachment.parent?.path;
+		if (parent === undefined || !plugin.matchAttachmentFolder(parent)) { return; }
+
+		processedAttachments.add(attachment.path);
+		strays.push({
+			file: attachment,
+			from: parent,
+			fromPath: attachment.path,
+			fromNote: noteOwningFolder.get(parent),
+			to: alternatives
+		});
+	};
+}
+
 export function findStrayAttachments(plugin: ImportAttachments) {
 	const maps = buildReferenceMaps(plugin);
 	const { noteToAttachFolder, noteToAttachments, attachmentToNotes } = maps;

@@ -393,6 +393,21 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
+            .setName('Move stray attachments into a new note’s folder automatically:')
+            .setDesc('With this option enabled, when a new note is created that references attachments still filed under \
+                another note that no longer uses them — what "extract selection to new note" leaves behind — those \
+                attachments are moved into the new note’s attachment folder straight away. The same rules as the \
+                "Move stray attachments" command apply: only folders managed by this plugin are touched, and an \
+                attachment still used by the note it is filed under is left alone. Without this option, run that \
+                command when you want to tidy up instead.')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.moveStrayAttachmentsOnNoteCreation)
+                .onChange(async (value: boolean) => {
+                    this.plugin.settings.moveStrayAttachmentsOnNoteCreation = value;
+                    this.debouncedSaveSettings();
+                }));
+
+        new Setting(containerEl)
             .setName('Rename the attachment folder automatically and update all links correspondingly:')
             .setDesc('With this option enabled, when you rename/move an note, if the renamed note has an attachment folder connected to it, \
                 its attachment folder is renamed/moved to a new name/location corresponding to the new name of the note.')
