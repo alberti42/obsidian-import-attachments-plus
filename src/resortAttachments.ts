@@ -1,8 +1,7 @@
-import { App, TFile, TFolder, CachedMetadata, Notice } from 'obsidian';
-import { parseFilePath, mapSoftSet, getAllFilesInFolder, joinPaths, findNewFilename, doesFileExist } from './utils';
+import { App, TFile, TFolder, CachedMetadata, Notice, getLinkpath } from 'obsidian';
+import { parseFilePath, mapSoftSet, joinPaths, findNewFilename, doesFileExist } from './utils';
 import type ImportAttachments from 'main';
 
-declare const app: App;
 export type SomeLink = { text: string, dest: string, resolvedDest: TFile };
 export type DedupeFileList = {f: TFile, list: Map<string, TFile>};
 export type DedupeLinkList = {f: TFile, list: Map<string, SomeLink>};
@@ -24,16 +23,43 @@ export type MovePairSelection = {
 const NOTE_EXTENSIONS = new Set(["md", "canvas"]);
 const warnInConsole = process.env.NODE_ENV === "development";
 
-const noteToAttachFolder = new Map<string, AttachFolder>();
+export type ReferenceMaps = {
+	noteToAttachFolder: Map<string, AttachFolder>,
+	// deduplicated on link.resolvedDest.path
+	noteToAttachments: Map<string, DedupeLinkList>,
+	// deduplicated on TFile.path
+	attachmentToNotes: Map<string, DedupeFileList>,
+};
 
-// deduplicated on link.resolvedDest.path
-const noteToAttachments = new Map<string, DedupeLinkList>();
-// deduplicated on TFile.path
-const attachmentToNotes = new Map<string, DedupeFileList>();
+/**
+ * Resolve one cache entry to the file it points at.
+ *
+ * `elem.link` is Obsidian's already-normalised target: the alias (`|`) is stripped and
+ * markdown-style links are handled identically to wikilinks. Parsing `elem.original`
+ * by hand instead would silently drop every `[alt](file.png)` link.
+ */
+function resolveLink(app: App, link: string, sourcePath: string): TFile | null {
+	const linkpath = getLinkpath(link);
+	if (!linkpath) { return null; } // pure subpath, e.g. [[#heading]]
 
-function unifyLinkCaches(input: { f: TFile, m: CachedMetadata | null}) {
+	const res = app.metadataCache.getFirstLinkpathDest(linkpath, sourcePath);
+	if (res) { return res; }
+
+	// Markdown links may carry percent-encoding that the cache preserves verbatim.
+	try {
+		const decoded = decodeURIComponent(linkpath);
+		if (decoded !== linkpath) {
+			return app.metadataCache.getFirstLinkpathDest(decoded, sourcePath);
+		}
+	} catch {
+		// malformed escape sequence: nothing more we can do
+	}
+	return null;
+}
+
+function unifyLinkCaches(app: App, input: { f: TFile, m: CachedMetadata | null}) {
 	const links: SomeLink[] = [];
-	if (!input.m) return { f: input.f, links: []};
+	if (!input.m) { return { f: input.f, links: []}; }
 
 	const mergedLinks = [
 		...(input.m?.links ?? []),
@@ -42,23 +68,13 @@ function unifyLinkCaches(input: { f: TFile, m: CachedMetadata | null}) {
 	]
 
 	for (const elem of mergedLinks) {
-		if (!elem.original || elem.original.startsWith("[[#")) continue; // skip [[#heading]]
-
-		let dest = elem.original;
-
-		// strip [[ and ]], ![[ and ]]
-		if (dest.startsWith("[[") && dest.endsWith("]]")) dest = dest.slice(2, -2);
-		if (dest.startsWith("![[") && dest.endsWith("]]")) dest = dest.slice(3, -2);
-		if (dest.match(/^\[.+\]\(.+\)$/)) continue; // skip links like [components](#components)
-		dest = dest.replace(/(?:\||\\\||#|\\#).+$/, ""); // strip |alt, #heading, #heading|alt
-
-		const res: TFile | null = app.metadataCache.getFirstLinkpathDest(dest, input.f.path);
-		if (res == null) {
-			if (warnInConsole) console.warn("resort: could not resolve link:", elem.original, `(parsed as: '${dest}')`);
+		const res = resolveLink(app, elem.link, input.f.path);
+		if (res === null) {
+			if (warnInConsole) { console.warn("resort: could not resolve link:", elem.original, `(link field: '${elem.link}')`); }
 			continue;
 		}
 		// we are not interested in notes linking to other notes
-		if (NOTE_EXTENSIONS.has(res.extension.toLowerCase())) continue;
+		if (NOTE_EXTENSIONS.has(res.extension.toLowerCase())) { continue; }
 
 		links.push({ text: elem.link, dest: elem.original, resolvedDest: res });
 	}
@@ -66,8 +82,12 @@ function unifyLinkCaches(input: { f: TFile, m: CachedMetadata | null}) {
 	return { f: input.f, links };
 }
 
-function buildReferenceMaps(plugin: ImportAttachments) {
-	app.metadataCache.trigger('resolve');
+function buildReferenceMaps(plugin: ImportAttachments): ReferenceMaps {
+	const app = plugin.app;
+
+	const noteToAttachFolder = new Map<string, AttachFolder>();
+	const noteToAttachments = new Map<string, DedupeLinkList>();
+	const attachmentToNotes = new Map<string, DedupeFileList>();
 
 	// find all files that are notes
 	// get all their metadata
@@ -83,7 +103,7 @@ function buildReferenceMaps(plugin: ImportAttachments) {
 			!(e.m.links == null || e.m.links.length === 0) ||
 			!(e.m.frontmatterLinks == null || e.m.frontmatterLinks.length === 0)
 		))
-		.map(unifyLinkCaches)
+		.map(e => unifyLinkCaches(app, e))
 		.filter(e => e.links.length > 0)
 
 	for (const file of filesWithLinks) {
@@ -109,70 +129,74 @@ function buildReferenceMaps(plugin: ImportAttachments) {
 			mapSoftSet(attachmentToNotes.get(link.resolvedDest.path)!.list, file.f.path, file.f);
 		}
 	}
+
+	return { noteToAttachFolder, noteToAttachments, attachmentToNotes };
 }
 
-export async function getAttachmentResortPairs(plugin: ImportAttachments) {
-	noteToAttachFolder.clear();
-	noteToAttachments.clear();
-	attachmentToNotes.clear();
-	buildReferenceMaps(plugin);
+/**
+ * Candidate destinations for `attachment`: the attachment folder of every note that
+ * references it, minus the folder the attachment already sits in.
+ *
+ * Excluding the current folder is what keeps the command quiet in the configurations
+ * where every note shares one attachment folder (ROOT / CURRENT / FOLDER without
+ * `${notename}`): there the only candidate is the folder the file is already in, so
+ * nothing is reported instead of the whole vault being listed once per note.
+ */
+function destinationsFor(attachment: TFile, notes: DedupeFileList, maps: ReferenceMaps): AttachFolder[] {
+	const currentFolder = attachment.parent?.path;
+	return Array.from(notes.list.values())
+		.map(ntf => maps.noteToAttachFolder.get(ntf.path))
+		.filter((e): e is AttachFolder => e !== undefined && e.attachFolder !== currentFolder);
+}
+
+export function getAttachmentResortPairs(plugin: ImportAttachments) {
+	const maps = buildReferenceMaps(plugin);
+	const { noteToAttachFolder, noteToAttachments, attachmentToNotes } = maps;
 
 	const attachmentResortPairs: AttachmentResortPair[] = [];
 	const processedAttachments = new Set<string>();
 
+	const record = (attachment: TFile, alternatives: AttachFolder[]) => {
+		if (alternatives.length === 0 || processedAttachments.has(attachment.path)) { return; }
+		processedAttachments.add(attachment.path);
+		attachmentResortPairs.push({
+			file: attachment,
+			from: attachment.parent?.path ?? "no parent!",
+			fromPath: attachment.path,
+			to: alternatives
+		});
+	};
+
 	// first pass: check attachments in notes' expected attachment folders
 	for (const [note, attachFolder] of noteToAttachFolder.entries()) {
-		const folder = app.vault.getAbstractFileByPath(attachFolder.attachFolder) as TFolder;
-		if (folder == null) {
-			if (warnInConsole) console.warn("resort: could not resolve folder: ", attachFolder);
+		const folder = plugin.app.vault.getAbstractFileByPath(attachFolder.attachFolder);
+		if (!(folder instanceof TFolder)) {
+			if (warnInConsole) { console.warn("resort: could not resolve folder: ", attachFolder); }
 			continue;
 		}
 
-		const filesInAttachFolder = getAllFilesInFolder(folder);
+		const referencedByNote = noteToAttachments.get(note);
+		if (!referencedByNote) { continue; }
+
+		// Direct children only: a subfolder the user created inside an attachment folder
+		// (e.g. "Note (attachments)/diagrams/") is theirs to organise, and moving its
+		// contents out would flatten that structure irreversibly.
+		const filesInAttachFolder = folder.children.filter((c): c is TFile => c instanceof TFile);
 		for (const attachment of filesInAttachFolder) {
-			if (!noteToAttachments.has(note)) continue;
-
 			// this *attachment* is in *note*'s attach folder, but the *note* does not reference it!
-			if (!noteToAttachments.get(note)?.list.has(attachment.path)) {
-				if (!attachmentToNotes.get(attachment.path)) continue;
+			if (referencedByNote.list.has(attachment.path)) { continue; }
 
-				const alternatives = Array.from(attachmentToNotes.get(attachment.path)!.list.values())
-					.map(ntf => noteToAttachFolder.get(ntf.path))
-					.filter(e => typeof e !== "undefined");
+			const notes = attachmentToNotes.get(attachment.path);
+			if (!notes) { continue; }
 
-				if (alternatives.length === 0) continue;
-				processedAttachments.add(attachment.path);
-
-				attachmentResortPairs.push({ 
-					file: attachment, 
-					from: attachment.parent?.name ?? "no parent!", 
-					fromPath: attachment.path, 
-					to: alternatives 
-				});
-			}
+			record(attachment, destinationsFor(attachment, notes, maps));
 		}
 	}
 
 	// second pass: check all referenced attachments not yet processed
 	for (const [attachmentPath, notesList] of attachmentToNotes.entries()) {
-		if (processedAttachments.has(attachmentPath)) continue;
-
-		const attachment = notesList.f;
-		const alternatives = Array.from(notesList.list.values())
-			.map(ntf => noteToAttachFolder.get(ntf.path))
-			.filter(e => typeof e !== "undefined");
-
-		if (alternatives.length === 0) continue;
-
-		const isInCorrectFolder = alternatives.some(alt => alt.attachFolder === attachment.parent?.path);
-		if (!isInCorrectFolder) {
-			attachmentResortPairs.push({ 
-				file: attachment, 
-				from: attachment.parent?.name ?? "no parent!", 
-				fromPath: attachment.path, 
-				to: alternatives 
-			});
-		}
+		if (processedAttachments.has(attachmentPath)) { continue; }
+		record(notesList.f, destinationsFor(notesList.f, notesList, maps));
 	}
 
 	return attachmentResortPairs;
@@ -201,8 +225,19 @@ export async function moveAttachmentPairs(plugin: ImportAttachments, selections:
 			await plugin.app.fileManager.renameFile(sourceFile, destPath);
 			successCount++;
 
-			if (sourceFolder && sourceFolder instanceof TFolder && sourceFolder.children.length === 0) {
-				try { await vault.delete(sourceFolder); } catch { }
+			// Only clean up a folder that (a) the user asked us to clean up, (b) is one of
+			// this plugin's attachment folders, and (c) is now empty. Deletion goes through
+			// plugin.trashFile() so it honours the user's trash preference rather than
+			// destroying the folder outright.
+			if (plugin.settings.deleteAttachmentFolderWhenEmpty
+				&& sourceFolder instanceof TFolder
+				&& sourceFolder.children.length === 0
+				&& plugin.matchAttachmentFolder(sourceFolder.path)) {
+				try {
+					await plugin.trashFile(sourceFolder);
+				} catch (error) {
+					console.error(`Failed to remove the emptied attachment folder ${sourceFolder.path}:`, error);
+				}
 			}
 		} catch (error) {
 			console.error(`Failed to move ${sourcePath}:`, error);

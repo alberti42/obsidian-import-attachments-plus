@@ -1409,7 +1409,7 @@ export default class ImportAttachments extends Plugin {
 	}
 
     async resort_attachments_cb() {
-        const pairs = await getAttachmentResortPairs(this);
+        const pairs = getAttachmentResortPairs(this);
         if (pairs.length === 0) {
             new Notice('No attachments need resorting.');
             return;
