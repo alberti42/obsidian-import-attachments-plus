@@ -174,17 +174,26 @@ function makeContext(app: App, plugin: ImportAttachments, scratch: string): Test
 			return f instanceof TFolder ? f : null;
 		},
 		note: async (relativePath: string, content = '') => {
-			const file = await app.vault.create(`${scratch}/${relativePath}`, content);
-			await untilResolved();
+			const path = `${scratch}/${relativePath}`;
+			await ensureParents(app, path);
+			// Subscribe before creating: the cache can finish resolving before a
+			// listener added afterwards exists, and the wait then costs the full
+			// timeout for nothing.
+			const resolved = untilResolved();
+			const file = await app.vault.create(path, content);
+			await resolved;
 			return file;
 		},
 		attachment: async (relativePath: string, bytes = TINY_PNG) => {
+			const path = `${scratch}/${relativePath}`;
+			await ensureParents(app, path);
 			const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-			return await app.vault.createBinary(`${scratch}/${relativePath}`, buffer);
+			return await app.vault.createBinary(path, buffer);
 		},
 		rewrite: async (file: TFile, content: string) => {
+			const resolved = untilResolved();
 			await app.vault.modify(file, content);
-			await untilResolved();
+			await resolved;
 		},
 	};
 }
@@ -194,6 +203,18 @@ const sleep = (ms: number) => new Promise<void>(resolve => window.setTimeout(res
 async function ensureFolder(app: App, path: string) {
 	if (app.vault.getAbstractFileByPath(path) === null) {
 		await app.vault.createFolder(path);
+	}
+}
+
+/**
+ * Create every folder leading up to a file. vault.create/createBinary do not do this
+ * themselves — they fail with ENOENT — so a fixture like
+ * "Big note (attachments)/diagram.png" needs its folder made first.
+ */
+async function ensureParents(app: App, filePath: string) {
+	const segments = filePath.split('/').slice(0, -1);
+	for (let i = 1; i <= segments.length; i++) {
+		await ensureFolder(app, segments.slice(0, i).join('/'));
 	}
 }
 

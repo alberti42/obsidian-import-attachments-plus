@@ -19,7 +19,6 @@ suite('stray attachments', () => {
 		// "Big note" owns the attachment folder and originally references the image.
 		const image = await t.attachment('Big note (attachments)/diagram.png');
 		await t.note('Big note.md', `Intro\n\n![[${image.name}]]\n`);
-		await t.untilResolved();
 
 		// The text (and its embed) moves into a new note; the file stays behind.
 		const small = await t.note('Small note.md', `![[${image.name}]]\n`);
@@ -42,7 +41,6 @@ suite('stray attachments', () => {
 		const image = await t.attachment('Big note (attachments)/shared.png');
 		await t.note('Big note.md', `![[${image.name}]]\n`);
 		const other = await t.note('Other note.md', `![[${image.name}]]\n`);
-		await t.untilResolved();
 
 		// Both notes reference it and it sits in Big note's folder, which is a valid
 		// home — so nothing should be proposed, or the two would fight over it for ever.
@@ -56,7 +54,6 @@ suite('stray attachments', () => {
 		await t.app.vault.createFolder(`${t.scratch}/assets`);
 		const image = await t.attachment('assets/logo.png');
 		const note = await t.note('Note.md', `![[${image.name}]]\n`);
-		await t.untilResolved();
 
 		assertEqual(findStrayAttachmentsOfNote(t.plugin, note).length, 0, 'assets/ must be left alone');
 	});
@@ -66,7 +63,6 @@ suite('stray attachments', () => {
 
 		const image = await t.attachment('Note (attachments)/pic.png');
 		await t.note('Note.md', `![[${image.name}]]\n`);
-		await t.untilResolved();
 
 		const strays = findStrayAttachments(t.plugin)
 			.filter(s => s.fromPath.startsWith(t.scratch));

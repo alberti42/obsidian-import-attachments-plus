@@ -62,8 +62,7 @@ import { suite, it, assert, assertEqual } from '../harness';
 suite('my area', () => {
   it('does the thing', async (t) => {
     const image = await t.attachment('Note (attachments)/pic.png');
-    await t.note('Note.md', `![[${image.name}]]\n`);
-    await t.untilResolved();
+    await t.note('Note.md', `![[${image.name}]]\n`);   // already waits for the cache
 
     assertEqual(/* … */, /* … */, 'message shown on failure');
   });
@@ -77,11 +76,15 @@ The context `t` gives you:
 - `t.note(path, content)` / `t.attachment(path)` — create fixtures inside this test's
   scratch folder, already waited for
 - `t.rewrite(file, content)` — change a note and wait for the cache
-- `t.untilResolved()` — **the important one.** Resolves once the metadata cache has
-  drained its queue. Most timing bugs in this plugin come from acting before both sides
-  of a move have been re-indexed, so assert after this, not after a fixed delay
-- `t.until(predicate, description)` — poll for a condition with a timeout, for things the
-  cache does not announce
+- `t.untilResolved()` — resolves once the metadata cache has drained its queue. **You
+  rarely need to call this yourself**: `t.note()` and `t.rewrite()` already wait, and
+  they subscribe *before* the change so they cannot miss the event. Calling it on its
+  own when the cache is already idle costs the full 2 s fallback, because `resolved`
+  only fires when there was work queued — four redundant calls were adding 8 s to a
+  four-test run
+- `t.until(predicate, description)` — poll for a condition with a timeout. **This** is
+  what you want when waiting for the plugin's own deferred work, such as the automatic
+  stray repair, which lands after the cache settles rather than with it
 - `t.scratch` — this test's folder; prefix any absolute vault path with it
 
 ## What is worth testing next
