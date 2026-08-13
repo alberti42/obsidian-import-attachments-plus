@@ -114,6 +114,24 @@ The context `t` gives you:
   stray repair, which lands after the cache settles rather than with it
 - `t.scratch` — this test's folder; prefix any absolute vault path with it
 
+**The automatic repair is switched off while the suite runs**, and restored afterwards.
+It is on by default, so otherwise it reacts to the fixtures a test has just created and
+moves them mid-test: assertions race a background move, and the move itself then fails
+with `ENOENT` once the scratch folder has been cleaned up. Both were visible in the
+console before this was added.
+
+A test that wants to exercise that path has to opt in and wait for it explicitly, since
+the repair lands *after* the metadata cache settles rather than with it:
+
+```ts
+itInVault('moves the attachment on its own', async (t) => {
+  t.plugin.settings.moveStrayAttachmentsAutomatically = true;   // restored by the runner
+  // … set up the fixtures …
+  await t.until(() => t.exists(`${t.scratch}/Small note (attachments)/diagram.png`),
+                'the attachment to be moved automatically');
+});
+```
+
 ## What is worth testing next
 
 Roughly in order of what a bug would cost:

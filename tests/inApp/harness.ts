@@ -84,11 +84,45 @@ export async function runAllTests(plugin: ImportAttachments, perTestTimeoutMs = 
 		return results;
 	}
 
+	// Turn the automatic repair off for the duration. It is on by default, so it reacts
+	// to the fixtures a test has just created and moves them while the test is still
+	// running — the assertions then race a background move, and the move itself fails
+	// with ENOENT once the scratch folder has been cleaned up. A test that wants to
+	// exercise that path should set the flag itself and wait with t.until().
+	const automaticRepair = plugin.settings.moveStrayAttachmentsAutomatically;
+	plugin.settings.moveStrayAttachmentsAutomatically = false;
+
+	try {
+		await runEach(app, plugin, all, results, perTestTimeoutMs);
+	} finally {
+		plugin.settings.moveStrayAttachmentsAutomatically = automaticRepair;
+		await removeFolder(app, '_plugin-tests');
+	}
+
+	const passed = results.filter(r => r.passed).length;
+	console.log(`[plugin tests] finished — ${passed} passed, ${results.length - passed} failed`);
+	console.table(results.map(r => ({
+		suite: r.suite,
+		test: r.name,
+		result: r.passed ? 'pass' : 'FAIL',
+		ms: Math.round(r.ms),
+	})));
+
+	return results;
+}
+
+async function runEach(
+	app: App,
+	plugin: ImportAttachments,
+	all: Registered[],
+	results: TestResult[],
+	perTestTimeoutMs: number,
+) {
 	for (const [index, entry] of all.entries()) {
 		const scratch = `_plugin-tests/run-${index}`;
 		const label = `${entry.suite} › ${entry.name}`;
 		const started = performance.now();
-		console.log(`[plugin tests] ${index + 1}/${registered.length} running: ${label}`);
+		console.log(`[plugin tests] ${index + 1}/${all.length} running: ${label}`);
 
 		try {
 			await ensureFolder(app, '_plugin-tests');
@@ -112,19 +146,6 @@ export async function runAllTests(plugin: ImportAttachments, perTestTimeoutMs = 
 			await removeFolder(app, scratch);
 		}
 	}
-
-	await removeFolder(app, '_plugin-tests');
-
-	const passed = results.filter(r => r.passed).length;
-	console.log(`[plugin tests] finished — ${passed} passed, ${results.length - passed} failed`);
-	console.table(results.map(r => ({
-		suite: r.suite,
-		test: r.name,
-		result: r.passed ? 'pass' : 'FAIL',
-		ms: Math.round(r.ms),
-	})));
-
-	return results;
 }
 
 function rejectAfter(ms: number, message: string): Promise<never> {
