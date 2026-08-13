@@ -38,13 +38,20 @@ export class TFolder extends TAbstractFile {
 
 /**
  * Mirrors Obsidian's normalizePath: collapse duplicate slashes, drop a leading and
- * trailing slash, and normalise unicode. Obsidian also replaces backslashes.
+ * trailing slash, and normalise unicode.
+ *
+ * The `|| '/'` is not decoration. Stripping the slashes from '/' leaves an empty
+ * string, but Obsidian returns '/' — the vault root is a path, not nothing. This was
+ * wrong here until the ROOT spec passed headlessly and failed in the app, which is the
+ * entire reason the pure specs run in both places. Do not "simplify" it away, and do
+ * not add behaviour here that has not been checked against the real thing the same way.
  */
 export function normalizePath(path: string): string {
-	return path
+	const normalized = path
 		.replace(/([\\/])+/g, '/')
 		.replace(/(^\/)|(\/$)/g, '')
 		.normalize('NFC');
+	return normalized || '/';
 }
 
 /** Strip a subpath (`#heading`, `^block`) from a link target. */

@@ -58,6 +58,33 @@ suite('stray attachments', () => {
 		assertEqual(findStrayAttachmentsOfNote(t.plugin, note).length, 0, 'assets/ must be left alone');
 	});
 
+	// Two markdown-link spellings for a filename containing a space. Obsidian generates
+	// the percent-encoded one; the angle-bracket one is CommonMark and a user may well
+	// type it. What matters is what ends up in `elem.link`, because resolveLink() feeds
+	// that to getFirstLinkpathDest: if the brackets survive, resolution fails silently
+	// and the attachment becomes invisible to the whole feature.
+	for (const [label, spelling] of [
+		['percent-encoded', 'space%20file.png'],
+		['angle brackets', '<space file.png>'],
+	]) {
+		itInVault(`resolves a markdown link with ${label}`, async (t) => {
+			requireSubfolderMode(t.plugin);
+
+			await t.attachment('Big note (attachments)/space file.png');
+			await t.note('Big note.md', 'no link here\n');
+			const small = await t.note('Small note.md', `![img](${spelling})\n`);
+
+			const cache = t.app.metadataCache.getFileCache(small);
+			const recorded = (cache?.embeds ?? []).map(e => e.link).join(', ');
+
+			const strays = findStrayAttachmentsOfNote(t.plugin, small);
+			assertEqual(
+				strays.length, 1,
+				`expected the attachment to be found; metadata cache recorded link as "${recorded}"`,
+			);
+		});
+	}
+
 	itInVault('the vault-wide command reports nothing for a tidy vault', async (t) => {
 		requireSubfolderMode(t.plugin);
 

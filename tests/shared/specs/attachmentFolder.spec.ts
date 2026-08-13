@@ -54,8 +54,10 @@ suite('attachment folder resolution', () => {
 	});
 
 	it('attachmentFolderOfNote: ROOT is the vault root', () => {
+		// '/' rather than '': Obsidian's normalizePath returns the root as a path.
+		// This spec asserted '' until it passed under `npm test` and failed in the app.
 		const s = settings(ROOT, 'ignored');
-		assertEqual(attachmentFolderOfNote(s, parseFilePath('2023/Trip.md')), '');
+		assertEqual(attachmentFolderOfNote(s, parseFilePath('2023/Trip.md')), '/');
 	});
 
 	it('attachmentFolderOfNote: canvas notes resolve like markdown notes', () => {
