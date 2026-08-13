@@ -1,6 +1,8 @@
 import esbuild from "esbuild";
 import process from "process";
 import { copyFile } from "fs/promises";
+import { globSync } from "fs";
+import path from "path";
 import builtins from "builtin-modules";
 
 // Banner message for the generated/bundled files
@@ -11,8 +13,16 @@ if you want to view the source, please visit the github repository of this plugi
 */
 `;
 
-// Determine whether to build for production or development
-const prod = (process.argv[2] === "production");
+// Build modes:
+//   (none)       watch build into dist/, NODE_ENV=development
+//   production   one-shot minified build into dist/
+//   withTests    like the watch build, but the in-Obsidian test suite is compiled in
+//                and registered as a command (see src/main.ts, INCLUDE_TESTS)
+//   unit         bundle tests/unit/*.test.ts into dist-tests/ for `node --test`
+const mode = process.argv[2] ?? "development";
+const prod = mode === "production";
+const withTests = mode === "withTests";
+const unit = mode === "unit";
 
 // Get the output directory
 const outdir = 'dist';
@@ -24,6 +34,43 @@ const copyManifest = {
 		build.onEnd(() => copyFile('manifest.json', `${outdir}/manifest.json`));
 	},
 };
+
+// The headless suite runs outside Obsidian, where the `obsidian` module has no
+// runtime at all — the npm package ships type declarations only. Point it at a small
+// shim so pure logic can be imported and executed by `node --test`.
+const obsidianShim = {
+	name: 'obsidian-shim',
+	setup(build) {
+		build.onResolve({ filter: /^obsidian$/ }, () => ({
+			path: path.resolve('tests/shims/obsidian.ts'),
+		}));
+	},
+};
+
+if (unit) {
+	const entryPoints = globSync('tests/unit/*.test.ts');
+	if (entryPoints.length === 0) {
+		console.error('No tests found in tests/unit/');
+		process.exit(1);
+	}
+	await esbuild.build({
+		entryPoints,
+		outdir: 'dist-tests',
+		bundle: true,
+		platform: 'node',
+		format: 'cjs',
+		target: 'node22',
+		logLevel: 'info',
+		sourcemap: 'inline',
+		external: [...builtins],
+		plugins: [obsidianShim],
+		define: {
+			"process.env.NODE_ENV": JSON.stringify("test"),
+			"process.env.INCLUDE_TESTS": JSON.stringify(""),
+		},
+	});
+	process.exit(0);
+}
 
 const context = await esbuild.context({
 	banner: {
@@ -63,6 +110,9 @@ const context = await esbuild.context({
 	outdir,
 	define: {
 		"process.env.NODE_ENV": JSON.stringify(prod ? "production" : "development"),
+		// Substituted at build time, so the in-app suite and everything it imports is
+		// tree-shaken out of any build that is not `npm run dev:test`.
+		"process.env.INCLUDE_TESTS": JSON.stringify(withTests ? "1" : ""),
 	},
 	minify: prod,
 	treeShaking: prod,

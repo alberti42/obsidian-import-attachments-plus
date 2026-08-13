@@ -24,3 +24,11 @@ obsidian-import-attachments-plus.sublime-workspace
 
 # iCLoud
 *.nosync
+# test artefacts
+dist-tests
+
+# Obsidian per-machine state inside the sandbox vault
+tests/vault/.obsidian/workspace.json
+tests/vault/.obsidian/workspace-mobile.json
+tests/vault/.obsidian/plugins
+tests/vault/_plugin-tests

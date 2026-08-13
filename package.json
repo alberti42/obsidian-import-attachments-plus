@@ -6,7 +6,9 @@
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
-		"lint": "eslint src",
+		"lint": "eslint src tests",
+		"test": "node esbuild.config.mjs unit && node --test 'dist-tests/*.test.js'",
+		"dev:test": "node esbuild.config.mjs withTests",
 		"version": "node version-bump.mjs && git add manifest.json versions.json"
 	},
 	"keywords": [],

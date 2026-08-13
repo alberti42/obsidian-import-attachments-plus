@@ -10,7 +10,6 @@ import {
 	TAbstractFile,
 	Platform,
 	PluginManifest,
-	normalizePath,
     Menu,
     TFolder,
     TFile,
@@ -59,6 +58,7 @@ import { DEFAULT_SETTINGS, DEFAULT_SETTINGS_1_3_0 } from 'default';
 import { EditorSelection } from '@codemirror/state';
 
 import { ImportAttachmentsSettingTab } from 'settings';
+import { attachmentFolderOfNote, compileAttachmentFolderMatcher } from 'attachmentFolder';
 import { findStrayAttachments, findStrayAttachmentsOfNote, moveStrayAttachments, type StrayAttachmentMove } from 'strayAttachments';
 
 
@@ -115,94 +115,14 @@ export default class ImportAttachments extends Plugin {
 		}
 	}
 
-	// Function to split around the original
+	// Recompile the predicate that recognises this plugin's attachment folders.
+	// Must be called again after any change to attachmentFolderPath/Location.
 	parseAttachmentFolderPath() {
-		switch(this.settings.attachmentFolderLocation) {
-		case AttachmentFolderLocationType.CURRENT:
-		case AttachmentFolderLocationType.ROOT:
-			this.matchAttachmentFolder = (filePath: string): boolean => {
-				return false;
-			}
-			return;
-        case AttachmentFolderLocationType.FOLDER:
-        case AttachmentFolderLocationType.SUBFOLDER:
-            /* continue */
-		}
-
-		const folderPath = this.settings.attachmentFolderPath;
-		const placeholder = '${notename}';
-
-		if(folderPath.includes(placeholder)) {
-			// Find the index of the first occurrence of the placeholder
-			const firstIndex = folderPath.indexOf(placeholder);
-
-			// Find the index of the last occurrence of the placeholder
-			const lastIndex = folderPath.lastIndexOf(placeholder);
-
-			// Calculate the starting index of the text after the placeholder
-			const endOfPlaceholderIndex = lastIndex + placeholder.length;
-
-			// Extract the parts before the first occurrence and after the last occurrence of the placeholder
-            const folderPathStartsWith = folderPath.substring(0, firstIndex)
-            const folderPathEndsWith = folderPath.substring(endOfPlaceholderIndex);
-
-            function escapeRegex(string:string) {
-                return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
-            }
-
-            // create regex from folder pattern
-            const regex = ((template:string) => {
-                    const [leftPart, rightPart] = template.split('${notename}');
-                    const escapedLeftPart = escapeRegex(leftPart);
-                    const escapedRightPart = escapeRegex(rightPart);
-
-                    const regexPattern = `^${escapedLeftPart}(.*?)${escapedRightPart}$`;
-                    return new RegExp(regexPattern);
-                })(folderPath);
-
-            const isSubfolderSetting = this.settings.attachmentFolderLocation === AttachmentFolderLocationType.SUBFOLDER;
-
-            this.matchAttachmentFolder = (filePath: string): boolean => {
-                // Check if filePath starts with startsWidth or contains /startsWidth
-                const startsWithMatch = filePath.startsWith(folderPathStartsWith) || filePath.includes(`/${folderPathStartsWith}`);
-                // Check if filePath ends with endsWidth
-                const endsWithMatch = filePath.endsWith(folderPathEndsWith);
-                
-                // Check that both conditions are met
-                const heuristicMatch = startsWithMatch && endsWithMatch;
-
-                if(heuristicMatch && isSubfolderSetting)
-                {
-                    const {foldername, dir} = Utils.parseFolderPath(filePath);
-
-                    // Use the match method to get the groups
-                    const match = foldername.match(regex);
-
-                    if (match && match[1]) {
-                        const noteName = normalizePath(Utils.joinPaths(dir,match[1]));
-                        return Utils.doesFileExist(this.app.vault,noteName+'.md') || Utils.doesFileExist(this.app.vault,noteName+'.canvas');
-                    } else {
-                        // No match found
-                        return false;
-                    }
-                }
-                return heuristicMatch;
-            };
-            return;
-        } else {
-            switch(this.settings.attachmentFolderLocation) {
-            case AttachmentFolderLocationType.FOLDER:
-                this.matchAttachmentFolder = (filePath: string): boolean => {
-                    return filePath === folderPath;
-                }
-                return;
-            case AttachmentFolderLocationType.SUBFOLDER:
-                this.matchAttachmentFolder = (filePath: string): boolean => {
-                    return filePath.endsWith(`/${folderPath}`) || filePath === folderPath;
-                }
-                return;
-            }
-        }	
+		this.matchAttachmentFolder = compileAttachmentFolderMatcher(
+			this.settings,
+			(noteName: string) => Utils.doesFileExist(this.app.vault, noteName + '.md')
+				|| Utils.doesFileExist(this.app.vault, noteName + '.canvas'),
+		);
 	}
 
 	// Function to split around the original
@@ -426,6 +346,20 @@ export default class ImportAttachments extends Plugin {
     // Commands that rely only on the vault and the metadata cache, and therefore
     // work on mobile as well (manifest.json declares isDesktopOnly: false).
     addPlatformIndependentCommands() {
+        // Only present in a build made with `npm run dev:test`. esbuild substitutes
+        // process.env.INCLUDE_TESTS at build time, so the suite and everything it
+        // imports is tree-shaken out of the development and production bundles.
+        if (process.env.INCLUDE_TESTS) {
+            this.addCommand({
+                id: 'run-plugin-tests',
+                name: 'Run plugin tests (development build only)',
+                callback: async () => {
+                    const { runPluginTests } = await import('../tests/inApp/index');
+                    await runPluginTests(this);
+                },
+            });
+        }
+
         this.addCommand({
             id: 'move-stray-attachments',
             name: "Move stray attachments to their note's folder",
@@ -809,31 +743,8 @@ export default class ImportAttachments extends Plugin {
         if(md_file.ext !== '.md' && md_file.ext !== '.canvas') {
             throw new Error('No Markdown file was provided.');
         }
-        
-        const currentNoteFolderPath = md_file.dir;
-        const notename = md_file.filename;
 
-        const folderPath = this.settings.attachmentFolderPath.replace(/\$\{notename\}/g, notename);
-
-        let attachmentsFolderPath;
-        switch(this.settings.attachmentFolderLocation) {
-        case AttachmentFolderLocationType.CURRENT:
-            attachmentsFolderPath = currentNoteFolderPath;
-            break;
-        case AttachmentFolderLocationType.SUBFOLDER:
-            attachmentsFolderPath = Utils.joinPaths(currentNoteFolderPath, folderPath)
-            break;
-        case AttachmentFolderLocationType.ROOT:
-            attachmentsFolderPath = '/';
-            break;
-        case AttachmentFolderLocationType.FOLDER:
-            attachmentsFolderPath = folderPath
-            break;
-        }
-
-        attachmentsFolderPath = normalizePath(attachmentsFolderPath);
-
-        return attachmentsFolderPath;           
+        return attachmentFolderOfNote(this.settings, md_file);
     }
 
     // `data`, when given, is the content of an attachment that does not exist on disk yet (e.g. an
