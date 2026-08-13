@@ -23,8 +23,12 @@ export type TestContext = {
 	/** Overwrite a note's content and wait for the cache to catch up. */
 	rewrite(file: TFile, content: string): Promise<void>;
 
-	/** Resolve once the metadata cache has finished everything it had queued. */
-	untilResolved(): Promise<void>;
+	/**
+	 * Resolve once the metadata cache has finished everything it had queued, or after
+	 * `timeoutMs` if it was already idle — the event only fires when there was work to
+	 * do, so waiting for it unconditionally would hang.
+	 */
+	untilResolved(timeoutMs?: number): Promise<void>;
 	/** Poll until `predicate` holds, or fail after `timeoutMs`. */
 	until(predicate: () => boolean, description: string, timeoutMs?: number): Promise<void>;
 
@@ -74,43 +78,79 @@ const TINY_PNG = Uint8Array.from(atob(
  * Run every registered test. Each test gets its own scratch folder, created before it
  * and removed afterwards even if it fails, so a run leaves the vault as it found it.
  */
-export async function runAllTests(plugin: ImportAttachments): Promise<TestResult[]> {
+export async function runAllTests(plugin: ImportAttachments, perTestTimeoutMs = 20000): Promise<TestResult[]> {
 	const app = plugin.app;
 	const results: TestResult[] = [];
 
+	console.log(`[plugin tests] starting — ${registered.length} test(s) registered`);
+	if (registered.length === 0) {
+		console.warn('[plugin tests] nothing registered. Suites register by being imported — '
+			+ 'check that tests/inApp/index.ts imports your suite file.');
+		return results;
+	}
+
 	for (const [index, entry] of registered.entries()) {
 		const scratch = `_plugin-tests/run-${index}`;
+		const label = `${entry.suite} › ${entry.name}`;
 		const started = performance.now();
+		console.log(`[plugin tests] ${index + 1}/${registered.length} running: ${label}`);
 
 		try {
 			await ensureFolder(app, '_plugin-tests');
 			await ensureFolder(app, scratch);
 
-			await entry.fn(makeContext(app, plugin, scratch));
-			results.push({ suite: entry.suite, name: entry.name, passed: true, ms: performance.now() - started });
+			// A hung test must not take the whole run down with it, silently.
+			await Promise.race([
+				Promise.resolve(entry.fn(makeContext(app, plugin, scratch))),
+				rejectAfter(perTestTimeoutMs, `test exceeded ${perTestTimeoutMs}ms`),
+			]);
+
+			const ms = performance.now() - started;
+			results.push({ suite: entry.suite, name: entry.name, passed: true, ms });
+			console.log(`[plugin tests]   PASS (${ms.toFixed(0)}ms)`);
 		} catch (error) {
-			results.push({
-				suite: entry.suite,
-				name: entry.name,
-				passed: false,
-				error: error instanceof Error ? (error.stack ?? error.message) : String(error),
-				ms: performance.now() - started,
-			});
+			const ms = performance.now() - started;
+			const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
+			results.push({ suite: entry.suite, name: entry.name, passed: false, error: message, ms });
+			console.error(`[plugin tests]   FAIL (${ms.toFixed(0)}ms)\n${message}`);
 		} finally {
 			await removeFolder(app, scratch);
 		}
 	}
 
 	await removeFolder(app, '_plugin-tests');
+
+	const passed = results.filter(r => r.passed).length;
+	console.log(`[plugin tests] finished — ${passed} passed, ${results.length - passed} failed`);
+	console.table(results.map(r => ({
+		suite: r.suite,
+		test: r.name,
+		result: r.passed ? 'pass' : 'FAIL',
+		ms: Math.round(r.ms),
+	})));
+
 	return results;
 }
 
+function rejectAfter(ms: number, message: string): Promise<never> {
+	return new Promise((_resolve, reject) => window.setTimeout(() => reject(new Error(message)), ms));
+}
+
 function makeContext(app: App, plugin: ImportAttachments, scratch: string): TestContext {
-	const untilResolved = () => new Promise<void>(resolve => {
-		const ref = app.metadataCache.on('resolved', () => {
+	// 'resolved' only fires when the cache had something queued. If it is already idle
+	// the event never comes, so this must not wait for it unconditionally — an earlier
+	// version did, and the whole run hung with no output at all.
+	const untilResolved = (timeoutMs = 2000) => new Promise<void>(resolve => {
+		let done = false;
+		const finish = () => {
+			if (done) { return; }
+			done = true;
 			app.metadataCache.offref(ref);
+			window.clearTimeout(timer);
 			resolve();
-		});
+		};
+		const ref = app.metadataCache.on('resolved', finish);
+		const timer = window.setTimeout(finish, timeoutMs);
 	});
 
 	const until = async (predicate: () => boolean, description: string, timeoutMs = 5000) => {

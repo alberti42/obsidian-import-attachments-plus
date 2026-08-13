@@ -12,21 +12,26 @@ import { runAllTests, TestResult } from './harness';
 import './suites/strayAttachments';
 
 export async function runPluginTests(plugin: ImportAttachments) {
-	new Notice('Running plugin tests…');
-	const results = await runAllTests(plugin);
+	new Notice('Running plugin tests — see the developer console');
 
-	const failed = results.filter(r => !r.passed);
-	for (const r of results) {
-		const label = `${r.suite} › ${r.name}`;
-		if (r.passed) {
-			console.log(`%c PASS %c ${label} (${r.ms.toFixed(0)}ms)`, 'background:#2d7;color:#fff', '');
-		} else {
-			console.error(`FAIL  ${label}\n${r.error}`);
-		}
+	let results: TestResult[];
+	try {
+		results = await runAllTests(plugin);
+	} catch (error) {
+		// Without this, a throw inside the harness itself disappears into the command
+		// callback's rejected promise and the user sees nothing at all.
+		console.error('[plugin tests] the run itself failed', error);
+		new Notice('Plugin tests could not run — see the developer console');
+		return false;
 	}
 
+	const failed = results.filter(r => !r.passed).length;
+	new Notice(failed === 0
+		? `Plugin tests: ${results.length} passed`
+		: `Plugin tests: ${failed} of ${results.length} FAILED`);
+
 	new TestResultsModal(plugin, results).open();
-	return failed.length === 0;
+	return failed === 0;
 }
 
 class TestResultsModal extends Modal {
