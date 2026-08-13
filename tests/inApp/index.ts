@@ -8,7 +8,10 @@ import { Modal, Notice } from 'obsidian';
 import ImportAttachments from 'main';
 import { runAllTests, TestResult } from './harness';
 
-// Importing a suite is what registers it. Add new files here.
+// Importing is what registers. Pure specs come from the shared list, so they run here
+// against the real Obsidian as well as headlessly against the shim; vault-only suites
+// are listed individually below.
+import '../shared/specs/index';
 import './suites/strayAttachments';
 
 export async function runPluginTests(plugin: ImportAttachments) {

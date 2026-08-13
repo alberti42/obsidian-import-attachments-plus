@@ -1,20 +1,36 @@
 # Tests
 
-Two suites, split by one question: **does this need a real Obsidian to be meaningful?**
+One vocabulary, two runners. A test is written with either `it` or `itInVault`,
+depending on one question: **does it need a live vault?**
 
-| | `tests/unit/` | `tests/inApp/` |
+```
+tests/shared/spec.ts        suite / it / assert… — the vocabulary and the registry
+tests/shared/specs/         pure specs: run headlessly AND inside Obsidian
+tests/unit/specs.test.ts    replays the pure specs into node --test
+tests/inApp/harness.ts      itInVault + the vault context; runs both registries
+tests/inApp/suites/         vault-only tests
+tests/vault/                sandbox vault to run the in-app suite in
+```
+
+| | `it` | `itInVault` |
 | --- | --- | --- |
-| Run with | `npm test` | `npm run dev:test`, then a command inside Obsidian |
-| Needs Obsidian | no | yes |
-| Can gate a PR | yes | no — it is a manual regression suite |
-| Good for | pure logic: path handling, folder resolution, settings shapes | monkey patches, the file explorer, metadata-cache timing, modals |
+| Needs a vault | no | yes |
+| Runs under `npm test` | **yes** | no |
+| Runs inside Obsidian | **yes** | yes |
+| Good for | folder resolution, path handling, settings shapes | monkey patches, the file explorer, metadata-cache timing, modals |
 
-The split matters. The `obsidian` npm package ships **type declarations only** — there is
-no runtime — so anything touching `TFile`, `normalizePath` or the metadata cache cannot
-execute under Node without being faked. Faking it is fine for a pure function and
-actively misleading for everything else: the bugs this plugin actually had were a patched
-method that no longer exists and a race between two notes being re-indexed. A stub would
-have reproduced both of those *incorrectly* and the tests would have passed.
+A pure spec runs in **both** places, and that is deliberate rather than wasteful. The
+`obsidian` npm package ships **type declarations only** — there is no runtime — so
+headlessly those specs execute against `tests/shims/obsidian.ts`, a hand-written stand-in
+for `normalizePath` and friends. Inside Obsidian the very same file executes against the
+real thing. **A spec that passes under `npm test` and fails in the app means the shim has
+drifted from Obsidian's behaviour** — which is the one failure mode hand-written fakes
+otherwise hide completely.
+
+Anything that cannot be tested honestly outside Obsidian should not be: the bugs this
+plugin actually had were a monkey patch on a method that no longer exists and a race
+between two notes being re-indexed. A stub would have reproduced both *incorrectly* and
+the tests would have passed.
 
 ## Headless suite — `npm test`
 
@@ -22,15 +38,21 @@ have reproduced both of those *incorrectly* and the tests would have passed.
 npm test        # bundles tests/unit/*.test.ts, then runs node --test
 ```
 
-esbuild bundles each test (resolving the `baseUrl: src` bare imports, which `node --test`
-alone cannot do) into `dist-tests/`, aliasing `obsidian` to `tests/shims/obsidian.ts`.
-No test framework is installed — Node's built-in runner and `node:assert/strict` are
-enough, and the plugin stays dependency-free.
+esbuild bundles `tests/unit/specs.test.ts` (resolving the `baseUrl: src` bare imports,
+which `node --test` alone cannot do) into `dist-tests/`, aliasing `obsidian` to the shim.
+No test framework is installed — Node's built-in runner is enough, and the plugin stays
+dependency-free.
 
-To add a test, drop a `tests/unit/<name>.test.ts` in place; it is picked up by the glob.
+**To add a pure spec:** write `tests/shared/specs/<name>.spec.ts` using `suite` and `it`
+from `../spec`, then add one import line to `tests/shared/specs/index.ts`. That single
+list is what both runners read, so there is nowhere else to register it.
 
-Keep the shim small. If a test needs much more of Obsidian than the shim already offers,
-that is the signal it belongs in the in-app suite instead.
+Assertions come from `../spec` (`assert`, `assertEqual`, `assertDeepEqual`,
+`assertThrows`) rather than `node:assert`, because the same file has to run inside
+Obsidian where `node:assert` does not exist.
+
+Keep the shim small. If a spec needs much more of Obsidian than the shim already offers,
+that is the signal it should be an `itInVault` test instead.
 
 ## In-app suite — `npm run dev:test`
 
@@ -57,10 +79,10 @@ npm run build && grep -c run-plugin-tests dist/main.js   # 0
 ### Writing one
 
 ```ts
-import { suite, it, assert, assertEqual } from '../harness';
+import { suite, itInVault, assert, assertEqual } from '../harness';
 
 suite('my area', () => {
-  it('does the thing', async (t) => {
+  itInVault('does the thing', async (t) => {
     const image = await t.attachment('Note (attachments)/pic.png');
     await t.note('Note.md', `![[${image.name}]]\n`);   // already waits for the cache
 
@@ -70,6 +92,11 @@ suite('my area', () => {
 ```
 
 Then import the file from `tests/inApp/index.ts` — importing is what registers it.
+
+`itInVault` rather than `it`: the name is the reminder that this test can only run in
+one of the two places. If you find yourself reaching for it when the test does not
+actually touch the vault, use `it` in `tests/shared/specs/` instead and get the headless
+run for free.
 
 The context `t` gives you:
 

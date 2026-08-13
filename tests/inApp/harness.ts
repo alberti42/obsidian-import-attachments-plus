@@ -9,6 +9,10 @@
 
 import { App, TFile, TFolder } from 'obsidian';
 import ImportAttachments from 'main';
+import { pureSpecs, suite, assert, assertEqual, assertDeepEqual, assertThrows, currentSuiteName } from '../shared/spec';
+
+// Re-exported so an in-app suite imports one module rather than two.
+export { suite, assert, assertEqual, assertDeepEqual, assertThrows };
 
 export type TestContext = {
 	app: App;
@@ -40,29 +44,13 @@ type TestFn = (t: TestContext) => Promise<void> | void;
 type Registered = { suite: string; name: string; fn: TestFn };
 
 const registered: Registered[] = [];
-let currentSuite = '(none)';
 
-export function suite(name: string, body: () => void) {
-	const previous = currentSuite;
-	currentSuite = name;
-	body();
-	currentSuite = previous;
-}
-
-export function it(name: string, fn: TestFn) {
-	registered.push({ suite: currentSuite, name, fn });
-}
-
-/* ------------------------------------------------------------------ assertions */
-
-export function assert(condition: boolean, message: string): asserts condition {
-	if (!condition) { throw new Error(message); }
-}
-
-export function assertEqual<T>(actual: T, expected: T, message?: string) {
-	if (actual !== expected) {
-		throw new Error(`${message ?? 'not equal'}\n  expected: ${String(expected)}\n  actual:   ${String(actual)}`);
-	}
+/**
+ * A test that needs a live vault. Use `it` from ../shared/spec for anything that does
+ * not — those run headlessly as well, and a pure test is worth far more there.
+ */
+export function itInVault(name: string, fn: TestFn) {
+	registered.push({ suite: currentSuiteName(), name, fn });
 }
 
 /* --------------------------------------------------------------------- results */
@@ -82,14 +70,21 @@ export async function runAllTests(plugin: ImportAttachments, perTestTimeoutMs = 
 	const app = plugin.app;
 	const results: TestResult[] = [];
 
-	console.log(`[plugin tests] starting — ${registered.length} test(s) registered`);
-	if (registered.length === 0) {
-		console.warn('[plugin tests] nothing registered. Suites register by being imported — '
-			+ 'check that tests/inApp/index.ts imports your suite file.');
+	// The pure specs run here as well as headlessly. Same files, real Obsidian instead
+	// of tests/shims/obsidian.ts — so a spec that passes under `npm test` and fails
+	// here means the shim has drifted from Obsidian's actual behaviour.
+	const pure: Registered[] = pureSpecs().map(s => ({ suite: s.suite, name: s.name, fn: () => s.fn() }));
+	const all = [...pure, ...registered];
+
+	console.log(`[plugin tests] starting — ${pure.length} pure spec(s) + ${registered.length} vault test(s)`);
+	if (all.length === 0) {
+		console.warn('[plugin tests] nothing registered. Tests register by being imported — '
+			+ 'check that tests/inApp/index.ts imports your suite, and that pure specs are '
+			+ 'listed in tests/shared/specs/index.ts.');
 		return results;
 	}
 
-	for (const [index, entry] of registered.entries()) {
+	for (const [index, entry] of all.entries()) {
 		const scratch = `_plugin-tests/run-${index}`;
 		const label = `${entry.suite} › ${entry.name}`;
 		const started = performance.now();

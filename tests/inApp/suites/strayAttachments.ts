@@ -9,11 +9,11 @@
 
 import { AttachmentFolderLocationType } from 'types';
 import { findStrayAttachments, findStrayAttachmentsOfNote } from 'strayAttachments';
-import { suite, it, assert, assertEqual } from '../harness';
+import { suite, itInVault, assert, assertEqual } from '../harness';
 
 suite('stray attachments', () => {
 
-	it('finds an attachment left behind when text moves to another note', async (t) => {
+	itInVault('finds an attachment left behind when text moves to another note', async (t) => {
 		requireSubfolderMode(t.plugin);
 
 		// "Big note" owns the attachment folder and originally references the image.
@@ -35,7 +35,7 @@ suite('stray attachments', () => {
 		);
 	});
 
-	it('leaves an attachment alone while the note it is filed under still uses it', async (t) => {
+	itInVault('leaves an attachment alone while the note it is filed under still uses it', async (t) => {
 		requireSubfolderMode(t.plugin);
 
 		const image = await t.attachment('Big note (attachments)/shared.png');
@@ -47,7 +47,7 @@ suite('stray attachments', () => {
 		assertEqual(findStrayAttachmentsOfNote(t.plugin, other).length, 0, 'shared attachment must not move');
 	});
 
-	it('never touches a folder outside the plugin\'s pattern', async (t) => {
+	itInVault('never touches a folder outside the plugin\'s pattern', async (t) => {
 		requireSubfolderMode(t.plugin);
 
 		// A hand-curated folder: not named after any note, so not ours.
@@ -58,7 +58,7 @@ suite('stray attachments', () => {
 		assertEqual(findStrayAttachmentsOfNote(t.plugin, note).length, 0, 'assets/ must be left alone');
 	});
 
-	it('the vault-wide command reports nothing for a tidy vault', async (t) => {
+	itInVault('the vault-wide command reports nothing for a tidy vault', async (t) => {
 		requireSubfolderMode(t.plugin);
 
 		const image = await t.attachment('Note (attachments)/pic.png');
