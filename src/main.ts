@@ -637,11 +637,21 @@ export default class ImportAttachments extends Plugin {
                                 // Wiki link `![...](...)` was matched
                                 file_path = decodeURIComponent(match[2]);
                             }
-                            return this.app.vault.getFileByPath(file_path);
+                            // What the regex captured is a linkpath, not a vault path: it omits
+                            // folders under every link format except 'Absolute path in vault'.
+                            // vault.getFileByPath() stood here and therefore returned null for
+                            // almost every real link, which quietly disabled the check below —
+                            // the same confusion as C27, and it also called an API newer than
+                            // the declared minAppVersion (C15).
+                            return resolveLink(this.app, file_path, activeView.file?.path ?? '');
                         })();
+                        traceDelete('link at this offset resolves to', fileInVault?.path ?? null);
 
                         if (fileInVault && fileInVault !== file_src) {
-                            throw new DeleteLinkError(`after parsing the link, file '${file_src.path}' was found in the vault, but does not match with clicked file '${file_src.path}'`);
+                            // Now reachable, and worth reaching: it means the link found here
+                            // points somewhere other than the file that was clicked, so removing
+                            // it would delete the wrong link from the note.
+                            throw new DeleteLinkError(`the link at this position resolves to '${fileInVault.path}', not to the clicked file '${file_src.path}'`);
                         }
                 
                         // Delete the file with user prompt

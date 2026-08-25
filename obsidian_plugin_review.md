@@ -67,7 +67,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C12](#c12) | Top-level `path` import (mobile) | 2 | `investigate` | high | L | todo |
 | [C13](#c13) | Top-level `fs` import (mobile) | 2 | `investigate` | high | L | todo |
 | [C14](#c14) | Top-level `crypto` import (mobile) | 1 | `investigate` | high | S | todo |
-| [C15](#c15) | API newer than `minAppVersion` | 2 | `decision-needed` | medium | S | todo |
+| [C15](#c15) | API newer than `minAppVersion` | 2 | `decision-needed` | medium | S | done |
 | [C16](#c16) | Redundant `\| undefined` on optional params | 2 | `fix` | low | S | done |
 | [C17](#c17) | Inline `style.display` in settings | 2 | `fix` | low | S | done |
 | [C18](#c18) | `authorUrl` unreachable | 1 | `decision-needed` | low | S | todo |
@@ -712,7 +712,7 @@ Same problem as **C12** — `utils.ts:3`. Cheapest of the three to resolve indep
 ```yaml
 id: C15
 status: todo          # todo | in-progress | done | wontfix | blocked
-outcome:              # one line + commit SHA, filled in by the session that closes this
+outcome: resolved with getFirstLinkpathDest instead of bumping the floor — minAppVersion stays 1.5.0; revived a cross-check that had always returned null — [sha]
 severity: medium       # as reported by the scan
 verdict: decision-needed
 risk: medium
@@ -742,6 +742,29 @@ sites: 2
 (b) is the safer default — it keeps the 1.5.0 floor that every release so far has declared.
 
 **Traps** — CLAUDE.md: `manifest.json`, `package.json` and `versions.json` must stay in sync; `minAppVersion` is *not* touched by `npm version`, so a bump is a hand edit. `versions.json` maps plugin version → minAppVersion, so bumping affects which app versions get offered the update.
+
+**Done — and neither (a) nor (b).** No decision about the version floor was needed in the end,
+because option (b) would have failed for the same reason `getFileByPath` did.
+
+- The first site went in [C27](#c27): it was resolving an embed's DOM `src`.
+- The second, in `delete_file_cb`'s cross-check, was parsing a **linkpath** out of the note text.
+  `getAbstractFileByPath` + `instanceof TFile` — the recommended option — resolves from the vault
+  root just like `getFileByPath`, so it would have gone on returning null for every link that is
+  not an absolute vault path. The right function is `getFirstLinkpathDest`, via the same
+  `resolveLink()` the other sites now use, and it long predates 1.5.0.
+
+`grep -rn getFileByPath src/` now matches only the comments explaining what used to be there.
+**`minAppVersion` stays 1.5.0**, as every release so far has declared, and `versions.json` is
+untouched.
+
+**A dead check came back to life.** Because the lookup always returned null, `if (fileInVault &&
+fileInVault !== file_src)` never fired. It fires now, and it is worth having: it means the link
+found at this position points somewhere other than the file that was clicked, so removing it would
+strip the *wrong* link from the note — reachable on a line holding several embeds. The message also
+interpolated `file_src.path` twice, claiming a file did not match itself; it now names both files.
+
+The consequence to know: a mismatch throws `DeleteLinkError`, which the existing handler answers by
+deleting the file and leaving the note alone. That is the safe side of the trade.
 
 ---
 
