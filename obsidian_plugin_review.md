@@ -82,6 +82,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C27](#c27) | Delete-image menu item did nothing (found while testing C25) | 2 | `fix` | high | S | done |
 | [C28](#c28) | Delete prompt in a popout may never resolve (found while fixing C20) | 1 | `investigate` | medium | S | done |
 | [C29](#c29) | Delete confirmation never resolved — deletion silently half-done | 1 | `fix` | **critical** | M | done |
+| [C30](#c30) | Delete menu offered in reading view | 1 | `fix` | low | S | done |
 
 **Suggested order.** Mechanical first, so the noise drops fast and later diffs stay small:
 C16 → C05 → C08 → C07 → C04+C21 → C17 → C25 → C19 → C20 → C03 → C23 → C06.
@@ -1219,6 +1220,45 @@ the caller ([C01](#c01)). Any one of the three would have surfaced it.
 **Verify** — with *Confirm file deletion* **on**: delete an attachment via the context menu (file
 and link both go), cancel the prompt (neither goes), and delete a note with a `${notename}` folder
 (the folder-cleanup prompt appears at all). The first is verified; see the outcome line.
+
+---
+
+## C30 — Delete menu offered in reading view
+
+```yaml
+id: C30
+status: done          # todo | in-progress | done | wontfix | blocked
+outcome: context_menu_cb now returns unless getMode() is 'source', so reading view keeps Obsidian's own image menu — [sha]
+severity: low         # not from the scan: the user's call while testing C27/C29
+verdict: fix
+risk: low
+size: S
+sites: 1
+```
+
+**The user's decision**, made while testing the fixes above: *Delete image file* should not be
+offered in reading view.
+
+**Sites**
+
+| line | scanned | code |
+| --- | --- | --- |
+| `src/main.ts:879` | — | `context_menu_cb` — the view-mode gate |
+
+**Why it is more than cosmetic** — the handler calls `evt.preventDefault()` before building its own
+`Menu`, so in reading view it did not *add* an item, it **replaced** Obsidian's image context menu
+(*Copy image*, *Open in default app*, …) with a single item that then edits a note the reader is not
+editing. Returning early leaves the native menu untouched.
+
+`MarkdownView.getMode()` reports `'source'` for both source mode and live preview, so
+`!== 'source'` excludes reading view and nothing else.
+
+**Knock-on for [C27](#c27)** — the `posAtDOM` fallback added there was aimed at reading view, which
+can no longer reach this code at all. It is still reachable from a hover popover or a Dataview block
+while the underlying note is in source mode, so it stays, but it remains **unexercised**. Note a
+known edge if anyone does chase it: in a hover popover the *active* view is the underlying note, so
+the cache fallback would look for the link in the wrong file. It declines rather than guessing when
+the reference is not unique.
 
 ---
 

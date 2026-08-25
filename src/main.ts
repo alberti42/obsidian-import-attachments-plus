@@ -881,7 +881,15 @@ export default class ImportAttachments extends Plugin {
         // Only hijack the context menu inside a markdown view. getActiveViewOfType replaces
         // the deprecated workspace.activeLeaf; note it also returns null when there is no
         // active leaf at all, where the old code fell through and carried on.
-        if (!this.app.workspace.getActiveViewOfType(MarkdownView)) {return;}
+        const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+        if (!activeView) {return;}
+
+        // Not in reading view. Deleting an attachment also edits the note, which is not what
+        // reading view is for, and returning here leaves Obsidian's own image context menu
+        // intact — the handler calls preventDefault() below, so offering our single item there
+        // means taking away 'Copy image', 'Open in default app' and the rest. getMode() reports
+        // 'source' for both source mode and live preview, so only reading view is excluded.
+        if (activeView.getMode() !== 'source') {return;}
         // This handler is registered on every document (design point #2), so the event can come
         // from a popout window, whose HTMLElement is a different constructor: `instanceof` is
         // false there, and the menu item would simply never appear. instanceOf is cross-window
