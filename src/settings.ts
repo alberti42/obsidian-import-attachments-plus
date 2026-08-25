@@ -40,7 +40,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
         const timeout_ms = 50;
 
         if (this.saveTimeout) {
-            clearTimeout(this.saveTimeout);
+            window.clearTimeout(this.saveTimeout);
         }
 
         this.saveTimeout = window.setTimeout(() => {

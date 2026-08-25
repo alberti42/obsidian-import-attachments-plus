@@ -56,7 +56,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C01](#c01) | Floating promises | 22 | `fix-with-care` | medium | L | todo |
 | [C02](#c02) | Unbound method references (`this` scoping) | 17 | `false-positive-fix-anyway` | medium | M | todo |
 | [C03](#c03) | Console logging | 10 | `false-positive-document` | low | S | todo |
-| [C04](#c04) | `setTimeout` → `window.setTimeout` | 6 | `fix` | low | S | todo |
+| [C04](#c04) | `setTimeout` → `window.setTimeout` | 6 | `fix` | low | S | done |
 | [C05](#c05) | `await` on non-promises | 6 | `fix` | low | S | done |
 | [C06](#c06) | `document.createElement` → `createEl` | 4 | `investigate` | low | S | todo |
 | [C07](#c07) | Unnecessary type assertions | 3 | `fix` | low | S | done |
@@ -73,7 +73,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C18](#c18) | `authorUrl` unreachable | 1 | `decision-needed` | low | S | todo |
 | [C19](#c19) | `builtin-modules` dependency | 1 | `fix` | low | S | todo |
 | [C20](#c20) | `instanceof HTMLElement` across windows | 1 | `fix` | medium | S | todo |
-| [C21](#c21) | `clearTimeout` → `window.clearTimeout` | 1 | `fix` | low | S | todo |
+| [C21](#c21) | `clearTimeout` → `window.clearTimeout` | 1 | `fix` | low | S | done |
 | [C22](#c22) | No `getSettingDefinitions()` (settings search) | 1 | `decision-needed` | medium | M | todo |
 | [C23](#c23) | `Object.create(TFile.prototype) as TFile` | 1 | `false-positive-document` | low | S | todo |
 | [C24](#c24) | `display()` deprecated since 1.13 | 1 | `decision-needed` | low | S | todo |
@@ -250,8 +250,8 @@ sites: 10
 
 ```yaml
 id: C04
-status: todo          # todo | in-progress | done | wontfix | blocked
-outcome:              # one line + commit SHA, filled in by the session that closes this
+status: done          # todo | in-progress | done | wontfix | blocked
+outcome: all 6 modal setTimeout calls window-scoped, together with C21 — [sha]
 severity: medium       # as reported by the scan
 verdict: fix
 risk: low
@@ -809,8 +809,8 @@ sites: 1
 
 ```yaml
 id: C21
-status: todo          # todo | in-progress | done | wontfix | blocked
-outcome:              # one line + commit SHA, filled in by the session that closes this
+status: done          # todo | in-progress | done | wontfix | blocked
+outcome: settings.ts clearTimeout window-scoped, in the same commit as C04 — [sha]
 severity: medium       # as reported by the scan
 verdict: fix
 risk: low

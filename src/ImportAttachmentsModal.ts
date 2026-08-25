@@ -151,7 +151,7 @@ export class ImportActionTypeModal extends Modal {
 			this.import();
 		});
 
-		setTimeout(() => {
+		window.setTimeout(() => {
 			// Set focus with a slight delay:
 			// this method leverages JavaScript's event loop, ensuring that focusing the button
 			// is enqueued after all the elements are properly rendered and the DOM is fully updated.
@@ -263,7 +263,7 @@ export class OverwriteChoiceModal extends Modal {
 			this.close(); 
 		});
 		
-		setTimeout(() => {
+		window.setTimeout(() => {
 			// Set focus with a slight delay:
 			// this method leverages JavaScript's event loop, ensuring that focusing the button
 			// is enqueued after all the elements are properly rendered and the DOM is fully updated.
@@ -347,7 +347,7 @@ export class DeleteAttachmentFolderModal extends Modal {
 			this.close(); 
 		});
 		
-		setTimeout(() => {
+		window.setTimeout(() => {
 			// Set focus with a slight delay:
 			// this method leverages JavaScript's event loop, ensuring that focusing the button
 			// is enqueued after all the elements are properly rendered and the DOM is fully updated.
@@ -431,7 +431,7 @@ export class ImportFromVaultChoiceModal extends Modal {
 			this.close(); 
 		});
 		
-		setTimeout(() => {
+		window.setTimeout(() => {
 			// Set focus with a slight delay:
 			// this method leverages JavaScript's event loop, ensuring that focusing the button
 			// is enqueued after all the elements are properly rendered and the DOM is fully updated.
@@ -502,7 +502,7 @@ export class FolderImportErrorModal extends Modal {
             this.close(); 
         });
         
-        setTimeout(() => {
+        window.setTimeout(() => {
             // Set focus with a slight delay:
             // this method leverages JavaScript's event loop, ensuring that focusing the button
             // is enqueued after all the elements are properly rendered and the DOM is fully updated.
@@ -562,7 +562,7 @@ export class CreateAttachmentFolderModal extends Modal {
             this.close(); 
         });
         
-        setTimeout(() => {
+        window.setTimeout(() => {
             // Set focus with a slight delay:
             // this method leverages JavaScript's event loop, ensuring that focusing the button
             // is enqueued after all the elements are properly rendered and the DOM is fully updated.
