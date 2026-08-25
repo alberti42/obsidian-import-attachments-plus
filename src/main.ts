@@ -15,8 +15,6 @@ import {
     TFile,
     MenuItem,
     EditorPosition,
-    WorkspaceWindow,
-    WorkspaceLeaf,
 } from 'obsidian';
 
 // Import utility and modal components
@@ -36,8 +34,6 @@ import {
 	isSettingsLatestFormat,
 	isSettingsFormat_1_3_0,
 	ImportAttachmentsSettings_1_3_0,
-    isSupportedMediaTag,
-    MediaLabels,
 } from './types';
 import * as Utils from 'utils';
 
@@ -73,19 +69,6 @@ const traceDelete = process.env.NODE_ENV === 'development'
     ? (...args: unknown[]) => { console.log('[delete attachment]', ...args); }
     : () => { /* no-op in production */ };
 
-// Dev-only: the DOM chain above a clicked media element, for diagnosing which ancestor
-// actually carries the vault link.
-const describeAncestry = process.env.NODE_ENV === 'development'
-    ? (el: HTMLElement | null): string[] => {
-        const out: string[] = [];
-        for (let node = el; node && out.length < 5; node = node.parentElement) {
-            const src = node.getAttribute('src');
-            out.push(`${node.tagName.toLowerCase()}.${node.className || '-'}${src!==null ? ` [src=${src}]` : ''}`);
-        }
-        return out;
-    }
-    : () => [];
-
 export default class ImportAttachments extends Plugin {
 	settings: ImportAttachmentsSettings = { ...DEFAULT_SETTINGS };
 	vaultPath: string;
@@ -97,7 +80,6 @@ export default class ImportAttachments extends Plugin {
 
     // mechanism to prevent calling the callback multiple times when renaming attachments associated with a markdown note
     private file_menu_cb_registered: boolean = false;
-    private file_menu_embedded_cb_registered_docs:Map<Document, boolean> = new Map<Document, boolean>();;
     
 	constructor(app: App, manifest: PluginManifest) {
 		super(app, manifest);
@@ -248,64 +230,10 @@ export default class ImportAttachments extends Plugin {
         // Add delete menu in context menu of links
 	    this.addDeleteMenuForLinks(this.settings.showDeleteMenu);
 
-        // Register documents
-        this.registerDocuments();
-
 		if (process.env.NODE_ENV === 'development') {
 			console.log('Loaded plugin Import Attachments+');
 		}
 	}
-
-    private iterateOverAllDocuments(fnc_cb:((doc:Document)=>void)) {
-        this.app.workspace.iterateAllLeaves((leaf:WorkspaceLeaf)=>{
-            const doc = leaf.view.containerEl.ownerDocument;
-            fnc_cb(doc);
-        });
-    }
-
-    private registerDocuments() {
-        // We first register the current document. It is important to do so
-        // because at the launch, there are no leaves yet.
-        this.addDeleteMenuForEmbeddedImages(document);
-
-        // We scan through all leaves and look for other open documents.
-        // This is important if the plugin is disabled and reenabled, and there multiple
-        // windows open.
-        this.iterateOverAllDocuments((doc:Document) => {
-            if(!this.file_menu_embedded_cb_registered_docs.has(doc)) {
-                // Add the doc to the tracked docs by default as unregistered
-                this.file_menu_embedded_cb_registered_docs.set(doc,false);
-                if(this.settings.showDeleteMenuForEmbedded) {
-                    // Add delete menu in context menu of embedded images
-                    this.addDeleteMenuForEmbeddedImages(doc);    
-                }
-            }
-        });
-
-        // Add handler to keep track of opened windows
-        this.app.workspace.on('window-open', (_:WorkspaceWindow, window:Window) => {
-            const doc = window.document;
-            if(!this.file_menu_embedded_cb_registered_docs.has(doc)) {
-                // Add the doc to the tracked docs
-                this.file_menu_embedded_cb_registered_docs.set(doc,false); // we add it to the map by default as unregistered
-            }
-            if(this.settings.showDeleteMenuForEmbedded) {
-                // Add delete menu in context menu of embedded images
-                this.addDeleteMenuForEmbeddedImages(doc);    
-            }
-        });
-
-        // Add handler to keep track of opened windows
-        this.app.workspace.on('window-close', (_:WorkspaceWindow, window:Window) => {
-            const doc = window.document;
-            if(this.file_menu_embedded_cb_registered_docs.has(doc)) {
-                // Remove delete menu in context menu of embedded images
-                this.removeDeleteMenuForEmbeddedImages(doc);
-                // Remove the doc from the tracked docs
-                this.file_menu_embedded_cb_registered_docs.delete(doc);
-            }
-        });
-    }
 
     addCommands() {
         // Command for importing as a standard link
@@ -401,8 +329,6 @@ export default class ImportAttachments extends Plugin {
         // remove delete menu
         this.addDeleteMenuForLinks(false);
 
-        // remove delete menu for embedded graphics
-        this.removeDeleteMenuForEmbeddedImages('all');
 	}
 
     addDeleteMenuForLinks(status:boolean) {
@@ -413,50 +339,6 @@ export default class ImportAttachments extends Plugin {
             if(this.file_menu_cb_registered) {
                 this.app.workspace.off('file-menu', this.file_menu_cb as (...data: unknown[]) => unknown);
                 this.file_menu_cb_registered = false;
-            }
-        }
-    }
-
-    addDeleteMenuForEmbeddedImages(doc:Document | 'all') {
-        const registerDoc = (d:Document) => {
-            d.addEventListener('contextmenu', this.context_menu_cb);
-            this.file_menu_embedded_cb_registered_docs.set(d,true);
-            // console.log("REGISTERED");
-            // console.log(d);
-        };
-
-        if(doc==='all') {
-            this.file_menu_embedded_cb_registered_docs.forEach((status:boolean, d:Document) => {
-                if(status===false) {  // then we register it
-                    registerDoc(d);
-                }
-            });
-        } else {
-            const status = this.file_menu_embedded_cb_registered_docs.get(doc);
-            if(status===undefined || status===false) { // then we register it
-                registerDoc(doc);
-            }
-        }
-    }
-
-    removeDeleteMenuForEmbeddedImages(doc:Document|'all') {
-        const unregisterDoc = (d:Document) => {
-            d.removeEventListener('contextmenu', this.context_menu_cb);
-            this.file_menu_embedded_cb_registered_docs.set(d,false);
-            // console.log("UNREGISTERED");
-            // console.log(d);
-        };
-
-        if(doc==='all') {
-            this.file_menu_embedded_cb_registered_docs.forEach((status:boolean, d:Document) => {
-                if(status===true) {  // then we register it
-                    unregisterDoc(d);
-                }
-            });
-        } else {
-            const status = this.file_menu_embedded_cb_registered_docs.get(doc);
-            if(status===true) {
-                unregisterDoc(doc);
             }
         }
     }
@@ -692,47 +574,6 @@ export default class ImportAttachments extends Plugin {
         return false;
     }
 
-    async delete_img_cb(evt: MouseEvent, target:HTMLElement) {
-        // Get a TFile reference from the clicked HTML element 
-        const fileToBeDeleted:TFile|null = (():TFile|null=>{
-            // The vault link lives on the .internal-embed wrapper. This used to read
-            // target.parentElement, but that wrapper is not always the img's direct parent:
-            // Obsidian nests further elements in some views, and then getAttribute('src')
-            // returned null and the menu item silently did nothing.
-            const embedEl = target.closest<HTMLElement>('.internal-embed');
-            const src = embedEl?.getAttribute('src') ?? target.parentElement?.getAttribute('src') ?? null;
-            traceDelete('embed element', {
-                found: embedEl!==null,
-                cls: embedEl?.className ?? null,
-                ancestry: describeAncestry(target),
-            });
-            if(!src) {return null;}
-            // The `src` of an .internal-embed is the link *as written*, i.e. a linkpath and
-            // not a vault path. Only the 'Absolute path in vault' link format makes the two
-            // coincide: with 'Shortest path when possible' or 'Path from the current file'
-            // the folders are omitted, so vault.getFileByPath() resolved nothing from the
-            // vault root and the click silently did nothing. resolveLink() resolves it the
-            // way Obsidian does — relative to the note holding the link, url-decoding as a
-            // fallback so markdown-style embeds work too.
-            const sourcePath = this.app.workspace.getActiveFile()?.path ?? '';
-            const resolved = resolveLink(this.app, src, sourcePath);
-            traceDelete('resolving embed', { src, sourcePath, resolved: resolved?.path ?? null });
-            if(!resolved) {
-                // Do not fail silently: an unresolved embed used to make the menu item a no-op.
-                // A dangling embed lands here — Obsidian still renders a broken <img> for one, so
-                // the menu item is offered for a file that is no longer in the vault.
-                const msg = `The embedded file '${src}' is not in the vault; nothing to delete.`;
-                console.error(`Import Attachments+: ${msg}`);
-                new Notice(msg);
-            }
-            return resolved;
-        })();
-
-        if(!fileToBeDeleted) {return;}
-
-        await this.delete_file_cb(fileToBeDeleted,target);
-    }
-
     async onExternalSettingsChange() {
         // Load settings
         await this.loadSettings();
@@ -885,62 +726,6 @@ export default class ImportAttachments extends Plugin {
         await Utils.createFolderIfNotExists(this.app.vault,attachmentsFolderPath);
 
         return Utils.joinPaths(attachmentsFolderPath,attachmentName);
-    }
-
-    context_menu_cb = (evt: MouseEvent) => {
-        // Only hijack the context menu inside a markdown view. getActiveViewOfType replaces
-        // the deprecated workspace.activeLeaf; note it also returns null when there is no
-        // active leaf at all, where the old code fell through and carried on.
-        const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-        if (!activeView) {return;}
-
-        // Not in reading view. Deleting an attachment also edits the note, which is not what
-        // reading view is for, and returning here leaves Obsidian's own image context menu
-        // intact — the handler calls preventDefault() below, so offering our single item there
-        // means taking away 'Copy image', 'Open in default app' and the rest. getMode() reports
-        // 'source' for both source mode and live preview, so only reading view is excluded.
-        if (activeView.getMode() !== 'source') {return;}
-        // This handler is registered on every document (design point #2), so the event can come
-        // from a popout window, whose HTMLElement is a different constructor: `instanceof` is
-        // false there, and the menu item would simply never appear. instanceOf is cross-window
-        // safe. The scan flagged only the patchFileManager site, not this one.
-        const eventTarget = evt.target as Node | null;
-        if(eventTarget === null || !eventTarget.instanceOf(HTMLElement)) {return;}
-        const target:HTMLElement = eventTarget;
-        const tagName:string = target.tagName;
-
-        // Check if the right-clicked element is an image
-        if (isSupportedMediaTag(tagName)) {
-            const parent = target.parentElement;
-            if(!parent) {return;}
-
-            evt.preventDefault(); // Prevent the default context menu
-
-            // Create a new Menu instance
-            const menu = new Menu();
-
-            // Add options to the menu
-            menu.addItem((item) => {
-                item.setTitle(`Delete ${MediaLabels[tagName]}`)
-                    .setIcon('trash-2')
-                    .setSection('danger')
-                    .onClick(() => {
-                        traceDelete('menu item clicked', { tagName, src: target.parentElement?.getAttribute('src') });
-                        // An unhandled rejection here is invisible, which is how a broken
-                        // delete path went unnoticed: say so instead.
-                        this.delete_img_cb(evt,target).catch((err: unknown) => {
-                            console.error('Import Attachments+: deleting the attachment failed:', err);
-                            new Notice('Failed to delete the attachment.');
-                        });
-                    });
-                item.dom.classList.add('is-warning');
-            });
-
-            // Add more context menu items as needed
-
-            // Show the context menu at the mouse position
-            menu.showAtMouseEvent(evt);
-        }
     }
 
     editor_rename_cb = async (newFile: TAbstractFile, oldPath: string) => {

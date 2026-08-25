@@ -50,7 +50,8 @@ export type ReferenceMaps = {
  * by hand instead would silently drop every `[alt](file.png)` link.
  *
  * Exported because the same resolution is needed outside this file: the `src` of an
- * .internal-embed in the DOM is a linkpath too, not a vault path (see delete_img_cb).
+ * .internal-embed in the DOM is a linkpath too, not a vault path, and so is what a regex pulls
+ * out of the note text (see delete_file_cb).
  */
 export function resolveLink(app: App, link: string, sourcePath: string): TFile | null {
 	const linkpath = getLinkpath(link);

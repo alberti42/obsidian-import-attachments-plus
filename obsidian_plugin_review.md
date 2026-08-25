@@ -84,6 +84,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C29](#c29) | Delete confirmation never resolved — deletion silently half-done | 1 | `fix` | **critical** | M | done |
 | [C30](#c30) | Delete menu offered in reading view | 1 | `fix` | low | S | done |
 | [C31](#c31) | 'Delete link and file' looked for the link at the caret | 1 | `fix` | medium | S | done |
+| [C32](#c32) | Embedded-image menu replaced Obsidian's own | 1 | `fix` | medium | M | done |
 
 **Suggested order.** Mechanical first, so the noise drops fast and later diffs stay small:
 C16 → C05 → C08 → C07 → C04+C21 → C17 → C25 → C19 → C20 → C03 → C23 → C06.
@@ -1403,6 +1404,64 @@ that failed before.
 the same linkpath confusion [C27](#c27) fixed. With a relative link such as
 `![[../Hello (attachments)/x.png]]` it simply returns null and the check is skipped. Benign, and
 still C15's to settle.
+
+---
+
+## C32 — Embedded-image menu replaced Obsidian's own
+
+```yaml
+id: C32
+status: done          # todo | in-progress | done | wontfix | blocked
+outcome: removed the custom menu and everything that served it (~250 lines, -3.5 kB); Obsidian's menu now shows, carrying the plugin's item via file_menu_cb — [sha]
+severity: medium      # not from the scan: the user's report
+verdict: fix
+risk: medium
+size: M
+sites: 1
+```
+
+**Not a scanner finding.** Reported while verifying [C15](#c15): *"when I right-click on an image,
+the contextual menu only shows the button to delete the image and link. However, when the plugin is
+disabled, right-click produces many more options."* A regression against stock Obsidian — the plugin
+was **subtracting** from the app rather than adding to it.
+
+**Sites**
+
+| line | scanned | code |
+| --- | --- | --- |
+| `src/main.ts:890` | — | `context_menu_cb` — `evt.preventDefault()` plus a hand-built `Menu` |
+
+**Pre-existing, not from this review** — though [C30](#c30) is what made it visible: once the
+plugin's entry stopped appearing in reading view, the contrast between the two modes was obvious.
+
+**Why it existed** — `cc0124c`, *"Added option to delete embedded graphics from context menu"*,
+2024-09-24, when Obsidian was ~1.6. The author's own recollection: Obsidian probably showed nothing
+useful on a right-clicked image back then, so a menu had to be built. Obsidian has one now.
+
+**How it was settled without guessing** — the `showDeleteMenuForEmbedded` setting already gated the
+whole hijack, so turning it **off** was a free preview of the removal. With it off, in live preview:
+Obsidian's full menu appears **and** carries the plugin's *Delete link and file*, which `file_menu_cb`
+adds through the `file-menu` event. Confirmed in the vault before a line was changed.
+
+**Removed** — `context_menu_cb`, `delete_img_cb`, `addDeleteMenuForEmbeddedImages`,
+`removeDeleteMenuForEmbeddedImages`, `registerDocuments`, `iterateOverAllDocuments`,
+`file_menu_embedded_cb_registered_docs`, the `window-open`/`window-close` handlers, the
+`describeAncestry` tracer, `MediaLabels` / `SupportedMediaTag` / `isSupportedMediaTag`, and the
+*"Show option in context menu of embedded images to delete them"* setting. **~250 lines, 3.5 kB off
+the production bundle** (72390 → 68891).
+
+**No settings migration needed** — `isSettingsLatestFormat` only checks `compatibility`, so dropping
+a key needs no new compatibility value; the stale key disappears from `data.json` on the next save.
+That was checked, not assumed.
+
+**Consequences to know**
+
+- The menu item on an embed now reads *Delete link and file* rather than *Delete image file*; the
+  media-specific wording went with `MediaLabels`.
+- **CLAUDE.md design point #2 was rewritten.** It described this machinery as the plugin's
+  multi-window story. What remains of that story is real but different: cross-window `instanceOf`,
+  `window.setTimeout`, and `activeDocument` for element creation.
+- Anyone who had the setting **off** loses nothing; anyone who had it **on** gains Obsidian's menu.
 
 ---
 

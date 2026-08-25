@@ -351,25 +351,6 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
         new Setting(containerEl).setName('Managing').setHeading();
 
         new Setting(containerEl)
-            .setName('Show option in context menu of embedded images to delete them:')
-            .setDesc("With this option enabled, when you right click on an embedded image in your note, an option 'Delete image' \
-                will be shown in the context menu.")
-            .addToggle(toggle => {
-                toggle
-                .setValue(this.plugin.settings.showDeleteMenuForEmbedded)
-                .onChange(async (value: boolean) => {
-                    this.plugin.settings.showDeleteMenuForEmbedded = value;
-                    if(value) {
-                        this.plugin.addDeleteMenuForEmbeddedImages('all');   
-                    } else {
-                        this.plugin.removeDeleteMenuForEmbeddedImages('all');
-                    }
-                    
-                    this.debouncedSaveSettings();
-                })
-            });
-
-        new Setting(containerEl)
             .setName('Show option in context menu to delete attachment files:')
             .setDesc("With this option enabled, when you right click on a Wikilink in your note, an 'Delete file' \
                 will be shown in the context menu.")
