@@ -1119,7 +1119,7 @@ subfolder attachment.
 ```yaml
 id: C28
 status: todo          # todo | in-progress | done | wontfix | blocked
-outcome: real, and fixed by construction in C29 — both documents are observed now, and the yes-path no longer needs the modal at all; popout *cancel* still unverified — [sha]
+outcome: real, and fixed by construction in C29 — both documents are observed now, and the yes-path no longer needs the modal at all; popout *cancel* still unverified — 4386b0a
 severity: unknown     # not from the scan: noticed while fixing C20
 verdict: investigate
 risk: medium
@@ -1167,7 +1167,7 @@ prompt can strand the next one too.
 ```yaml
 id: C29
 status: done          # todo | in-progress | done | wontfix | blocked
-outcome: replaced modal-button scraping with the vault's own delete event; verified in a vault, file and link both go — [sha]
+outcome: replaced modal-button scraping with the vault's own delete event; verified in a vault, file and link both go — 4386b0a
 severity: critical    # not from the scan: found by manual test
 verdict: fix
 risk: high
