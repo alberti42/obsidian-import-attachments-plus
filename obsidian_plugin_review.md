@@ -188,7 +188,7 @@ Measured, two runs each: **1.86 s / 1.39 s without, 1.73 s / 1.75 s with**.
 ```yaml
 id: C02
 status: todo          # todo | in-progress | done | wontfix | blocked
-outcome: 11 callbacks are arrow properties (binds gone, identity preserved), 4 patch sites disabled with reasons, and unbound-method is now enforced — 1fc9f4c
+outcome: 11 callbacks are arrow properties (binds gone, identity preserved), 4 patch sites disabled with reasons, and unbound-method is now enforced — 1fc9f4c; verified in a vault: drop, paste, rename, both menus, folder create/rename, stray repair, and the off() path on unload
 severity: medium       # as reported by the scan
 verdict: false-positive-fix-anyway
 risk: medium
