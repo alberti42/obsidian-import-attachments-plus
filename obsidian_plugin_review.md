@@ -1314,4 +1314,11 @@ the reference is not unique.
 - **Pass:** the scan reproduced the released `main.js` **byte-for-byte** from source. Worth keeping
   true — it is the strongest signal on the page, and C19/C26 both touch the build.
 - **"Malware scan not available."** Reported separately, not counted as a warning; nothing to do.
+- **Not a bug, but confusing** (noticed while verifying [C09](#c09), and deliberately left alone).
+  One modal answers two questions — move/copy *and* embed/link — so `main.ts:1148` opens it when
+  *either* setting is still `ASK_USER`. Fixing the move/copy row therefore does not stop the prompt
+  while *Embed imported documents* is on "Ask each time", which is its default; and the modal's
+  "remember the decision" writes **both** fields, so it does stop it. Nothing on either settings row
+  says so. If it is ever worth refining: ask only the unanswered question, or add a sentence to both
+  descriptions. Not filed as a concern — the behaviour is intended.
 
