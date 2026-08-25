@@ -54,7 +54,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | ID | Concern | Sites | Verdict | Risk | Size | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | [C01](#c01) | Floating promises | 20 | `fix-with-care` | medium | L | done |
-| [C02](#c02) | Unbound method references (`this` scoping) | 17 | `false-positive-fix-anyway` | medium | M | todo |
+| [C02](#c02) | Unbound method references (`this` scoping) | 17 | `false-positive-fix-anyway` | medium | M | done |
 | [C03](#c03) | Console logging | 10 | `false-positive-document` | low | S | done |
 | [C04](#c04) | `setTimeout` → `window.setTimeout` | 6 | `fix` | low | S | done |
 | [C05](#c05) | `await` on non-promises | 6 | `fix` | low | S | done |
@@ -188,7 +188,7 @@ Measured, two runs each: **1.86 s / 1.39 s without, 1.73 s / 1.75 s with**.
 ```yaml
 id: C02
 status: todo          # todo | in-progress | done | wontfix | blocked
-outcome:              # one line + commit SHA, filled in by the session that closes this
+outcome: 11 callbacks are arrow properties (binds gone, identity preserved), 4 patch sites disabled with reasons, and unbound-method is now enforced — [sha]
 severity: medium       # as reported by the scan
 verdict: false-positive-fix-anyway
 risk: medium
@@ -235,6 +235,25 @@ sites: 17
 *Group B — the 4 `patch*.ts` sites* (`originalX = SomeClass.prototype.method`). This is the monkey-patch save/restore pattern and it is **required** to store the unbound prototype method. Do **not** bind these. Add a scoped `eslint-disable-next-line @typescript-eslint/unbound-method` with a description (see C09) and move on. (That rule *is* resolvable, unlike the one C23 wanted to disable — but this config does not enable type-checked rules, so check first whether the directive is even needed: an unused one is a warning.)
 
 **Traps** — CLAUDE.md: callbacks handed to `app.workspace.on(...)` must keep a stable identity so they can be `off()`-ed. Never wrap a registration in a fresh inline arrow.
+
+**Done, both groups, and the rule is now enforced.** A one-off type-checked run reproduced all 17
+(13 in `main.ts`, 4 in `patch*.ts`), so the split in the assessment was exactly right.
+
+*Group A* — the 11 callbacks became arrow-function class properties and the 11 `.bind(this)` lines
+went, in the same commit as the concern requires. **No registration site changed**: arrow
+properties are per-instance, so `this.file_menu_cb` is still one stable reference and the `off()` at
+`main.ts:423` still matches. The 13 findings in `main.ts` are gone; the bundle is ~570 bytes smaller
+for the 11 binds it no longer performs.
+
+*Group B* — the 4 `patch*.ts` sites keep the unbound prototype method, which is the whole point of
+the save/restore: `unpatchX` puts it *back on the prototype*, where `this` is the caller. Each now
+carries `// eslint-disable-next-line @typescript-eslint/unbound-method -- <reason>`.
+
+**And the rule is enabled in `eslint.config.js`** — this was the precondition for the disables. As
+[C23](#c23) found, a directive naming a rule ESLint cannot resolve is a hard error, and an *unused*
+directive for a rule that is resolvable but disabled is a warning; either way the lint gate breaks.
+Enabling the rule makes the four disables meaningful, costs nothing (the TypeScript program is
+already built), and means a future `.bind`-less registration of a plain method gets caught.
 
 **Verify** — after converting, load the plugin and confirm drop/paste/rename/file-menu all still fire, then unload and confirm the `file-menu` handler is gone (menu entries disappear).
 

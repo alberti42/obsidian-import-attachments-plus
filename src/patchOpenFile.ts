@@ -85,6 +85,7 @@ function unpatchOpenFile() {
 }
 
 function patchOpenFile(plugin: ImportAttachments) {
+	// eslint-disable-next-line @typescript-eslint/unbound-method -- the monkey-patch save/restore pattern requires the *unbound* prototype method: it is put back on the prototype in unpatch, where `this` is the caller
 	originalOpenFile = WorkspaceLeaf.prototype.openFile;
 
 	// Monkey patch the openFile method

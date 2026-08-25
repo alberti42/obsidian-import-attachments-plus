@@ -44,6 +44,7 @@ async function resolveAttachmentPath(plugin: ImportAttachments, fileName: string
 function patchImportFunctions(plugin: ImportAttachments) {
 
 	if (!originalGetAvailablePathForAttachments) {
+		// eslint-disable-next-line @typescript-eslint/unbound-method -- the monkey-patch save/restore pattern requires the *unbound* prototype method: it is put back on the prototype in unpatch, where `this` is the caller
 		originalGetAvailablePathForAttachments = Vault.prototype.getAvailablePathForAttachments;
 	}
 
@@ -61,6 +62,7 @@ function patchImportFunctions(plugin: ImportAttachments) {
 	// Still kept, even though we no longer delegate to it: unpatchImportFunctions() needs it to
 	// restore Obsidian's own method on unload.
 	if (!originalSaveAttachment) {
+		// eslint-disable-next-line @typescript-eslint/unbound-method -- the monkey-patch save/restore pattern requires the *unbound* prototype method: it is put back on the prototype in unpatch, where `this` is the caller
 		originalSaveAttachment = App.prototype.saveAttachment;
 	}
 

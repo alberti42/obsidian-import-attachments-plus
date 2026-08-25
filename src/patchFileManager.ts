@@ -24,6 +24,7 @@ function unpatchFilemanager() {
 
 function patchFilemanager(p: ImportAttachments) {
     plugin = p;
+	// eslint-disable-next-line @typescript-eslint/unbound-method -- the monkey-patch save/restore pattern requires the *unbound* prototype method: it is put back on the prototype in unpatch, where `this` is the caller
 	originalPromptForDeletion = FileManager.prototype.promptForDeletion;
 
     // const fileExplorer = this.app.internalPlugins.getPluginById('file-explorer');

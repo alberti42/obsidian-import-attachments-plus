@@ -53,7 +53,12 @@ module.exports = tseslint.config(
             // Discard a promise deliberately with `void`; if its failure matters to the user,
             // route it through Utils.reportFailure.
             '@typescript-eslint/no-floating-promises': 'error',
-            '@typescript-eslint/no-misused-promises': 'error'
+            '@typescript-eslint/no-misused-promises': 'error',
+            // Also type-aware, and also free. Event callbacks are arrow-function class
+            // properties, so passing `this.some_cb` to workspace.on() is safe *and* keeps the
+            // stable identity that off() needs. The four legitimate exceptions are the
+            // monkey-patch save/restore sites in patch*.ts, each disabled with its reason.
+            '@typescript-eslint/unbound-method': 'error'
         }
     }
 );

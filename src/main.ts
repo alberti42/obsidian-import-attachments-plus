@@ -109,19 +109,10 @@ export default class ImportAttachments extends Plugin {
 
 		this.settingsTab = new ImportAttachmentsSettingTab(this.app, this);
 
-        // Bind the callback functions
-        this.file_menu_cb = this.file_menu_cb.bind(this);
-        this.editor_drop_cb = this.editor_drop_cb.bind(this);
-        this.editor_paste_cb = this.editor_paste_cb.bind(this);
-        this.editor_rename_cb = this.editor_rename_cb.bind(this);
-        this.context_menu_cb = this.context_menu_cb.bind(this);
-        this.folder_created_cb = this.folder_created_cb.bind(this);
-        this.folder_renamed_cb = this.folder_renamed_cb.bind(this);
-        this.layout_change_cb = this.layout_change_cb.bind(this);
-        this.note_created_cb = this.note_created_cb.bind(this);
-        this.note_changed_cb = this.note_changed_cb.bind(this);
-        this.metadata_resolved_cb = this.metadata_resolved_cb.bind(this);
-        
+		// The event callbacks used to be bound here, one `.bind(this)` per callback. They are
+		// arrow-function class properties now, which are per-instance and therefore keep a stable
+		// reference identity — still a requirement, because `file-menu` is `off()`-ed by identity.
+
 		// Store the path to the vault
 		if (Platform.isDesktopApp) {
 			// store the vault path
@@ -470,7 +461,7 @@ export default class ImportAttachments extends Plugin {
         }
     }
 
-    file_menu_cb(menu: Menu, file: TAbstractFile):void {
+    file_menu_cb = (menu: Menu, file: TAbstractFile):void => {
         if(menu.sections.contains('canvas')) {return;}
         
         if (file instanceof TFile) {
@@ -886,7 +877,7 @@ export default class ImportAttachments extends Plugin {
         return Utils.joinPaths(attachmentsFolderPath,attachmentName);
     }
 
-    context_menu_cb(evt: MouseEvent) {
+    context_menu_cb = (evt: MouseEvent) => {
         // Only hijack the context menu inside a markdown view. getActiveViewOfType replaces
         // the deprecated workspace.activeLeaf; note it also returns null when there is no
         // active leaf at all, where the old code fell through and carried on.
@@ -942,7 +933,7 @@ export default class ImportAttachments extends Plugin {
         }
     }
 
-    async editor_rename_cb(newFile: TAbstractFile, oldPath: string) {
+    editor_rename_cb = async (newFile: TAbstractFile, oldPath: string) => {
         if (!this.settings.autoRenameAttachmentFolder) { return }
 
             const oldPath_parsed = Utils.parseFilePath(oldPath);
@@ -970,7 +961,7 @@ export default class ImportAttachments extends Plugin {
         
     }
 
-    async editor_paste_cb(evt: ClipboardEvent, editor: Editor, view: MarkdownView | MarkdownFileInfo) {
+    editor_paste_cb = async (evt: ClipboardEvent, editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
         // Check if the event has already been handled
         if (evt.defaultPrevented) {return;}
 
@@ -1050,7 +1041,7 @@ export default class ImportAttachments extends Plugin {
         input.click(); // Trigger the file input dialog
     }
 
-    async editor_drop_cb(evt: DragEvent, editor: Editor, view: MarkdownView | MarkdownFileInfo) {
+    editor_drop_cb = async (evt: DragEvent, editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
         // Check if the event has already been handled
         if (evt.defaultPrevented) {return;}
 
@@ -1509,14 +1500,14 @@ export default class ImportAttachments extends Plugin {
     }
 
     // A file explorer may be opened long after startup, so sweep on layout changes.
-    layout_change_cb() {
+    layout_change_cb = () => {
         updateVisibilityAttachmentFolders(this);
     }
 
     // A folder has been created. The explorer builds its item from this same event and
     // the order the two handlers run in is not ours to choose, so defer the sweep by a
     // tick to be sure the item exists.
-    folder_created_cb(file: TAbstractFile) {
+    folder_created_cb = (file: TAbstractFile) => {
         if (!(file instanceof TFolder)) { return; }
         if (!this.settings.hideAttachmentFolders) { return; }
         if (!this.matchAttachmentFolder(file.path)) { return; }
@@ -1527,13 +1518,13 @@ export default class ImportAttachments extends Plugin {
     // A rename can change whether a folder qualifies in either direction: a note renamed
     // so that its attachment folder no longer matches must become visible again, which a
     // one-way 'hide it' patch never did.
-    folder_renamed_cb(file: TAbstractFile) {
+    folder_renamed_cb = (file: TAbstractFile) => {
         if (!(file instanceof TFolder)) { return; }
         window.setTimeout(() => { updateVisibilityAttachmentFolders(this); }, 0);
     }
 
     // A note has been created. Covers 'extract selection' when it targets a new note.
-    note_created_cb(file: TAbstractFile) {
+    note_created_cb = (file: TAbstractFile) => {
         if (!this.settings.moveStrayAttachmentsAutomatically) { return; }
         if (!(file instanceof TFile)) { return; }
         if (file.extension !== 'md' && file.extension !== 'canvas') { return; }
@@ -1547,7 +1538,7 @@ export default class ImportAttachments extends Plugin {
     // Only records the path: the note the text came from may not have been re-indexed
     // yet, and until it has it still appears to reference the attachment, so nothing
     // would look like a stray.
-    note_changed_cb(file: TFile) {
+    note_changed_cb = (file: TFile) => {
         if (!this.settings.moveStrayAttachmentsAutomatically) { return; }
         if (file.extension !== 'md' && file.extension !== 'canvas') { return; }
         this.notes_awaiting_stray_check.add(file.path);
@@ -1555,7 +1546,7 @@ export default class ImportAttachments extends Plugin {
 
     // Fired once the metadata cache has finished resolving everything it had queued,
     // i.e. when both sides of the move reflect their final link sets.
-    metadata_resolved_cb() {
+    metadata_resolved_cb = () => {
         if (this.notes_awaiting_stray_check.size === 0) { return; }
 
         const pending = Array.from(this.notes_awaiting_stray_check);
