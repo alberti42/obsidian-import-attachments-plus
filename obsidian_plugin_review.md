@@ -331,7 +331,7 @@ sites: 6
 ```yaml
 id: C06
 status: done          # todo | in-progress | done | wontfix | blocked
-outcome: one real site; used activeDocument.createElement rather than createEl, and recorded why; other 3 sites are false positives — [sha]
+outcome: one real site; used activeDocument.createElement rather than createEl, and recorded why; other 3 sites are false positives — 901c5e8
 severity: medium       # as reported by the scan
 verdict: investigate
 risk: low
