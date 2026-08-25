@@ -1000,7 +1000,13 @@ export default class ImportAttachments extends Plugin {
             return;
         }
 
-        const input = document.createElement('input');
+        // Deliberately not Obsidian's createEl(): this input is never attached to a document,
+        // so the helper's conveniences (cls/text/parent) buy nothing, and it would pin the
+        // element to the main window. `activeDocument` is the document of the window the user
+        // is actually in, which is where the file dialog should belong — the same cross-window
+        // concern as C20. The scan asked for createEl here; this keeps the warning and the
+        // correctness instead of the reverse.
+        const input = activeDocument.createElement('input');
         input.type = 'file';
         input.multiple = true; // Allow selection of multiple files
 

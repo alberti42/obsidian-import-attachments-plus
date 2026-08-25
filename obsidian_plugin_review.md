@@ -58,7 +58,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C03](#c03) | Console logging | 10 | `false-positive-document` | low | S | done |
 | [C04](#c04) | `setTimeout` → `window.setTimeout` | 6 | `fix` | low | S | done |
 | [C05](#c05) | `await` on non-promises | 6 | `fix` | low | S | done |
-| [C06](#c06) | `document.createElement` → `createEl` | 4 | `investigate` | low | S | todo |
+| [C06](#c06) | `document.createElement` → `createEl` | 4 | `investigate` | low | S | done |
 | [C07](#c07) | Unnecessary type assertions | 3 | `fix` | low | S | done |
 | [C08](#c08) | `eslint-disable` without a reason | 3 | `fix` | low | S | done |
 | [C09](#c09) | Cross-enum comparison in settings | 3 | `fix-with-care` | medium | S | todo |
@@ -330,8 +330,8 @@ sites: 6
 
 ```yaml
 id: C06
-status: todo          # todo | in-progress | done | wontfix | blocked
-outcome:              # one line + commit SHA, filled in by the session that closes this
+status: done          # todo | in-progress | done | wontfix | blocked
+outcome: one real site; used activeDocument.createElement rather than createEl, and recorded why; other 3 sites are false positives — [sha]
 severity: medium       # as reported by the scan
 verdict: investigate
 risk: low
@@ -354,7 +354,27 @@ sites: 4
 
 **Assessment** — only **one** real site. `grep -rn 'document.createElement' src/` returns exactly `main.ts:914`. The three `ImportAttachmentsModal.ts` sites the scanner points at already use `createEl`/`createDiv`, so the line attribution there is off or the rule is matching the surrounding block — confirm and dismiss them.
 
+**Confirmed and dismissed:** `grep -c createElement src/ImportAttachmentsModal.ts` is **0**. All
+three flagged lines already use `el.createEl(...)`. False positives.
+
 **Do this** — `main.ts:914` is a hidden `<input type=file>` used to open a native picker. It is never attached to a document, so `createEl` buys nothing except rule compliance; converting it is still fine (`createEl('input', { attr: { type: 'file' } })`). Low value either way — decide and record which.
+
+**Decided: neither option the scan offered — `activeDocument.createElement('input')`.** The reasoning,
+since the worklist asked for it to be recorded:
+
+- The element is never attached, so `createEl`'s conveniences (cls/text/parent) are dead weight here.
+- `createEl` is a *global* helper and creates in the **main window's** document. So does the
+  `document.createElement` it would replace. Converting therefore buys rule compliance and nothing
+  else — while leaving a cross-window bug of exactly the kind [C20](#c20) just fixed twice: run the
+  import command from a popout and the file dialog belongs to the wrong window.
+- `activeDocument` is the document of the window the user is actually in. Obsidian does **not**
+  augment `Document` with `createEl` (only `on`/`off`, `obsidian.d.ts:223`), so compliance and
+  cross-window correctness cannot be combined at this site. Correctness wins; the cosmetic warning
+  stays.
+
+**Unverified** — whether Chromium routes a detached input's file chooser to its owning document's
+window. If it does not, this change is merely harmless rather than a fix. Testable by running the
+command from a popout and seeing which window the dialog attaches to.
 
 **Verify** — if changed, exercise the "import from vault / choose file" command end to end; a detached input that stops firing `change` is a silent break.
 
@@ -787,7 +807,7 @@ sites: 1
 ```yaml
 id: C20
 status: done          # todo | in-progress | done | wontfix | blocked
-outcome: both sites use instanceOf; the scan had missed the context-menu one, which broke the feature in popouts outright — 9000d19
+outcome: both sites use instanceOf; the scan had missed the context-menu one, which broke the feature in popouts outright; verified in a popout: the item appears and deletion works — 9000d19
 severity: medium       # as reported by the scan
 verdict: fix
 risk: medium
