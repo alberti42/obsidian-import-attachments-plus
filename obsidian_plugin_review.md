@@ -1471,7 +1471,7 @@ That was checked, not assumed.
 ```yaml
 id: C33
 status: done          # todo | in-progress | done | wontfix | blocked
-outcome: modifier listeners installed on every document via registerDomEvent; verified in a popout; also fixes an addEventListener-for-removeEventListener typo that leaked a listener per unload — [sha]
+outcome: modifier listeners installed on every document via registerDomEvent; verified in a popout; also fixes an addEventListener-for-removeEventListener typo that leaked a listener per unload — d327341
 severity: medium      # not from the scan: found by manual test
 verdict: fix
 risk: medium
