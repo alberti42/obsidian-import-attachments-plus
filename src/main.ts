@@ -730,7 +730,7 @@ export default class ImportAttachments extends Plugin {
 
 
     // Get attachment folder path based on current note
-    getAttachmentFolderOfMdNote(md_file?: ParsedPath | undefined): string { 
+    getAttachmentFolderOfMdNote(md_file?: ParsedPath): string { 
         // Get the current active note if md_file is not provided
         if (md_file===undefined) {
             const md_active_file = this.app.workspace.getActiveFile();

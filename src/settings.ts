@@ -35,7 +35,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
         this.plugin = plugin;
     }
 
-    debouncedSaveSettings(fnc?:(()=>void) | undefined) {
+    debouncedSaveSettings(fnc?:(()=>void)) {
         // timeout after 250 ms
         const timeout_ms = 50;
 
