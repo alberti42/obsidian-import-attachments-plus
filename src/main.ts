@@ -577,8 +577,10 @@ export default class ImportAttachments extends Plugin {
         // Load settings
         await this.loadSettings();
 
+        // update() rebuilds the definitions and re-renders; display() is deprecated since 1.13
+        // and, now that getSettingDefinitions() returns a non-empty array, is never called.
         const activeTab = this.app.setting.activeTab;
-        if(activeTab && activeTab instanceof ImportAttachmentsSettingTab) {activeTab.display();}
+        if(activeTab && activeTab instanceof ImportAttachmentsSettingTab) {activeTab.update();}
     }
 
 	async loadSettings() {

@@ -11,7 +11,7 @@
 // by the sweep below, so that is all this module does now: no private methods are
 // replaced, only the class on elements the explorer has already built.
 
-import { TFolder, requireApiVersion } from 'obsidian';
+import { TFolder } from 'obsidian';
 import ImportAttachments from 'main';
 import { isFileExplorerView } from 'types';
 
@@ -36,8 +36,9 @@ function updateVisibilityAttachmentFolders(plugin: ImportAttachments) {
 
 	for (const leaf of leaves) {
 		// A deferred view has no items to update yet, and loading it purely to hide
-		// folders would defeat the point of deferring it.
-		if (requireApiVersion('1.7.2') && leaf.isDeferred) { continue; }
+		// folders would defeat the point of deferring it. The `requireApiVersion('1.7.2')`
+		// guard that used to sit here is dead now that minAppVersion is 1.13.0.
+		if (leaf.isDeferred) { continue; }
 
 		const viewInstance = leaf.view;
 		if (!isFileExplorerView(viewInstance)) { continue; }
@@ -59,7 +60,7 @@ function updateVisibilityAttachmentFolders(plugin: ImportAttachments) {
  */
 function revealAllAttachmentFolders(plugin: ImportAttachments) {
 	for (const leaf of plugin.app.workspace.getLeavesOfType('file-explorer')) {
-		if (requireApiVersion('1.7.2') && leaf.isDeferred) { continue; }
+		if (leaf.isDeferred) { continue; }
 
 		const viewInstance = leaf.view;
 		if (!isFileExplorerView(viewInstance)) { continue; }

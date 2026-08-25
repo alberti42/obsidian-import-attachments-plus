@@ -74,9 +74,9 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C19](#c19) | `builtin-modules` dependency | 1 | `fix` | low | S | done |
 | [C20](#c20) | `instanceof HTMLElement` across windows | 2 | `fix` | medium | S | done |
 | [C21](#c21) | `clearTimeout` → `window.clearTimeout` | 1 | `fix` | low | S | done |
-| [C22](#c22) | No `getSettingDefinitions()` (settings search) | 1 | `decision-needed` | medium | M | todo |
+| [C22](#c22) | No `getSettingDefinitions()` (settings search) | 1 | `decision-needed` | medium | M | done |
 | [C23](#c23) | `Object.create(TFile.prototype) as TFile` | 1 | `false-positive-document` | low | S | done |
-| [C24](#c24) | `display()` deprecated since 1.13 | 1 | `decision-needed` | low | S | todo |
+| [C24](#c24) | `display()` deprecated since 1.13 | 1 | `decision-needed` | low | S | done |
 | [C25](#c25) | `workspace.activeLeaf` deprecated | 1 | `fix` | low | S | done |
 | [C26](#c26) | No release-asset attestations | — | `decision-needed` | low | M | todo |
 | [C27](#c27) | Delete-image menu item did nothing (found while testing C25) | 2 | `fix` | high | S | done |
@@ -1009,7 +1009,7 @@ Same as **C04**, one site (`settings.ts:43`). Note the sibling line `settings.ts
 ```yaml
 id: C22
 status: todo          # todo | in-progress | done | wontfix | blocked
-outcome:              # one line + commit SHA, filled in by the session that closes this
+outcome: migrated the whole tab to getSettingDefinitions(); minAppVersion 1.5.0 -> 1.13.0 by the author's decision; settings.ts 647 -> 529 lines — 6171c39
 severity: medium       # as reported by the scan
 verdict: decision-needed
 risk: medium
@@ -1032,6 +1032,36 @@ sites: 1
 **Do this** — a feature, not a cleanup. Adding it means describing every control in `settings.ts` declaratively, guarded so 1.5.0 users keep the existing `display()` path. Related info-level item: `display` itself is deprecated since 1.13.0 (**C24**).
 
 **Recommendation** — do C15 first (it settles the version floor), then treat this as its own scoped task.
+
+**Done: migrated fully, `minAppVersion` 1.5.0 → 1.13.0.** The author's decision, taken over three
+alternatives (definitions alongside `display()`; one definition array with a hand-written renderer
+for old versions; defer). Full migration was chosen for the smallest end state and no duplicated
+description of the UI, accepting that users on Obsidian 1.5–1.12 stop being offered updates.
+
+The API turned out to be a better fit than this entry assumed:
+
+- `display()` needs **no version guard**: Obsidian documents it as *"not called when
+  `getSettingDefinitions` returns a non-empty array"*. Keeping both would have worked — that was
+  option (b) — but was not chosen.
+- `getControlValue`/`setControlValue` do the persistence, so the per-row `debouncedSaveSettings()`
+  calls are gone. `setControlValue` became the one place for everything the old `onChange` bodies
+  did: normalising stored text, mirroring the `last*` values, re-parsing the folder pattern,
+  re-sweeping the explorer, registering the delete menu.
+- `visible: () => …` plus `refreshDomState()` replaced **four** inline `style.display` writes — three
+  more than [C17](#c17) knew about, since the scan only reported two sites.
+- Two rows mirror *vault* preferences (`useMarkdownLinks`, `newLinkFormat`) rather than plugin
+  settings. They use synthetic keys (`vault:…`) special-cased in `getControlValue`/`setControlValue`,
+  with `visible` predicates so the row disappears if Obsidian stops exposing the config, rather than
+  the old `settingEl.remove()` after the fact.
+
+**Result** — `settings.ts` 647 → 529 lines (390 inserted, 508 deleted), and 3.9 kB off the bundle.
+`display()` is deleted, which closes [C24](#c24); `onExternalSettingsChange` now calls `update()`.
+The floor raise also made `requireApiVersion('1.7.2')` in `hideAttachmentFolders.ts` dead, so both
+guards went with it.
+
+**Verify** — every row renders, every conditional row appears and disappears, values persist across
+a settings-tab close/reopen, the two vault-mirror rows still round-trip to *Files and links*, and
+the plugin's settings now appear in Obsidian's settings search.
 
 ---
 
@@ -1075,7 +1105,7 @@ scanner's plugin is ever added as a devDependency. **The same applies to C02 gro
 ```yaml
 id: C24
 status: todo          # todo | in-progress | done | wontfix | blocked
-outcome:              # one line + commit SHA, filled in by the session that closes this
+outcome: display() deleted, not merely deprecated; onExternalSettingsChange calls update() — 6171c39
 severity: info       # as reported by the scan
 verdict: decision-needed
 risk: low
@@ -1094,6 +1124,11 @@ sites: 1
 | `src/main.ts:645` | 711 | `if(activeTab && activeTab instanceof ImportAttachmentsSettingTab) {activeTab.display();}` |
 
 Info-level. `main.ts:645` calls `activeTab.display()` to redraw the settings tab after an external settings change (design point #5, `onExternalSettingsChange`). The replacement is `getSettingDefinitions` — i.e. this is the same work as **C22**. Keep them together; do not half-migrate.
+
+**Done with [C22](#c22).** `display()` is deleted outright rather than left deprecated, and the
+external-change hook calls `update()`, which rebuilds the definitions and re-renders. `update()` is
+the right call there rather than `refreshDomState()`: sync or an external editor can change any
+value, not just the ones that gate visibility.
 
 ---
 
