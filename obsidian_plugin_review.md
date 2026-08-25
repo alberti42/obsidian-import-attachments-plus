@@ -1412,7 +1412,7 @@ still C15's to settle.
 ```yaml
 id: C32
 status: done          # todo | in-progress | done | wontfix | blocked
-outcome: removed the custom menu and everything that served it (~250 lines, -3.5 kB); Obsidian's menu now shows, carrying the plugin's item via file_menu_cb — [sha]
+outcome: removed the custom menu and everything that served it (~250 lines, -3.5 kB); Obsidian's menu now shows, carrying the plugin's item via file_menu_cb — eedc022
 severity: medium      # not from the scan: the user's report
 verdict: fix
 risk: medium
