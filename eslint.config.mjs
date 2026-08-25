@@ -1,9 +1,14 @@
-// ESLint flat config (ESLint >= 9). The former .eslintrc-style object exported from this
-// same filename was silently ignored, so linting was a no-op; keep this file in flat format.
-const js = require('@eslint/js');
-const tseslint = require('typescript-eslint');
+// ESLint flat config (ESLint >= 9). Two traps are already paid for here:
+//
+//  - the former .eslintrc-style object exported from this file was silently ignored, so linting
+//    was a no-op for a long time. Keep it in flat format.
+//  - the file is `.mjs`, not `.js`, so it is ESM regardless of package.json having no
+//    `"type": "module"`. After any change here, run `npm run lint` and check that it still
+//    reports on **both** src and tests — 23 files at the time of writing (13 + 10).
+import js from '@eslint/js';
+import tseslint from 'typescript-eslint';
 
-module.exports = tseslint.config(
+export default tseslint.config(
     {
         ignores: ['node_modules/**', 'node_modules.nosync/**', 'dist/**', 'coverage/**', '**/*.d.ts']
     },

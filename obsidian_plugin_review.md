@@ -62,7 +62,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C07](#c07) | Unnecessary type assertions | 3 | `fix` | low | S | done |
 | [C08](#c08) | `eslint-disable` without a reason | 3 | `fix` | low | S | done |
 | [C09](#c09) | Cross-enum comparison in settings | 3 | `fix-with-care` | medium | S | done |
-| [C10](#c10) | CommonJS `require` in `eslint.config.js` | 2 | `decision-needed` | low | S | todo |
+| [C10](#c10) | CommonJS `require` in `eslint.config.js` | 2 | `decision-needed` | low | S | done |
 | [C11](#c11) | `async` handler where `void` is expected | 2 | `fix` | low | S | done |
 | [C12](#c12) | Top-level `path` import (mobile) | 2 | `investigate` | high | L | todo |
 | [C13](#c13) | Top-level `fs` import (mobile) | 2 | `investigate` | high | L | todo |
@@ -559,7 +559,7 @@ the modal and the others still skip it.
 ```yaml
 id: C10
 status: todo          # todo | in-progress | done | wontfix | blocked
-outcome:              # one line + commit SHA, filled in by the session that closes this
+outcome: renamed to eslint.config.mjs with ESM imports; same 23 files covered and rules verified to still fire — 6045ee2
 severity: medium       # as reported by the scan
 verdict: decision-needed
 risk: low
@@ -583,6 +583,22 @@ sites: 2
 **Options** — (a) rename to `eslint.config.mjs` and use `import`; (b) rename to `.cjs` and keep `require`; (c) leave it and accept 2 warnings.
 
 **Traps** — `package.json` has no `"type": "module"`, so plain `.js` is CJS today and the file works. Renaming touches how `npm run lint` resolves config; run `npm run lint` immediately after and confirm it still reports on `src` **and** `tests` (CLAUDE.md: this config was silently matching zero files once before).
+
+**Done: option (a), `eslint.config.mjs` with `import`.** Option (b) would have kept `require` and
+therefore kept the warning, since the rule matches the call, not the file extension.
+
+Both halves of the trap were checked rather than assumed:
+
+- **Coverage** — `--format json` reports the same **23 files** before and after (13 `src`, 10
+  `tests`), so the config still matches what it did.
+- **Teeth** — a throwaway probe file with a double-quoted string, an `==`, a braceless `if` and a
+  floating promise produced exactly four errors (`quotes`, `eqeqeq`, `curly`,
+  `no-floating-promises`). The last one matters most: it is type-aware, so the TypeScript program
+  still resolves under an ESM config. A config that matches files but enforces nothing reads as a
+  clean run, which is how this repo lost linting for months.
+
+`esbuild.config.mjs` was already ESM, so the toolchain is consistent now. CLAUDE.md updated in two
+places that named the old filename, plus the probe recipe.
 
 ---
 
