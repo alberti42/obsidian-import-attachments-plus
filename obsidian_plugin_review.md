@@ -83,6 +83,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C28](#c28) | Delete prompt in a popout may never resolve (found while fixing C20) | 1 | `investigate` | medium | S | done |
 | [C29](#c29) | Delete confirmation never resolved — deletion silently half-done | 1 | `fix` | **critical** | M | done |
 | [C30](#c30) | Delete menu offered in reading view | 1 | `fix` | low | S | done |
+| [C31](#c31) | 'Delete link and file' looked for the link at the caret | 1 | `fix` | medium | S | done |
 
 **Suggested order.** Mechanical first, so the noise drops fast and later diffs stay small:
 C16 → C05 → C08 → C07 → C04+C21 → C17 → C25 → C19 → C20 → C03 → C23 → C06.
@@ -1306,6 +1307,60 @@ while the underlying note is in source mode, so it stays, but it remains **unexe
 known edge if anyone does chase it: in a hover popover the *active* view is the underlying note, so
 the cache fallback would look for the link in the wrong file. It declines rather than guessing when
 the reference is not unique.
+
+---
+
+## C31 — 'Delete link and file' looked for the link at the caret
+
+```yaml
+id: C31
+status: done          # todo | in-progress | done | wontfix | blocked
+outcome: both callers now fall back to the metadata cache for the link position; verified — file deleted and link removed — [sha]
+severity: medium      # not from the scan: found by manual test
+verdict: fix
+risk: medium
+size: S
+sites: 1
+```
+
+**Not a scanner finding.** Reported as "the button to delete an image does not work anymore" while
+testing [C09](#c09). The console said:
+
+```
+No matching link found at the click position: no link was found at the line number 3 containing:
+```
+
+— an **empty** line 3.
+
+**Sites**
+
+| line | scanned | code |
+| --- | --- | --- |
+| `src/main.ts:566` | — | `pos = codemirror.state.selection.main.head;` |
+
+**Cause** — the stack had no `delete_img_cb` in it, so this was the *other* entry point: **Delete
+link and file**, which `file_menu_cb` adds to Obsidian's own file menu. That caller passes no DOM
+node, so the only clue `delete_file_cb` had was the caret — and right-clicking does not move the
+caret. It searched whatever line the user had last typed on, found no link there, and fell through
+to deleting the file while leaving the link in the note.
+
+Not a regression from the C01/C09 work; the caret has always been the only clue on that path. What
+made it visible now is [C30](#c30): with the plugin's own entry gone from reading view, Obsidian's
+menu — carrying this item — is what a right-click on an embed offers there.
+
+**Fix** — the position is no longer a single guess. `delete_file_cb` collects **candidate offsets**,
+best first, and tries each: `posAtDOM` for the embed menu (when the node is in the editor content),
+the caret for the file menu, and then `offsetOfSoleReference` from the metadata cache backing up
+both. The cache is authoritative about where the link is; the DOM and the caret are only hints.
+
+**Verified in a real vault** — the note is left empty and the attachment is gone, on the same click
+that failed before.
+
+**Not touched, but seen in passing** — the cross-check inside the loop still calls
+`vault.getFileByPath(file_path)` on the raw link text, which is [C15](#c15)'s remaining site and has
+the same linkpath confusion [C27](#c27) fixed. With a relative link such as
+`![[../Hello (attachments)/x.png]]` it simply returns null and the check is skipped. Benign, and
+still C15's to settle.
 
 ---
 

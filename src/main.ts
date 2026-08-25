@@ -581,92 +581,99 @@ export default class ImportAttachments extends Plugin {
             const codemirror = editorView.cm
             const doc = codemirror.state.doc;
 
-            // Get the position at the mouse event's coordinates or at the current cursor
-            const cursorIdx = (():number|null => {
-                let pos:number|null
-                if(target) {
-                    try {
-                        pos = codemirror.posAtDOM(target);
-                        traceDelete('posAtDOM', pos);
-                    } catch (err: unknown) {
-                        traceDelete('posAtDOM raised, falling back to the metadata cache', err);
-                        // posAtDOM raises when the node is not part of the editor content, which
-                        // is the normal case in reading view, in a hover popover and inside a
-                        // Dataview block. Ask the metadata cache where the link is instead.
-                        pos = this.offsetOfSoleReference(activeView.file, file_src);
-                        traceDelete('cache fallback offset', pos);
-                    }
-                } else {
-                    pos = codemirror.state.selection.main.head;  // equivalent to editorView.getCursor()
+            // Where to look for the link, best guess first. Two callers, two different guesses:
+            //
+            //  - the embed context menu passes the clicked node, and posAtDOM maps it to an
+            //    offset — except when the node is not part of the editor content (hover popover,
+            //    Dataview block), where it raises;
+            //  - the file menu ('Delete link and file') passes no node at all, so all it had was
+            //    the caret, which is wherever the user last typed. Right-clicking does not move
+            //    it, so this looked for the link on a blank line and gave up.
+            //
+            // The metadata cache knows where the link actually is, so it backs both up.
+            const candidateOffsets:number[] = [];
+            if(target) {
+                try {
+                    const pos = codemirror.posAtDOM(target);
+                    traceDelete('posAtDOM', pos);
+                    candidateOffsets.push(pos);
+                } catch (err: unknown) {
+                    traceDelete('posAtDOM raised; leaving it to the metadata cache', err);
                 }
-                if(pos!==null) {
-                    pos = Math.clamp(pos,0,doc.length);
-                }
-                return pos;
-            })();
-
-            if(cursorIdx===null) {throw new DeleteLinkError('could not determine the link position in the MarkDown note');}
-            traceDelete('cursorIdx', cursorIdx);
-
-            const line = doc.lineAt(cursorIdx);
-            const lineContent = line.text;
-            
-            const position:EditorPosition = {
-                line: line.number - 1,
-                ch: cursorIdx - line.from
-            };
-
-            // Regular expression to match Markdown image/external links
-            const regex = /!?\[\[\s*(.*?)\s*(?:\|.*?)?\]\]|!?\[.*?\]\(([^\s]+)\)/g;
-            let match;
-
-            // Loop through all links in the line
-            while ((match = regex.exec(lineContent)) !== null) {
-                
-                const startIdx = match.index;
-                const endIdx = startIdx + match[0].length;
-                
-                // Check if the link encompasses the current position in the line
-                // It is certain that that linkPosInLine will be somewhere inside the
-                // the link but it is not always at the beginning. So, we can be sure
-                // only the link on which we clicked will be removed.
-                traceDelete('candidate link', { matched: match[0], startIdx, endIdx, positionCh: position.ch });
-                if (position.ch >= startIdx && position.ch <= endIdx) {
-                    const fileInVault = (():TFile|null=>{
-                        let file_path:string;
-                        if (match[1]) {
-                            // Wiki link `![[...]]` was matched
-                            file_path = match[1];
-                        } else { // match[2]
-                            // Wiki link `![...](...)` was matched
-                            file_path = decodeURIComponent(match[2]);
-                        }
-                        return this.app.vault.getFileByPath(file_path);
-                    })();
-
-                    if (fileInVault && fileInVault !== file_src) {
-                        throw new DeleteLinkError(`after parsing the link, file '${file_src.path}' was found in the vault, but does not match with clicked file '${file_src.path}'`);
-                    }
-                
-                    // Delete the file with user prompt
-                    traceDelete('prompting for deletion of', file_src.path);
-                    const wasDeleted = await callPromptForDeletion(file_src);
-                    traceDelete('deletion result', { wasDeleted, removeWikilink: this.settings.removeWikilinkOnFileDeletion });
-                    
-                    // Remove the link only if the file was actually deleted by the user and
-                    // the user has chosen to remove the link once the file has been deleted
-                    if(wasDeleted && this.settings.removeWikilinkOnFileDeletion) {
-                        // Replace the range corresponding to the found link with empty string
-                        traceDelete('removing the link', { line: line.number - 1, startIdx, endIdx, before: editorView.getLine(line.number - 1) });
-                        editorView.replaceRange('', { line: line.number - 1, ch: startIdx }, { line: line.number - 1, ch: endIdx });
-                        traceDelete('line after removal', editorView.getLine(line.number - 1));
-                    }          
-
-                    // Success              
-                    return true;
-                }
+            } else {
+                candidateOffsets.push(codemirror.state.selection.main.head);  // == editorView.getCursor()
             }
-            throw new DeleteLinkError(`no link was found at the line number ${line.number} containing: ${lineContent}`);
+            const cachedOffset = this.offsetOfSoleReference(activeView.file, file_src);
+            if(cachedOffset !== null) {candidateOffsets.push(cachedOffset);}
+            traceDelete('candidate offsets', candidateOffsets);
+
+            if(candidateOffsets.length === 0) {throw new DeleteLinkError('could not determine the link position in the MarkDown note');}
+
+            for(const rawIdx of candidateOffsets) {
+                const cursorIdx = Math.clamp(rawIdx,0,doc.length);
+                traceDelete('trying offset', cursorIdx);
+
+                const line = doc.lineAt(cursorIdx);
+                const lineContent = line.text;
+            
+                const position:EditorPosition = {
+                    line: line.number - 1,
+                    ch: cursorIdx - line.from
+                };
+
+                // Regular expression to match Markdown image/external links
+                const regex = /!?\[\[\s*(.*?)\s*(?:\|.*?)?\]\]|!?\[.*?\]\(([^\s]+)\)/g;
+                let match;
+
+                // Loop through all links in the line
+                while ((match = regex.exec(lineContent)) !== null) {
+                
+                    const startIdx = match.index;
+                    const endIdx = startIdx + match[0].length;
+                
+                    // Check if the link encompasses the current position in the line
+                    // It is certain that that linkPosInLine will be somewhere inside the
+                    // the link but it is not always at the beginning. So, we can be sure
+                    // only the link on which we clicked will be removed.
+                    traceDelete('candidate link', { matched: match[0], startIdx, endIdx, positionCh: position.ch });
+                    if (position.ch >= startIdx && position.ch <= endIdx) {
+                        const fileInVault = (():TFile|null=>{
+                            let file_path:string;
+                            if (match[1]) {
+                                // Wiki link `![[...]]` was matched
+                                file_path = match[1];
+                            } else { // match[2]
+                                // Wiki link `![...](...)` was matched
+                                file_path = decodeURIComponent(match[2]);
+                            }
+                            return this.app.vault.getFileByPath(file_path);
+                        })();
+
+                        if (fileInVault && fileInVault !== file_src) {
+                            throw new DeleteLinkError(`after parsing the link, file '${file_src.path}' was found in the vault, but does not match with clicked file '${file_src.path}'`);
+                        }
+                
+                        // Delete the file with user prompt
+                        traceDelete('prompting for deletion of', file_src.path);
+                        const wasDeleted = await callPromptForDeletion(file_src);
+                        traceDelete('deletion result', { wasDeleted, removeWikilink: this.settings.removeWikilinkOnFileDeletion });
+                    
+                        // Remove the link only if the file was actually deleted by the user and
+                        // the user has chosen to remove the link once the file has been deleted
+                        if(wasDeleted && this.settings.removeWikilinkOnFileDeletion) {
+                            // Replace the range corresponding to the found link with empty string
+                            traceDelete('removing the link', { line: line.number - 1, startIdx, endIdx, before: editorView.getLine(line.number - 1) });
+                            editorView.replaceRange('', { line: line.number - 1, ch: startIdx }, { line: line.number - 1, ch: endIdx });
+                            traceDelete('line after removal', editorView.getLine(line.number - 1));
+                        }          
+
+                        // Success              
+                        return true;
+                    }
+                }
+                traceDelete('no link at this offset', { line: line.number, lineContent });
+            }
+            throw new DeleteLinkError(`no link was found at any candidate offset in '${activeView.file?.path ?? '?'}'`);
         } catch(err) {
             if(!(err instanceof DeleteLinkError)) {
                 // some major, unexpected error occurred
