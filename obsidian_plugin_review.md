@@ -996,7 +996,7 @@ Info-level, repo-level (no source lines — it concerns the released `main.js` a
 ```yaml
 id: C27
 status: done          # todo | in-progress | done | wontfix | blocked
-outcome: two causes — wrong DOM element (closest('.internal-embed')) and wrong resolver (resolveLink); verified working in a real vault — 2b9a3b6 + PENDING
+outcome: two causes — wrong DOM element (closest('.internal-embed')) and wrong resolver (resolveLink); verified working in a real vault — 2b9a3b6 + 68129dc
 severity: high        # not from the scan: found by manual test
 verdict: fix
 risk: high
