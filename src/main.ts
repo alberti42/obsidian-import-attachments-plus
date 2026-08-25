@@ -59,7 +59,7 @@ import { EditorSelection } from '@codemirror/state';
 
 import { ImportAttachmentsSettingTab } from 'settings';
 import { attachmentFolderOfNote, compileAttachmentFolderMatcher } from 'attachmentFolder';
-import { findStrayAttachments, findStrayAttachmentsOfNote, moveStrayAttachments, type StrayAttachmentMove } from 'strayAttachments';
+import { findStrayAttachments, findStrayAttachmentsOfNote, moveStrayAttachments, resolveLink, type StrayAttachmentMove } from 'strayAttachments';
 
 
 class DeleteLinkError extends Error {}
@@ -630,8 +630,20 @@ export default class ImportAttachments extends Plugin {
             if(!parent) {return null;}
             const src = parent.getAttribute('src');
             if(!src) {return null;}
-            const fileInVault = this.app.vault.getFileByPath(src);
-            return fileInVault;
+            // The `src` of an .internal-embed is the link *as written*, i.e. a linkpath and
+            // not a vault path. Only the 'Absolute path in vault' link format makes the two
+            // coincide: with 'Shortest path when possible' or 'Path from the current file'
+            // the folders are omitted, so vault.getFileByPath() resolved nothing from the
+            // vault root and the click silently did nothing. resolveLink() resolves it the
+            // way Obsidian does — relative to the note holding the link, url-decoding as a
+            // fallback so markdown-style embeds work too.
+            const sourcePath = this.app.workspace.getActiveFile()?.path ?? '';
+            const resolved = resolveLink(this.app, src, sourcePath);
+            if(!resolved) {
+                // Do not fail silently: an unresolved embed used to make the menu item a no-op.
+                console.error(`Import Attachments+: no vault file matches the embedded link '${src}' in '${sourcePath}'.`);
+            }
+            return resolved;
         })();
 
         if(!fileToBeDeleted) {return;}

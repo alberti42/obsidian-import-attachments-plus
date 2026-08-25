@@ -48,8 +48,11 @@ export type ReferenceMaps = {
  * `elem.link` is Obsidian's already-normalised target: the alias (`|`) is stripped and
  * markdown-style links are handled identically to wikilinks. Parsing `elem.original`
  * by hand instead would silently drop every `[alt](file.png)` link.
+ *
+ * Exported because the same resolution is needed outside this file: the `src` of an
+ * .internal-embed in the DOM is a linkpath too, not a vault path (see delete_img_cb).
  */
-function resolveLink(app: App, link: string, sourcePath: string): TFile | null {
+export function resolveLink(app: App, link: string, sourcePath: string): TFile | null {
 	const linkpath = getLinkpath(link);
 	if (!linkpath) { return null; } // pure subpath, e.g. [[#heading]]
 

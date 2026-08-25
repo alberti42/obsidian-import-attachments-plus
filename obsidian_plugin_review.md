@@ -79,6 +79,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C24](#c24) | `display()` deprecated since 1.13 | 1 | `decision-needed` | low | S | todo |
 | [C25](#c25) | `workspace.activeLeaf` deprecated | 1 | `fix` | low | S | done |
 | [C26](#c26) | No release-asset attestations | — | `decision-needed` | low | M | todo |
+| [C27](#c27) | Delete-image menu item did nothing (found while testing C25) | 1 | `fix` | high | S | done |
 
 **Suggested order.** Mechanical first, so the noise drops fast and later diffs stay small:
 C16 → C05 → C08 → C07 → C04+C21 → C17 → C25 → C19 → C20 → C03 → C23 → C06.
@@ -633,10 +634,12 @@ sites: 2
 
 | line | scanned | code |
 | --- | --- | --- |
-| `src/main.ts:586` | 652 | `return this.app.vault.getFileByPath(file_path);` |
-| `src/main.ts:631` | 697 | `const fileInVault = this.app.vault.getFileByPath(src);` |
+| `src/main.ts:588` | 652 | `return this.app.vault.getFileByPath(file_path);` |
+| ~~`src/main.ts:631`~~ | 697 | ~~`const fileInVault = this.app.vault.getFileByPath(src);`~~ — **gone**, see [C27](#c27) |
 
 **Assessment** — real. Both sites call `vault.getFileByPath()`, which postdates the declared `minAppVersion: 1.5.0`. On 1.5.0 these calls are `undefined` → a crash on the attachment-resolution path.
+
+**One site down.** `main.ts:631` was removed by [C27](#c27) — not for this concern's reason but because `getFileByPath` was the wrong function there entirely. **One site left** (`main.ts:588`), so this stays open, but it is now a one-line decision. Note the remaining site has the same linkpath-vs-vault-path confusion C27 fixed, though there a `null` is benign: it only skips a cross-check. Worth folding into whichever way C15 is settled.
 
 **Do this** — one of:
 - (a) bump `minAppVersion` in `manifest.json` to the version that introduced `getFileByPath` (**look it up, do not guess**); or
@@ -685,7 +688,7 @@ sites: 2
 ```yaml
 id: C17
 status: done          # todo | in-progress | done | wontfix | blocked
-outcome: class toggle instead of inline display; needed a new class — .import-plugin-hidden is explorer-scoped — [sha]
+outcome: class toggle instead of inline display; needed a new class — .import-plugin-hidden is explorer-scoped — c9d948e
 severity: medium       # as reported by the scan
 verdict: fix
 risk: low
@@ -930,7 +933,7 @@ Info-level. `main.ts:645` calls `activeTab.display()` to redraw the settings tab
 ```yaml
 id: C25
 status: done          # todo | in-progress | done | wontfix | blocked
-outcome: getActiveViewOfType(MarkdownView) replaces activeLeaf in context_menu_cb; null now bails instead of falling through — [sha]
+outcome: getActiveViewOfType(MarkdownView) replaces activeLeaf in context_menu_cb; null now bails instead of falling through — c3cd712
 severity: info       # as reported by the scan
 verdict: fix
 risk: low
@@ -981,6 +984,52 @@ Info-level, repo-level (no source lines — it concerns the released `main.js` a
 **Assessment** — the scan already reports **"Build reproduced the release `main.js` byte-for-byte"** as a pass, so reproducibility is established; attestations would add provenance signing on top.
 
 **Do this** — requires a GitHub Actions release workflow with `actions/attest-build-provenance` and `id-token: write`. The repo currently has **no CI** (CLAUDE.md) and releases are cut by hand with `gh release create`, so this means introducing a release workflow. Scoped project, user's call.
+
+---
+
+## C27 — Delete-image menu item did nothing
+
+```yaml
+id: C27
+status: done          # todo | in-progress | done | wontfix | blocked
+outcome: resolve the embed src with resolveLink() instead of getFileByPath(); also logs when it cannot resolve — [sha]
+severity: high        # not from the scan: found by manual test
+verdict: fix
+risk: high
+size: S
+sites: 1
+```
+
+**Not a scanner finding.** Found while manually verifying [C25](#c25): right-clicking an embedded
+image offered *Delete image file*, and clicking it did nothing at all — no notice, no error, no
+deletion.
+
+**Sites**
+
+| line | scanned | code |
+| --- | --- | --- |
+| `src/main.ts:631` | — | `const fileInVault = this.app.vault.getFileByPath(src);` |
+
+**Cause** — the `src` attribute of an `.internal-embed` is the link *as written*, i.e. a
+**linkpath**, while `vault.getFileByPath()` resolves from the **vault root**. The two coincide only
+under the `Absolute path in vault` link format. Under `Shortest path when possible` (Obsidian's
+default) or `Path from the current file`, folders are omitted — `Notes/shot.png` is embedded as
+`![[shot.png]]` — so the lookup returned `null` and `delete_img_cb` hit a bare `return`. Links are
+written by `fileManager.generateMarkdownLink` (`main.ts:1268`), which honours that setting, so the
+plugin generated links its own delete path could not resolve.
+
+This is exactly the invariant CLAUDE.md already states for `strayAttachments.ts`: resolve links via
+`getFirstLinkpathDest`, never by re-parsing the written form. The rule was simply never applied here.
+
+**Fix** — export the existing `resolveLink()` from `strayAttachments.ts` (one implementation, and it
+already handles url-encoded markdown-style embeds) and call it with the active note as the source
+path. The unresolved branch now logs instead of returning silently, which is what hid this.
+
+**Interaction with C15** — this deleted one of C15's two `getFileByPath` sites; see that concern.
+
+**Verify** — right-click an embedded image under a non-absolute link format and delete it; confirm
+both the file and the link go. Repeat with a markdown-style embed (`![alt](path)`) and with a
+subfolder attachment.
 
 ---
 
