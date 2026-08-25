@@ -1114,7 +1114,7 @@ export default class ImportAttachments extends Plugin {
 			let destFilePath = await this.createAttachmentName(originalFilePath, md_file_parsed);
 
 			// Check if file already exists in the vault
-			const existingFile = await Utils.doesFileExist(this.app.vault,destFilePath);
+			const existingFile = Utils.doesFileExist(this.app.vault,destFilePath);
 
 			// If the original file is already in the vault
 			const relativePath = await Utils.getFileInVault(this.vaultPath, originalFilePath)

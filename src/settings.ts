@@ -430,7 +430,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.autoDeleteAttachmentFolder)
                 .onChange(async (value: boolean) => {
                     this.plugin.settings.autoDeleteAttachmentFolder = value;
-                    await this.debouncedSaveSettings();
+                    this.debouncedSaveSettings();
                 }));
 
         new Setting(containerEl)
@@ -441,7 +441,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.confirmDeleteAttachmentFolder)
                 .onChange(async (value: boolean) => {
                     this.plugin.settings.confirmDeleteAttachmentFolder = value;
-                    await this.debouncedSaveSettings();
+                    this.debouncedSaveSettings();
                 }));
 
         new Setting(containerEl).setName('Attachment folder').setHeading();
@@ -457,7 +457,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.hideAttachmentFolders)
                 .onChange(async (value: boolean) => {
                     this.plugin.settings.hideAttachmentFolders = value;
-                    await this.debouncedSaveSettings();
+                    this.debouncedSaveSettings();
                     updateVisibilityAttachmentFolders(this.plugin);
                 }));
 
@@ -484,7 +484,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                             value = '${original}'; // TODO: improve checking the input by the user that it is not empty
                         }
                         this.plugin.settings.attachmentName = value;
-                        await this.debouncedSaveSettings();
+                        this.debouncedSaveSettings();
                     })
                 });
 
@@ -503,7 +503,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                     text.setValue(this.plugin.settings.dateFormat);
                     text.onChange(async (value: string) => {
                         this.plugin.settings.dateFormat = value;
-                        await this.debouncedSaveSettings();
+                        this.debouncedSaveSettings();
                     })
                 });
         }

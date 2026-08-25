@@ -57,7 +57,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C02](#c02) | Unbound method references (`this` scoping) | 17 | `false-positive-fix-anyway` | medium | M | todo |
 | [C03](#c03) | Console logging | 10 | `false-positive-document` | low | S | todo |
 | [C04](#c04) | `setTimeout` → `window.setTimeout` | 6 | `fix` | low | S | todo |
-| [C05](#c05) | `await` on non-promises | 6 | `fix` | low | S | todo |
+| [C05](#c05) | `await` on non-promises | 6 | `fix` | low | S | done |
 | [C06](#c06) | `document.createElement` → `createEl` | 4 | `investigate` | low | S | todo |
 | [C07](#c07) | Unnecessary type assertions | 3 | `fix` | low | S | todo |
 | [C08](#c08) | `eslint-disable` without a reason | 3 | `fix` | low | S | todo |
@@ -286,8 +286,8 @@ sites: 6
 
 ```yaml
 id: C05
-status: todo          # todo | in-progress | done | wontfix | blocked
-outcome:              # one line + commit SHA, filled in by the session that closes this
+status: done          # todo | in-progress | done | wontfix | blocked
+outcome: dropped the 6 no-op awaits (5 debouncedSaveSettings, 1 doesFileExist); enclosing async kept — [sha]
 severity: medium       # as reported by the scan
 verdict: fix
 risk: low
