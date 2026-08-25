@@ -482,7 +482,7 @@ sites: 3
 ```yaml
 id: C09
 status: todo          # todo | in-progress | done | wontfix | blocked
-outcome: narrowed with two new type guards, removing 12 casts; also fixed `value in ImportActionType`, which tested keys rather than values — [sha]
+outcome: narrowed with two new type guards, removing 12 casts; also fixed `value in ImportActionType`, which tested keys rather than values — a6bdfc2
 severity: medium       # as reported by the scan
 verdict: fix-with-care
 risk: medium
