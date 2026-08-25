@@ -794,12 +794,10 @@ export default class ImportAttachments extends Plugin {
     }
 
     context_menu_cb(evt: MouseEvent) {
-        const activeLeaf = this.app.workspace.activeLeaf;
-        if (activeLeaf) {
-            const view = activeLeaf.view;
-            const viewType = view.getViewType();
-            if(viewType !== 'markdown') {return;}
-        }
+        // Only hijack the context menu inside a markdown view. getActiveViewOfType replaces
+        // the deprecated workspace.activeLeaf; note it also returns null when there is no
+        // active leaf at all, where the old code fell through and carried on.
+        if (!this.app.workspace.getActiveViewOfType(MarkdownView)) {return;}
         if(!(evt.target instanceof HTMLElement)) {return;}
         const target:HTMLElement = evt.target;
         const tagName:string = target.tagName;

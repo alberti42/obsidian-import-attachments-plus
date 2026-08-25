@@ -77,7 +77,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C22](#c22) | No `getSettingDefinitions()` (settings search) | 1 | `decision-needed` | medium | M | todo |
 | [C23](#c23) | `Object.create(TFile.prototype) as TFile` | 1 | `false-positive-document` | low | S | done |
 | [C24](#c24) | `display()` deprecated since 1.13 | 1 | `decision-needed` | low | S | todo |
-| [C25](#c25) | `workspace.activeLeaf` deprecated | 1 | `fix` | low | S | todo |
+| [C25](#c25) | `workspace.activeLeaf` deprecated | 1 | `fix` | low | S | done |
 | [C26](#c26) | No release-asset attestations | — | `decision-needed` | low | M | todo |
 
 **Suggested order.** Mechanical first, so the noise drops fast and later diffs stay small:
@@ -929,8 +929,8 @@ Info-level. `main.ts:645` calls `activeTab.display()` to redraw the settings tab
 
 ```yaml
 id: C25
-status: todo          # todo | in-progress | done | wontfix | blocked
-outcome:              # one line + commit SHA, filled in by the session that closes this
+status: done          # todo | in-progress | done | wontfix | blocked
+outcome: getActiveViewOfType(MarkdownView) replaces activeLeaf in context_menu_cb; null now bails instead of falling through — [sha]
 severity: info       # as reported by the scan
 verdict: fix
 risk: low
