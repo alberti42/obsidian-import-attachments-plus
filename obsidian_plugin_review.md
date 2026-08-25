@@ -85,6 +85,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C30](#c30) | Delete menu offered in reading view | 1 | `fix` | low | S | done |
 | [C31](#c31) | 'Delete link and file' looked for the link at the caret | 1 | `fix` | medium | S | done |
 | [C32](#c32) | Embedded-image menu replaced Obsidian's own | 1 | `fix` | medium | M | done |
+| [C33](#c33) | ⌘⌥-click did not reveal in a popout; listener leak on unload | 2 | `fix` | medium | S | done |
 
 **Suggested order.** Mechanical first, so the noise drops fast and later diffs stay small:
 C16 → C05 → C08 → C07 → C04+C21 → C17 → C25 → C19 → C20 → C03 → C23 → C06.
@@ -1462,6 +1463,59 @@ That was checked, not assumed.
   multi-window story. What remains of that story is real but different: cross-window `instanceOf`,
   `window.setTimeout`, and `activeDocument` for element creation.
 - Anyone who had the setting **off** loses nothing; anyone who had it **on** gains Obsidian's menu.
+
+---
+
+## C33 — ⌘⌥-click did not reveal in a popout, and a listener leaked on unload
+
+```yaml
+id: C33
+status: done          # todo | in-progress | done | wontfix | blocked
+outcome: modifier listeners installed on every document via registerDomEvent; verified in a popout; also fixes an addEventListener-for-removeEventListener typo that leaked a listener per unload — [sha]
+severity: medium      # not from the scan: found by manual test
+verdict: fix
+risk: medium
+size: S
+sites: 2
+```
+
+**Not a scanner finding.** Reported while checking [C32](#c32): ⌘⌥-click on an attachment opened it
+instead of revealing it in Finder — **in a popout window only**. The main window was always correct,
+which is why it went unnoticed.
+
+**Sites**
+
+| line | scanned | code |
+| --- | --- | --- |
+| `src/patchOpenFile.ts:68` | — | `document.addEventListener('keydown', keyDownHandler);` and the other three |
+| `src/patchOpenFile.ts:75` | — | `document.addEventListener('mouseup', mouseUpHandler, …)` inside `removeKeyListeners` |
+
+**Cause** — the four handlers that track ⌘ and ⌥ were attached to `document`, i.e. the **main
+window's** document and nothing else. Events in a popout never reached them, so the flags kept
+whatever the main window had last set; `openFile` then read `meta && !alt` and took the
+open-externally branch. Pre-existing, and *not* a consequence of [C32](#c32) removing the
+per-document machinery — that machinery only ever served the context menu; these listeners were
+never part of it.
+
+**Second bug, found while reading the fix** — `removeKeyListeners` called
+`document.addEventListener('mouseup', …)` where it meant `removeEventListener`. Every unload
+therefore **added** a listener rather than removing one: exactly the failure CLAUDE.md design
+point #1 exists to prevent, and it had been there since the file was written.
+
+**Fix** — `addKeyListeners(plugin)` installs on the main document, on every document already open
+(the plugin can be enabled with popouts on screen), and on `window-open` for later ones, keeping it
+idempotent with a `WeakSet<Document>`. All four go through `plugin.registerDomEvent`, which detaches
+on unload — so `removeKeyListeners` is deleted rather than repaired: there is no teardown left to
+get wrong. `registerDomEvent` accepts a `Document` and dates from 0.14.8, well under the 1.5.0 floor.
+
+The flags stay module-global rather than per-window, which is correct: the click that reaches
+`openFile` is always the most recent `mousedown`, whichever window produced it.
+
+**Verified in a real vault** — ⌘⌥-click in a popout now reveals, ⌘-click still opens, and both still
+behave in the main window.
+
+**Worth noticing** — this is the **second** multi-window defect of the review after [C20](#c20), and
+both predate it. Design point #2 is not decoration.
 
 ---
 

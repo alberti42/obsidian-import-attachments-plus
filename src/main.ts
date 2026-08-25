@@ -41,7 +41,7 @@ import { sep, posix } from 'path';
 
 import { promises as fs } from 'fs';  // This imports the promises API from fs
 
-import { patchOpenFile, unpatchOpenFile, addKeyListeners, removeKeyListeners } from 'patchOpenFile';
+import { patchOpenFile, unpatchOpenFile, addKeyListeners } from 'patchOpenFile';
 import { callPromptForDeletion, patchFilemanager, unpatchFilemanager } from 'patchFileManager';
 
 import { patchImportFunctions, unpatchImportFunctions } from 'patchImportFunctions';
@@ -156,7 +156,7 @@ export default class ImportAttachments extends Plugin {
 			// patch the openFile function
 			patchOpenFile(this);
 			// add key listeners for modifying the behavior when opening files
-			addKeyListeners();
+			addKeyListeners(this);
 		}
 
 		// Monkey patches of the vault function
@@ -312,7 +312,6 @@ export default class ImportAttachments extends Plugin {
 	onunload() {
 		// unpatch openFile
 		unpatchOpenFile();
-		removeKeyListeners();
 
 		// unpatch fileManager
 		unpatchFilemanager();
