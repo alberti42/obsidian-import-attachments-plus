@@ -4,6 +4,7 @@ import {
     App,
     PluginSettingTab,
     Platform,
+    Setting,
     normalizePath,
     type SettingDefinitionItem,
     type SettingGroupItem,
@@ -211,11 +212,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                 desc: 'Enter a list of extensions separated by comma (e.g.: .md, .pdf) for which the default Obsidian behavior applies instead of opening the file in the default external application.',
                 aliases: ['open external exclude extensions'],
                 visible: () => this.plugin.settings.openAttachmentExternal,
-                control: {
-                    type: 'text',
-                    key: 'openAttachmentExternalExtExcluded',
-                    placeholder: 'Enter a list of extensions',
-                },
+                render: (setting) => { this.renderExtensionExclusion(setting, 'openAttachmentExternalExtExcluded'); },
             },
             {
                 name: "Reveal attachments in system's file manager:",
@@ -227,11 +224,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                 desc: 'Enter a list of extensions separated by comma (e.g.: .md, .pdf) for which the default Obsidian behavior applies instead of revealing the file in the system\'s file manager',
                 aliases: ['reveal exclude extensions'],
                 visible: () => this.plugin.settings.revealAttachment,
-                control: {
-                    type: 'text',
-                    key: 'revealAttachmentExtExcluded',
-                    placeholder: 'Enter a list of extensions',
-                },
+                render: (setting) => { this.renderExtensionExclusion(setting, 'revealAttachmentExtExcluded'); },
             },
         ];
 
@@ -390,6 +383,28 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
         ];
     }
 
+    /**
+     * The two extension-exclusion fields are rendered imperatively for one reason: the box should
+     * show the tidied list as soon as it loses focus. A declarative `text` control stores the
+     * normalised value but leaves the field showing exactly what was typed until the tab is
+     * reopened, and the on-blur rewrite is nicer. `render` rows are still indexed for settings
+     * search — SettingDefinitionRender carries the same name/desc/aliases as any other row.
+     */
+    private renderExtensionExclusion(setting: Setting, key: 'openAttachmentExternalExtExcluded' | 'revealAttachmentExtExcluded'): void {
+        setting.addText(text => {
+            text.setPlaceholder('Enter a list of extensions');
+            text.setValue(this.plugin.settings[key]);
+            text.onChange((value: string) => {
+                this.plugin.settings[key] = normaliseExtensionList(value);
+                this.debouncedSaveSettings();
+            });
+            // Event when the text field loses focus: show the processed value back to the user.
+            text.inputEl.onblur = () => {
+                text.setValue(this.plugin.settings[key]);
+            };
+        });
+    }
+
     /** Two rows read a vault preference rather than a plugin setting; everything else is default. */
     getControlValue(key: string): unknown {
         switch (key) {
@@ -429,17 +444,11 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
             return;
         }
 
-        // What gets stored is not always what was typed.
+        // What gets stored is not always what was typed. (The extension lists are normalised in
+        // renderExtensionExclusion instead, since those rows render their own control.)
         let stored = value;
-        if (typeof value === 'string') {
-            let text = value;
-            if (key === 'openAttachmentExternalExtExcluded' || key === 'revealAttachmentExtExcluded') {
-                text = normaliseExtensionList(text);
-            }
-            if (key === 'attachmentName' && text.trim() === '') {
-                text = '${original}'; // TODO: improve checking the input by the user that it is not empty
-            }
-            stored = text;
+        if (typeof value === 'string' && key === 'attachmentName' && value.trim() === '') {
+            stored = '${original}'; // TODO: improve checking the input by the user that it is not empty
         }
 
         // Remember the last concrete choice, so the import dialog can preselect it. Set before

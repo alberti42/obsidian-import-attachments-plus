@@ -1061,7 +1061,14 @@ guards went with it.
 
 **Verify** — every row renders, every conditional row appears and disappears, values persist across
 a settings-tab close/reopen, the two vault-mirror rows still round-trip to *Files and links*, and
-the plugin's settings now appear in Obsidian's settings search.
+the plugin's settings now appear in Obsidian's settings search. **Verified in a vault.**
+
+**One row type kept imperative, on the author's preference.** The two *Exclude the following
+extensions* fields use the `render` escape hatch rather than a declarative `text` control, so the
+box shows the tidied list the moment it loses focus. A declarative control stores the normalised
+value but leaves the field showing exactly what was typed until the tab is reopened, which is worse.
+`render` rows are still indexed for search — `SettingDefinitionRender` carries the same
+`name`/`desc`/`aliases` as any other row — so nothing is lost by it.
 
 ---
 
