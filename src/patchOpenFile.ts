@@ -6,7 +6,7 @@ let metaKeyPressed = false;
 let altKeyPressed = false;
 let keyListenersInstalled = false
 
-import { joinPaths, makePosixPathOScompatible } from 'utils';
+import { joinPaths, makePosixPathOScompatible, reportFailure } from 'utils';
 
 // Save a reference to the original method for the monkey patch
 let originalOpenFile: ((this: WorkspaceLeaf, file: TFile, openState?: OpenViewState)=> Promise<void>) | null = null;
@@ -111,7 +111,9 @@ function patchOpenFile(plugin: ImportAttachments) {
 			window.require('electron').remote.shell.showItemInFolder(makePosixPathOScompatible(joinPaths(plugin.vaultPath,file.path)));
 		}
 		else if(plugin.settings.openAttachmentExternal && metaKeyPressed && !altKeyPressed) {
-			plugin.app.openWithDefaultApp(file.path);
+			plugin.app.openWithDefaultApp(file.path).catch((err: unknown) => {
+				reportFailure(`Could not open '${file.path}' with the default app`, err);
+			});
 		}
 		else
 		{

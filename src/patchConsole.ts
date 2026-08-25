@@ -58,7 +58,10 @@ export function monkeyPatchConsole(plugin: ImportAttachments) {
 			logs[prefix] = [];
 		}
 		logs[prefix].push(timestampedMessage);
-		saveLogs();
+		// Deliberately fire-and-forget, and deliberately without a catch that logs: this runs
+		// *inside* the patched console, so reporting a failure here through console.error would
+		// re-enter this same function. A Notice is no better — it would fire on every log line.
+		void saveLogs();
 	};
 
 	if(originalConsole.debug) {console.debug = logMessages(originalConsole.debug, 'debug');}
