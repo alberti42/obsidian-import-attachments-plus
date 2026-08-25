@@ -78,7 +78,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C23](#c23) | `Object.create(TFile.prototype) as TFile` | 1 | `false-positive-document` | low | S | done |
 | [C24](#c24) | `display()` deprecated since 1.13 | 1 | `decision-needed` | low | S | done |
 | [C25](#c25) | `workspace.activeLeaf` deprecated | 1 | `fix` | low | S | done |
-| [C26](#c26) | No release-asset attestations | — | `decision-needed` | low | M | todo |
+| [C26](#c26) | No release-asset attestations | — | `decision-needed` | low | M | done |
 | [C27](#c27) | Delete-image menu item did nothing (found while testing C25) | 2 | `fix` | high | S | done |
 | [C28](#c28) | Delete prompt in a popout may never resolve (found while fixing C20) | 1 | `investigate` | medium | S | done |
 | [C29](#c29) | Delete confirmation never resolved — deletion silently half-done | 1 | `fix` | **critical** | M | done |
@@ -1176,7 +1176,7 @@ Info-level, real. `main.ts:795` reads `this.app.workspace.activeLeaf`. Replace p
 ```yaml
 id: C26
 status: todo          # todo | in-progress | done | wontfix | blocked
-outcome:              # one line + commit SHA, filled in by the session that closes this
+outcome: attest-release.yml on release:published — verifies versions, lints, tests, rebuilds, refuses to attest unless byte-identical to the published assets; the rebuild assertion was tested against tag 1.6.4 — 9432896
 severity: info       # as reported by the scan
 verdict: decision-needed
 risk: low
@@ -1195,6 +1195,40 @@ Info-level, repo-level (no source lines — it concerns the released `main.js` a
 **Assessment** — the scan already reports **"Build reproduced the release `main.js` byte-for-byte"** as a pass, so reproducibility is established; attestations would add provenance signing on top.
 
 **Do this** — requires a GitHub Actions release workflow with `actions/attest-build-provenance` and `id-token: write`. The repo currently has **no CI** (CLAUDE.md) and releases are cut by hand with `gh release create`, so this means introducing a release workflow. Scoped project, user's call.
+
+**Done: `.github/workflows/attest-release.yml`**, the repo's first workflow. It runs on
+`release: published`, so the manual draft-then-publish procedure is unchanged.
+
+It is a **release gate**, not only a signer, and the order matters:
+
+1. check out the released tag;
+2. verify `package.json` and `manifest.json` declare the tag's version and `versions.json` has an
+   entry for it — the stale-`package.json` downgrade CLAUDE.md warns about would be caught here;
+3. `npm run lint` and `npm test`;
+4. rebuild (`npm run build`, which carries `tsc -noEmit`);
+5. **refuse to attest unless the rebuild is byte-identical to the three published assets**;
+6. `actions/attest-build-provenance@v2` signs `main.js`, `manifest.json`, `styles.css`.
+
+Step 5 is the point. Attesting bytes that differ from what users download would be worse than no
+attestation at all, and since the build is deterministic (esbuild pinned by `package-lock.json`) a
+mismatch means the assets did not come from that tag.
+
+Permissions are `contents: read`, `id-token: write`, `attestations: write` — it cannot modify the
+repo or the release.
+
+**Tested before committing**, rather than trusting the next release to find out: tag `1.6.4` was
+checked out into a worktree and rebuilt, and all three assets came back **byte-identical**
+(`main.js` 69551, `manifest.json` 351, `styles.css` 4849). Its version checks would also have
+passed. So the assertion the workflow makes is known to hold on real data.
+
+Anyone can now verify a future release with:
+
+```bash
+gh attestation verify main.js --repo alberti42/obsidian-import-attachments-plus
+```
+
+**1.6.4 and earlier stay unattested** — the workflow only fires for releases published after it
+lands.
 
 ---
 

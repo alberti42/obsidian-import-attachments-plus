@@ -1,0 +1,93 @@
+# Signs the three release assets with build provenance, so anyone can verify they were built
+# from this repository at the released tag:
+#
+#     gh attestation verify main.js --repo alberti42/obsidian-import-attachments-plus
+#
+# Releases are still cut by hand (see CLAUDE.md); this runs after one is published and does not
+# create or modify anything. It rebuilds from the tag and *refuses to attest* unless the result is
+# byte-identical to the assets that were uploaded — an attestation for bytes users do not download
+# would be worse than none. The build is deterministic (esbuild is pinned by package-lock.json), so
+# a mismatch means the assets did not come from this tag.
+name: Attest release assets
+
+on:
+  release:
+    types: [published]
+
+# No write access to the repository: this job reads, verifies and attests.
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
+jobs:
+  attest:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name }}
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Check out the released tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # The three version files must agree with the tag. A stale package.json used to downgrade
+      # the manifest silently, which is exactly the kind of thing a release gate should catch.
+      - name: Check the version files against the tag
+        run: |
+          set -euo pipefail
+          for f in package.json manifest.json; do
+            v=$(node -p "require('./$f').version")
+            if [ "$v" != "$TAG" ]; then
+              echo "::error::$f declares $v but the tag is $TAG"
+              exit 1
+            fi
+          done
+          node -e "
+            const versions = require('./versions.json');
+            const tag = process.env.TAG;
+            if (!versions[tag]) { throw new Error('versions.json has no entry for ' + tag); }
+            console.log(tag + ' -> minAppVersion ' + versions[tag]);
+          "
+
+      - name: Lint and test
+        run: |
+          npm run lint
+          npm test
+
+      # Carries `tsc -noEmit` before bundling.
+      - run: npm run build
+
+      - name: Compare the rebuild with the published assets
+        run: |
+          set -euo pipefail
+          mkdir -p published
+          gh release download "$TAG" --dir published \
+            --pattern main.js --pattern manifest.json --pattern styles.css
+          status=0
+          for f in main.js manifest.json styles.css; do
+            if cmp -s "dist/$f" "published/$f"; then
+              echo "$f: identical ($(wc -c < "dist/$f") bytes)"
+            else
+              echo "::error::$f differs from the published asset; the release was not built from $TAG"
+              status=1
+            fi
+          done
+          exit $status
+
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            dist/main.js
+            dist/manifest.json
+            dist/styles.css
