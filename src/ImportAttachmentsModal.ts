@@ -167,7 +167,9 @@ export class ImportActionTypeModal extends Modal {
 		*/
 	}
 
-	async import() {
+	// Not async: resolveChoice and close are both synchronous, and the keyword only made the
+	// click handler below a floating promise.
+	import() {
 		this.resolveChoice({
 			action: this.selectedAction,
 			embed: this.selectedEmbedOption,
@@ -692,7 +694,7 @@ export class StrayAttachmentsModal extends Modal {
 		this.selectedRow.setAttribute('data-selected', 'true');
 		this.selectedStray = this.rowToStray.get(target)!
 		if (doScroll) {this.selectedRow.scrollIntoView({ behavior: 'auto', block: 'nearest' });}
-		if (doRenderPreview) {this.renderPreview();}
+		if (doRenderPreview) {void this.renderPreview();}
 	}
 
 	private selectNextRow(row: HTMLElement) {
@@ -832,27 +834,11 @@ export class StrayAttachmentsModal extends Modal {
 		wrapper.createSpan({ cls: 'stray-attachment-spacer' });
 		const confirmButton = wrapper.createEl('button', { cls: ['clickable-icon', 'stray-attachment-row-btn', 'stray-attachment-confirm'] });
 		setIcon(confirmButton, 'check');
-		confirmButton.addEventListener('click', async (e) => {
+		// The listener itself must return void, not a promise: a rejection from an async
+		// listener is one nothing handles. The work is named and voided instead.
+		confirmButton.addEventListener('click', (e) => {
 			e.stopPropagation();
-			const destFolder = stray.to[parseInt(wrapper.dataset.destIndex ?? '0')];
-			if (!destFolder) {
-				console.warn('No destination folder found for stray attachment:', stray);
-				return;
-			}
-			try {
-				const count = await moveStrayAttachments(this.plugin, [{
-					sourcePath: stray.fromPath,
-					destinationPath: destFolder.attachFolder,
-					sourceFile: stray.file
-				}]);
-				if (count > 0) {new Notice(`Successfully moved ${stray.file.name}`);}
-				this.selectNextOrPreviousBeforeRemove(wrapper);
-				wrapper.remove();
-				this.contentEl.focus();
-			} catch (error) {
-				console.error('Error moving attachment:', error);
-				new Notice(`Failed to move ${stray.file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-			}
+			void this.moveOneStray(stray, wrapper);
 		});
 
 		const removeButton = wrapper.createEl('button', { cls: ['clickable-icon', 'stray-attachment-row-btn', 'stray-attachment-dismiss'] });
@@ -869,7 +855,7 @@ export class StrayAttachmentsModal extends Modal {
 			this.selectedRow = wrapper;
 			this.selectedRow.setAttribute('data-selected', 'true');
 			this.selectedStray = stray;
-			this.renderPreview();
+			void this.renderPreview();
 		})
 	}
 
@@ -903,7 +889,7 @@ export class StrayAttachmentsModal extends Modal {
 		for (const stray of this.strays) {
 			this.renderRow(scroller, stray);
 		}
-		this.renderPreview();
+		void this.renderPreview();
 
 		// select the first row by default so keyboard navigation and preview work immediately
 		const firstRow = scroller.querySelector<HTMLElement>(`.${ROW_CLASSNAME}`);
@@ -930,8 +916,10 @@ export class StrayAttachmentsModal extends Modal {
 			cls: 'mod-cta'
 		});
 		this.moveAllButtonEl = yesButton;
-		yesButton.addEventListener('click', async () => {
-			await this.handleMoveAll();
+		yesButton.addEventListener('click', () => {
+			this.handleMoveAll().catch((err: unknown) => {
+				Utils.reportFailure('Could not move the stray attachments', err);
+			});
 		});
 
 		const cancelButton = bottomBar.createEl('button', {
@@ -944,6 +932,28 @@ export class StrayAttachmentsModal extends Modal {
 		});
 
 		contentEl.focus();
+	}
+
+	private async moveOneStray(stray: StrayAttachment, wrapper: HTMLElement) {
+		const destFolder = stray.to[parseInt(wrapper.dataset.destIndex ?? '0')];
+		if (!destFolder) {
+			console.warn('No destination folder found for stray attachment:', stray);
+			return;
+		}
+		try {
+			const count = await moveStrayAttachments(this.plugin, [{
+				sourcePath: stray.fromPath,
+				destinationPath: destFolder.attachFolder,
+				sourceFile: stray.file
+			}]);
+			if (count > 0) {new Notice(`Successfully moved ${stray.file.name}`);}
+			this.selectNextOrPreviousBeforeRemove(wrapper);
+			wrapper.remove();
+			this.contentEl.focus();
+		} catch (error) {
+			console.error('Error moving attachment:', error);
+			new Notice(`Failed to move ${stray.file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+		}
 	}
 
 	private async handleMoveAll() {
