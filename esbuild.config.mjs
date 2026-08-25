@@ -3,7 +3,13 @@ import process from "process";
 import { copyFile } from "fs/promises";
 import { globSync } from "fs";
 import path from "path";
-import builtins from "builtin-modules";
+import { builtinModules } from "module";
+
+// Node builtins are supplied by the Electron/Node runtime, so they stay out of the
+// bundle. `module.builtinModules` is the stdlib equivalent of the former
+// `builtin-modules` dependency; the `node:`-prefixed spellings are listed too
+// because an import of `node:test` does not match the bare name.
+const builtins = [...builtinModules, ...builtinModules.map((m) => `node:${m}`)];
 
 // Banner message for the generated/bundled files
 const banner = `

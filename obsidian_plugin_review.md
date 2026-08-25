@@ -71,7 +71,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C16](#c16) | Redundant `\| undefined` on optional params | 2 | `fix` | low | S | done |
 | [C17](#c17) | Inline `style.display` in settings | 2 | `fix` | low | S | todo |
 | [C18](#c18) | `authorUrl` unreachable | 1 | `decision-needed` | low | S | todo |
-| [C19](#c19) | `builtin-modules` dependency | 1 | `fix` | low | S | todo |
+| [C19](#c19) | `builtin-modules` dependency | 1 | `fix` | low | S | done |
 | [C20](#c20) | `instanceof HTMLElement` across windows | 1 | `fix` | medium | S | todo |
 | [C21](#c21) | `clearTimeout` → `window.clearTimeout` | 1 | `fix` | low | S | done |
 | [C22](#c22) | No `getSettingDefinitions()` (settings search) | 1 | `decision-needed` | medium | M | todo |
@@ -747,8 +747,8 @@ sites: 1
 
 ```yaml
 id: C19
-status: todo          # todo | in-progress | done | wontfix | blocked
-outcome:              # one line + commit SHA, filled in by the session that closes this
+status: done          # todo | in-progress | done | wontfix | blocked
+outcome: replaced with module.builtinModules and uninstalled; production bundle byte-identical — [sha]
 severity: medium       # as reported by the scan
 verdict: fix
 risk: low
