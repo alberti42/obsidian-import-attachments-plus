@@ -787,7 +787,7 @@ sites: 1
 ```yaml
 id: C20
 status: done          # todo | in-progress | done | wontfix | blocked
-outcome: both sites use instanceOf; the scan had missed the context-menu one, which broke the feature in popouts outright — [sha]
+outcome: both sites use instanceOf; the scan had missed the context-menu one, which broke the feature in popouts outright — 9000d19
 severity: medium       # as reported by the scan
 verdict: fix
 risk: medium
