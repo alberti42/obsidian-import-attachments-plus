@@ -97,7 +97,7 @@ Then take to the user: C18, C15, C10, C26, and C12/C13/C14 as one decision, with
 ```yaml
 id: C01
 status: todo          # todo | in-progress | done | wontfix | blocked
-outcome: 20 sites, but 8 of them were manufactured by two needless `async` keywords; buckets recorded in the section; both rules now enforced in eslint.config.js — 4219b4e, 193e9b9, 302f2a0, acde983, [sha]
+outcome: 20 sites, but 8 of them were manufactured by two needless `async` keywords; buckets recorded in the section; both rules now enforced in eslint.config.js — 4219b4e, 193e9b9, 302f2a0, acde983, 42060d5
 severity: medium       # as reported by the scan
 verdict: fix-with-care
 risk: medium
