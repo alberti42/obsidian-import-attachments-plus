@@ -64,9 +64,9 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C09](#c09) | Cross-enum comparison in settings | 3 | `fix-with-care` | medium | S | done |
 | [C10](#c10) | CommonJS `require` in `eslint.config.js` | 2 | `decision-needed` | low | S | done |
 | [C11](#c11) | `async` handler where `void` is expected | 2 | `fix` | low | S | done |
-| [C12](#c12) | Top-level `path` import (mobile) | 2 | `investigate` | high | L | todo |
-| [C13](#c13) | Top-level `fs` import (mobile) | 2 | `investigate` | high | L | todo |
-| [C14](#c14) | Top-level `crypto` import (mobile) | 1 | `investigate` | high | S | todo |
+| [C12](#c12) | Top-level `path` import (mobile) | 2 | `investigate` | high | L | done |
+| [C13](#c13) | Top-level `fs` import (mobile) | 2 | `investigate` | high | L | done |
+| [C14](#c14) | Top-level `crypto` import (mobile) | 1 | `investigate` | high | S | done |
 | [C15](#c15) | API newer than `minAppVersion` | 2 | `decision-needed` | medium | S | done |
 | [C16](#c16) | Redundant `\| undefined` on optional params | 2 | `fix` | low | S | done |
 | [C17](#c17) | Inline `style.display` in settings | 2 | `fix` | low | S | done |
@@ -639,7 +639,7 @@ sites: 2
 ```yaml
 id: C12
 status: todo          # todo | in-progress | done | wontfix | blocked
-outcome:              # one line + commit SHA, filled in by the session that closes this
+outcome: lazy nodePath() accessor; nothing Node-related is required at load — cb8a8ca
 severity: medium       # as reported by the scan
 verdict: investigate
 risk: high
@@ -664,6 +664,31 @@ sites: 2
 - (a) set `isDesktopOnly: true` — honest, one-line, loses the mobile-capable subset (rename events, delete menus) that the current code claims to support; or
 - (b) make the imports lazy behind `Platform.isDesktopApp` and split the desktop-only helpers into a module loaded on demand — the real fix, and a substantial refactor of `utils.ts` + `main.ts`.
 
+**The premise was wrong, and the author settled it.** The plugin **does** load on mobile and a
+reduced feature set works there — hiding attachment folders was the example. `isDesktopOnly: false`
+is deliberate. (The "never verified" line in CLAUDE.md was about individual *features* on mobile,
+such as whether an attachment follows cut-and-pasted text, not about whether the plugin runs.)
+
+Why it survived a top-level `require('fs')`: Obsidian's mobile `require` evidently returns something
+falsy rather than throwing, so `var J = require("fs")` is harmless at load, and every *use* of the
+three builtins sits on a desktop-only path that mobile never reaches.
+
+**Done: option (b), for all three.** Not because loading was broken, but because it was relying on
+that leniency, which is not a promise. `fs`, `path` and `crypto` are now required lazily inside the
+functions that use them — the pattern `electron` already followed — through `nodeFs()`,
+`nodePath()` and `nodeCrypto()` in `utils.ts`.
+
+**One real bug fixed on the way** ([C14](#c14)): `Utils.uuidv4()` called `randomUUID()` on **Node's**
+crypto, which resolves to `{}` on mobile and would have thrown. `crypto.randomUUID()` is a web
+global, so it now works everywhere. It is also the `${md5}` fallback, so it is reachable.
+
+**Verified the same way the original claim was made** — brace-depth analysis of `dist/main.js`: every
+`require("fs")`, `require("path")` and `require("crypto")` is at depth ≥ 1, i.e. inside a function.
+Only `require("obsidian")` remains at top level. Nothing Node-related is touched at load.
+
+**Still unverified on a device**, and worth saying plainly: the individual mobile features. This work
+removed a load-time assumption; it did not test the stray-attachment automation on a phone.
+
 **Traps** — `utils.ts` uses `path` throughout for the POSIX↔OS conversion that CLAUDE.md design point #6 depends on; do not swap it for string surgery without tests. `attachmentFolder.ts` was extracted precisely so this logic is testable without Obsidian — lean on `npm test` here.
 
 **Verify** — after either route, `npm run build`, then load on a real mobile device or accept that (a) makes the question moot. Do not claim mobile works without a device test.
@@ -675,7 +700,7 @@ sites: 2
 ```yaml
 id: C13
 status: todo          # todo | in-progress | done | wontfix | blocked
-outcome:              # one line + commit SHA, filled in by the session that closes this
+outcome: lazy nodeFs() accessor, used from utils.ts and main.ts — cb8a8ca
 severity: medium       # as reported by the scan
 verdict: investigate
 risk: high
@@ -703,7 +728,7 @@ Same problem and same decision as **C12** — `main.ts:46`, `utils.ts:2`. Do not
 ```yaml
 id: C14
 status: todo          # todo | in-progress | done | wontfix | blocked
-outcome:              # one line + commit SHA, filled in by the session that closes this
+outcome: lazy nodeCrypto() for MD5, and uuidv4() now uses the web-global crypto.randomUUID(), which fixes a real mobile crash — cb8a8ca
 severity: medium       # as reported by the scan
 verdict: investigate
 risk: high

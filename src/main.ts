@@ -37,9 +37,7 @@ import {
 } from './types';
 import * as Utils from 'utils';
 
-import { sep, posix } from 'path';
 
-import { promises as fs } from 'fs';  // This imports the promises API from fs
 
 import { patchOpenFile, unpatchOpenFile, addKeyListeners } from 'patchOpenFile';
 import { callPromptForDeletion, patchFilemanager, unpatchFilemanager } from 'patchFileManager';
@@ -103,6 +101,8 @@ export default class ImportAttachments extends Plugin {
 				throw new Error('The vault folder could not be determined.');
 			}
 			// Normalize to POSIX-style path
+			// eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy so the plugin does not need `path` merely to load; see utils.ts
+			const { sep, posix } = require('path') as typeof import('path');
 			this.vaultPath = adapter.getBasePath().split(sep).join(posix.sep);
 		} else {
 			this.vaultPath = '';
@@ -1068,10 +1068,10 @@ export default class ImportAttachments extends Plugin {
 			try {
 				switch (importSettings.action) {
 					case ImportActionType.MOVE:
-						await fs.rename(originalFilePath, Utils.joinPaths(this.vaultPath,destFilePath));
+						await Utils.nodeFs().rename(originalFilePath, Utils.joinPaths(this.vaultPath,destFilePath));
 						return destFilePath;
 					case ImportActionType.COPY:
-						await fs.copyFile(originalFilePath, Utils.joinPaths(this.vaultPath,destFilePath));
+						await Utils.nodeFs().copyFile(originalFilePath, Utils.joinPaths(this.vaultPath,destFilePath));
 						return destFilePath;
 					case ImportActionType.LINK:
 					default:

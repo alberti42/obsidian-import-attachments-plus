@@ -1,11 +1,34 @@
 // utils.ts
-import { promises as fs } from 'fs';  // This imports the promises API from fs
-import * as crypto from 'crypto';
 
 import { Notice, Vault, normalizePath, TAbstractFile, TFile, TFolder } from 'obsidian';
 
 import { ParsedPath as ParsedFilePath, ParsedFolderPath } from 'types';
-import * as path from 'path';
+
+/**
+ * Node builtins, required lazily — the same treatment `electron` already gets.
+ *
+ * They used to be static imports, which put `require('fs')` at the top of the bundle and made the
+ * plugin's *loading* depend on Obsidian's mobile `require` being lenient about modules it does not
+ * have. Every use is on a desktop-only path anyway — file I/O outside the vault, MD5 hashing, OS
+ * separator conversion — so mobile never reaches them, and now never needs them to load either.
+ *
+ * Note `uuidv4()` below does **not** use Node's crypto: `crypto.randomUUID()` is a web global, so
+ * that one works on every platform.
+ */
+export function nodeFs(): typeof import('fs').promises {
+	// eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy on purpose; see above
+	return (require('fs') as typeof import('fs')).promises;
+}
+
+function nodePath(): typeof import('path') {
+	// eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy on purpose; see above
+	return require('path') as typeof import('path');
+}
+
+function nodeCrypto(): typeof import('crypto') {
+	// eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy on purpose; see above
+	return require('crypto') as typeof import('crypto');
+}
 
 /**
  * Report a background failure to the user.
@@ -70,14 +93,15 @@ export function arePathsSameFile(vault: Vault, filePath1: string, filePath2: str
 }
 
 export function makePosixPathOScompatible(posixPath:string): string {
+	const path = nodePath();
 	return posixPath.split(path.posix.sep).join(path.sep);
 }
 
 export async function hashFile(filePath: string): Promise<string> {
-	const hash = crypto.createHash('md5');
+	const hash = nodeCrypto().createHash('md5');
 	let fileHandle = null;
 	try {
-		fileHandle = await fs.open(filePath, 'r'); // Open the file to get a filehandle
+		fileHandle = await nodeFs().open(filePath, 'r'); // Open the file to get a filehandle
 		const stream = fileHandle.createReadStream();  // Create a read stream from the file handle
 
 		for await (const chunk of stream) {
@@ -94,7 +118,7 @@ export async function hashFile(filePath: string): Promise<string> {
 // Hashes data we already hold in memory, e.g. an image coming from the clipboard, which has no
 // path to hash yet. Kept next to hashFile so the two ${md5} sources stay side by side.
 export function hashBuffer(data: ArrayBuffer): string {
-	return crypto.createHash('md5').update(new Uint8Array(data)).digest('hex');
+	return nodeCrypto().createHash('md5').update(new Uint8Array(data)).digest('hex');
 }
 
 function formatDateTime(dateFormat:string):string {
@@ -174,6 +198,8 @@ export function findNewFilename(vault: Vault, destFilePath: string): string
 export async function getFileInVault(vaultPath: string, filePath: string): Promise<string | null> {
 	try {
 		// Resolve the real (absolute) paths to handle symlinks and relative paths
+		const fs = nodeFs();
+		const path = nodePath();
 		const realFilePath = await fs.realpath(filePath);
 		const realVaultFolderPath = await fs.realpath(vaultPath);
 
@@ -198,7 +224,7 @@ export async function getFileInVault(vaultPath: string, filePath: string): Promi
 
 export async function checkFileExists(filePath: string): Promise<boolean> {
 	try {
-		const stats = await fs.stat(filePath);
+		const stats = await nodeFs().stat(filePath);
 		return stats.isFile();  // Check if the path is a directory
 	} catch (error: unknown) {
 		if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
@@ -210,7 +236,7 @@ export async function checkFileExists(filePath: string): Promise<boolean> {
 
 export async function doesDirectoryOutsideVaultExist(dirPath: string): Promise<boolean> {
 	try {
-		const stats = await fs.stat(dirPath);
+		const stats = await nodeFs().stat(dirPath);
 		return stats.isDirectory();  // Check if the path is a directory
 	} catch (error: unknown) {
 		if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
@@ -288,6 +314,7 @@ export function mapSoftSet<K, V>(map: Map<K, V>, key: K, value: V) {
 
 // Random RFC 4122 v4 UUID; replaces the former `uuid` package dependency.
 function uuidv4(): string {
+	// The *web* global, not Node's crypto: this one has to work on mobile too.
 	return crypto.randomUUID();
 }
 
