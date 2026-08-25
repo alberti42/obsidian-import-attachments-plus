@@ -28,7 +28,9 @@ const trace = process.env.NODE_ENV === 'development'
  * has an item for. Idempotent, and cheap enough to run on any event that could change
  * which folders qualify.
  */
-async function updateVisibilityAttachmentFolders(plugin: ImportAttachments) {
+// Not async: the body is a synchronous DOM sweep, and the keyword alone made every one of the
+// seven call sites a floating promise that had to be dismissed with `void`. Nothing awaits it.
+function updateVisibilityAttachmentFolders(plugin: ImportAttachments) {
 	const leaves = plugin.app.workspace.getLeavesOfType('file-explorer');
 	const hide = plugin.settings.hideAttachmentFolders;
 
