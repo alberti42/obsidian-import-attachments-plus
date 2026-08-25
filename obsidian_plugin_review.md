@@ -75,7 +75,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C20](#c20) | `instanceof HTMLElement` across windows | 1 | `fix` | medium | S | todo |
 | [C21](#c21) | `clearTimeout` → `window.clearTimeout` | 1 | `fix` | low | S | done |
 | [C22](#c22) | No `getSettingDefinitions()` (settings search) | 1 | `decision-needed` | medium | M | todo |
-| [C23](#c23) | `Object.create(TFile.prototype) as TFile` | 1 | `false-positive-document` | low | S | todo |
+| [C23](#c23) | `Object.create(TFile.prototype) as TFile` | 1 | `false-positive-document` | low | S | done |
 | [C24](#c24) | `display()` deprecated since 1.13 | 1 | `decision-needed` | low | S | todo |
 | [C25](#c25) | `workspace.activeLeaf` deprecated | 1 | `fix` | low | S | todo |
 | [C26](#c26) | No release-asset attestations | — | `decision-needed` | low | M | todo |
@@ -196,7 +196,7 @@ sites: 17
 - To satisfy it properly, convert each method to an arrow-function class property (`editor_drop_cb = async (evt, editor, view) => { … }`) and delete the matching `.bind` line in the constructor. Arrow properties are per-instance, so reference identity stays stable — which matters for the one `off()` call at `main.ts:400` (`file-menu`).
 - Do the conversion and the `.bind` removal in the *same* commit. Half-done leaves a method bound to nothing or a double-bind.
 
-*Group B — the 4 `patch*.ts` sites* (`originalX = SomeClass.prototype.method`). This is the monkey-patch save/restore pattern and it is **required** to store the unbound prototype method. Do **not** bind these. Add a scoped `eslint-disable-next-line @typescript-eslint/unbound-method` with a description (see C09) and move on.
+*Group B — the 4 `patch*.ts` sites* (`originalX = SomeClass.prototype.method`). This is the monkey-patch save/restore pattern and it is **required** to store the unbound prototype method. Do **not** bind these. Add a scoped `eslint-disable-next-line @typescript-eslint/unbound-method` with a description (see C09) and move on. (That rule *is* resolvable, unlike the one C23 wanted to disable — but this config does not enable type-checked rules, so check first whether the directive is even needed: an unused one is a warning.)
 
 **Traps** — CLAUDE.md: callbacks handed to `app.workspace.on(...)` must keep a stable identity so they can be `off()`-ed. Never wrap a registration in a fresh inline arrow.
 
@@ -867,8 +867,8 @@ sites: 1
 
 ```yaml
 id: C23
-status: todo          # todo | in-progress | done | wontfix | blocked
-outcome:              # one line + commit SHA, filled in by the session that closes this
+status: done          # todo | in-progress | done | wontfix | blocked
+outcome: comment only — an eslint-disable naming the scanner rule is a hard error in ESLint 10 — [sha]
 severity: medium       # as reported by the scan
 verdict: false-positive-document
 risk: low
@@ -889,6 +889,12 @@ sites: 1
 **Assessment** — deliberate. `utils.ts:224` is `createMockTFile`, which fabricates a `TFile` for a file that is not in the vault yet; an `instanceof` check is not applicable because the object is being constructed. The scanner's suggested fix does not apply.
 
 **Do this** — add a scoped `eslint-disable-next-line` **with a description** (see C08) plus a comment explaining why a real `TFile` cannot be obtained here. Do not restructure.
+
+⚠️ **The `eslint-disable` half of that is not available.** The rule lives in the community
+scanner, not in `eslint.config.js`, and ESLint 10 treats a directive naming an unresolvable
+rule as an **error** (`Definition for rule 'obsidianmd/no-tfile-tfolder-cast' was not found`),
+which breaks the lint gate. Measured, not assumed. So: explanatory comment only, unless the
+scanner's plugin is ever added as a devDependency. **The same applies to C02 group B.**
 
 ---
 

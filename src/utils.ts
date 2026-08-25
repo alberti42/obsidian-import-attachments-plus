@@ -220,7 +220,12 @@ export function createMockTFile(vault:Vault,filepath:string): TFile {
 
 	const { filename, path, ext } = parseFilePath(filepath);
 	
-	// Create a new TFile object
+	// Deliberate cast, and the scan's suggested `instanceof TFile` check does not apply:
+	// this file is not in the vault yet, so there is no TFile to narrow. Obsidian exports
+	// no TFile constructor, so grafting the prototype is the only way to hand the rest of
+	// the code something that behaves like one. No eslint-disable here on purpose: the rule
+	// that flags this ships with the community scanner, not with this config, and ESLint 10
+	// errors on a directive naming a rule it cannot resolve.
 	const tfile = Object.create(TFile.prototype) as TFile;
 
 	// Set necessary properties
