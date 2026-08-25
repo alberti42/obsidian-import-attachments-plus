@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-import-attachments-plus",
-	"version": "1.6.3",
+	"version": "1.6.4",
 	"description": "Import attachments by moving them into the vault.",
 	"main": "main.js",
 	"scripts": {
