@@ -986,13 +986,13 @@ export default class ImportAttachments extends Plugin {
             // Using Electron's webFrameUtils to get the file path.
             // `require` (rather than a static import) keeps electron out of the module
             // graph, so this file stays loadable where electron is unavailable.
-            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            // eslint-disable-next-line @typescript-eslint/no-require-imports -- electron is required lazily, as the comment above explains
             const webUtils = require('electron').webUtils;
 
             let files_array;
 
             if(!webUtils) {
-                // eslint-disable-next-line @typescript-eslint/no-require-imports
+                // eslint-disable-next-line @typescript-eslint/no-require-imports -- same lazy require, on the old-installer fallback path
                 const installer_version = require('electron').remote.app.getVersion();
                 console.warn(`webUtils not available with the current Obsidian installer version ${installer_version}. Please replace your installation of Obsidian with a fresh new installation.`);
             
@@ -1371,7 +1371,7 @@ export default class ImportAttachments extends Plugin {
 		const absAttachmentsFolderPath = Utils.joinPaths(this.vaultPath,attachmentsFolderPath);
 
 		// Open the folder in the system's default file explorer
-		// eslint-disable-next-line @typescript-eslint/no-require-imports
+		// eslint-disable-next-line @typescript-eslint/no-require-imports -- electron is required lazily; this path is desktop-only anyway
 		require('electron').remote.shell.openPath(Utils.makePosixPathOScompatible(absAttachmentsFolderPath));
 	}
 

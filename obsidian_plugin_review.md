@@ -60,7 +60,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C05](#c05) | `await` on non-promises | 6 | `fix` | low | S | done |
 | [C06](#c06) | `document.createElement` → `createEl` | 4 | `investigate` | low | S | todo |
 | [C07](#c07) | Unnecessary type assertions | 3 | `fix` | low | S | todo |
-| [C08](#c08) | `eslint-disable` without a reason | 3 | `fix` | low | S | todo |
+| [C08](#c08) | `eslint-disable` without a reason | 3 | `fix` | low | S | done |
 | [C09](#c09) | Cross-enum comparison in settings | 3 | `fix-with-care` | medium | S | todo |
 | [C10](#c10) | CommonJS `require` in `eslint.config.js` | 2 | `decision-needed` | low | S | todo |
 | [C11](#c11) | `async` handler where `void` is expected | 2 | `fix` | low | S | todo |
@@ -393,8 +393,8 @@ sites: 3
 
 ```yaml
 id: C08
-status: todo          # todo | in-progress | done | wontfix | blocked
-outcome:              # one line + commit SHA, filled in by the session that closes this
+status: done          # todo | in-progress | done | wontfix | blocked
+outcome: appended `-- reason` to all three no-require-imports directives; lint still suppresses them — [sha]
 severity: medium       # as reported by the scan
 verdict: fix
 risk: low
