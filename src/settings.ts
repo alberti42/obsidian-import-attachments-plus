@@ -23,6 +23,7 @@ import {
 } from './types';
 
 import { updateVisibilityAttachmentFolders } from 'hideAttachmentFolders';
+import * as Utils from 'utils';
 
 // Plugin settings tab
 export class ImportAttachmentsSettingTab extends PluginSettingTab {
@@ -35,6 +36,19 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
         this.plugin = plugin;
     }
 
+    /**
+     * Persist the settings, reporting a failure rather than dropping it.
+     *
+     * Every caller here is a debounce callback or an onChange handler, so there is nobody to
+     * await the save. Settings that silently fail to persist are worth a notice: the control
+     * shows the new value while data.json still holds the old one.
+     */
+    private saveOrReport() {
+        this.plugin.saveSettings().catch((err: unknown) => {
+            Utils.reportFailure('Could not save the settings', err);
+        });
+    }
+
     debouncedSaveSettings(fnc?:(()=>void)) {
         // timeout after 250 ms
         const timeout_ms = 50;
@@ -45,7 +59,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
 
         this.saveTimeout = window.setTimeout(() => {
             if(fnc===undefined) {
-                this.plugin.saveSettings();
+                this.saveOrReport();
             } else {
                 fnc.call(this);
             }
@@ -573,7 +587,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                 text.onChange(async (value: string) => {
                     this.plugin.settings.attachmentFolderPath = value;
                     this.debouncedSaveSettings(():void => {
-                        this.plugin.saveSettings();
+                        this.saveOrReport();
                         this.plugin.parseAttachmentFolderPath();
                         updateVisibilityAttachmentFolders(this.plugin);
                     });
@@ -612,7 +626,7 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                 updateVisibilityFolderPath(value);
             
                 this.debouncedSaveSettings(():void => {
-                    this.plugin.saveSettings();
+                    this.saveOrReport();
                     this.plugin.parseAttachmentFolderPath();
                     updateVisibilityAttachmentFolders(this.plugin);
                 });
