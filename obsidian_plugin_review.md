@@ -59,7 +59,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C04](#c04) | `setTimeout` → `window.setTimeout` | 6 | `fix` | low | S | todo |
 | [C05](#c05) | `await` on non-promises | 6 | `fix` | low | S | done |
 | [C06](#c06) | `document.createElement` → `createEl` | 4 | `investigate` | low | S | todo |
-| [C07](#c07) | Unnecessary type assertions | 3 | `fix` | low | S | todo |
+| [C07](#c07) | Unnecessary type assertions | 3 | `fix` | low | S | done |
 | [C08](#c08) | `eslint-disable` without a reason | 3 | `fix` | low | S | done |
 | [C09](#c09) | Cross-enum comparison in settings | 3 | `fix-with-care` | medium | S | todo |
 | [C10](#c10) | CommonJS `require` in `eslint.config.js` | 2 | `decision-needed` | low | S | todo |
@@ -358,8 +358,8 @@ sites: 4
 
 ```yaml
 id: C07
-status: todo          # todo | in-progress | done | wontfix | blocked
-outcome:              # one line + commit SHA, filled in by the session that closes this
+status: done          # todo | in-progress | done | wontfix | blocked
+outcome: two assertions were redundant and are gone; the modal one was NOT (querySelector returns Element) — now querySelector<HTMLElement> — [sha]
 severity: medium       # as reported by the scan
 verdict: fix
 risk: low

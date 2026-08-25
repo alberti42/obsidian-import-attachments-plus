@@ -906,7 +906,7 @@ export class StrayAttachmentsModal extends Modal {
 		this.renderPreview();
 
 		// select the first row by default so keyboard navigation and preview work immediately
-		const firstRow = scroller.querySelector(`.${ROW_CLASSNAME}`) as HTMLElement | null;
+		const firstRow = scroller.querySelector<HTMLElement>(`.${ROW_CLASSNAME}`);
 		if (firstRow) {this.selectTargetRow(firstRow);}
 
 		// Modal.scope is scoped to this modal and torn down with it, unlike a listener on

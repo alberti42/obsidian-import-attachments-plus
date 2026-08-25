@@ -124,9 +124,9 @@ function buildReferenceMaps(plugin: ImportAttachments): ReferenceMaps {
 	// unify all those links into a standardized link format (unifyLinkCaches)
 	// filter out notes which end up without any links
 
-	const filesWithLinks = (app.vault.getFiles() as TFile[])
+	const filesWithLinks = app.vault.getFiles()
 		.filter(t => NOTE_EXTENSIONS.has(t.extension.toLowerCase()))
-		.map(t => ({ f: t, m: app.metadataCache.getFileCache(t) as CachedMetadata | null }))
+		.map(t => ({ f: t, m: app.metadataCache.getFileCache(t) }))
 		// Keep notes that reference something. The caches are optional, so `== null`
 		// was doing real work here (it matches undefined, which `=== null` does not);
 		// `?.length ?? 0` says the same thing without depending on that.
