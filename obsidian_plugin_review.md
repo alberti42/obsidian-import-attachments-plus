@@ -72,7 +72,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C17](#c17) | Inline `style.display` in settings | 2 | `fix` | low | S | done |
 | [C18](#c18) | `authorUrl` unreachable | 1 | `decision-needed` | low | S | todo |
 | [C19](#c19) | `builtin-modules` dependency | 1 | `fix` | low | S | done |
-| [C20](#c20) | `instanceof HTMLElement` across windows | 1 | `fix` | medium | S | todo |
+| [C20](#c20) | `instanceof HTMLElement` across windows | 2 | `fix` | medium | S | done |
 | [C21](#c21) | `clearTimeout` → `window.clearTimeout` | 1 | `fix` | low | S | done |
 | [C22](#c22) | No `getSettingDefinitions()` (settings search) | 1 | `decision-needed` | medium | M | todo |
 | [C23](#c23) | `Object.create(TFile.prototype) as TFile` | 1 | `false-positive-document` | low | S | done |
@@ -80,6 +80,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C25](#c25) | `workspace.activeLeaf` deprecated | 1 | `fix` | low | S | done |
 | [C26](#c26) | No release-asset attestations | — | `decision-needed` | low | M | todo |
 | [C27](#c27) | Delete-image menu item did nothing (found while testing C25) | 2 | `fix` | high | S | done |
+| [C28](#c28) | Delete prompt in a popout may never resolve (found while fixing C20) | 1 | `investigate` | medium | S | todo |
 
 **Suggested order.** Mechanical first, so the noise drops fast and later diffs stay small:
 C16 → C05 → C08 → C07 → C04+C21 → C17 → C25 → C19 → C20 → C03 → C23 → C06.
@@ -785,13 +786,13 @@ sites: 1
 
 ```yaml
 id: C20
-status: todo          # todo | in-progress | done | wontfix | blocked
-outcome:              # one line + commit SHA, filled in by the session that closes this
+status: done          # todo | in-progress | done | wontfix | blocked
+outcome: both sites use instanceOf; the scan had missed the context-menu one, which broke the feature in popouts outright — [sha]
 severity: medium       # as reported by the scan
 verdict: fix
 risk: medium
 size: S
-sites: 1
+sites: 2          # 1 from the scan, 1 it missed
 ```
 
 **Scanner message**
@@ -803,12 +804,30 @@ sites: 1
 | line | scanned | code |
 | --- | --- | --- |
 | `src/patchFileManager.ts:129` | 129 | `node instanceof HTMLElement && node.classList.contains('modal-container')` |
+| `src/main.ts:879` | — | `if(!(evt.target instanceof HTMLElement)) {return;}` — **the scan missed this one** |
 
 **Assessment** — real, and a genuine bug in popout windows: each window has its own `HTMLElement` constructor, so `node instanceof HTMLElement` is `false` for a node from another window. `patchFileManager.ts:129` uses it to detect the modal container, i.e. deletion prompts in a popout may not be recognised.
 
 **Do this** — swap for Obsidian's cross-window-safe check (`node.instanceOf(HTMLElement)`).
 
+**A second site, not in the scan.** `context_menu_cb` (`main.ts:879`) opens with
+`evt.target instanceof HTMLElement`, and that handler is registered on **every document**
+(design point #2) precisely so it works in popouts. In a popout the check is false, so the
+handler returns immediately and *Delete image file* never appears there at all. Same defect,
+same fix; `grep -rn 'instanceof HTMLElement' src/` now returns nothing.
+
+⚠️ **`instanceOf` is not the whole popout story for the modal site.** The observer is armed with
+`.observe(document.body, …)`, and that `document` is the **main window's**. If Obsidian renders
+the delete-confirm modal into the focused popout's document instead, the observer never fires and
+`registeredUserDecisionPromise` never resolves — the await simply hangs, with no error. Unmeasured;
+filed as [C28](#c28) rather than guessed at.
+
 **Traps** — multi-window is design point #2; `patchFileManager` is on the note-deletion path, which is destructive. Test in a popout: delete a note that has an attachment folder and confirm the folder prompt still appears and still targets the right folder.
+
+**Testing note** — the modal branch only runs when Obsidian's *Confirm file deletion* is on
+(`promptDelete`). With it off, `callOriginalPromptForDeletion` resolves immediately and the
+observer is never armed, so the fixed line is not exercised at all. The `main.ts` site, by
+contrast, is exercised by any right-click on an embed in a popout.
 
 ---
 
@@ -937,7 +956,7 @@ Info-level. `main.ts:645` calls `activeTab.display()` to redraw the settings tab
 ```yaml
 id: C25
 status: done          # todo | in-progress | done | wontfix | blocked
-outcome: getActiveViewOfType(MarkdownView) replaces activeLeaf in context_menu_cb; null now bails instead of falling through — c3cd712
+outcome: getActiveViewOfType(MarkdownView) replaces activeLeaf in context_menu_cb; null now bails instead of falling through — c3cd712; verified in a vault: the item appears on an embed in a note and not on an image outside a markdown view
 severity: info       # as reported by the scan
 verdict: fix
 risk: low
@@ -1071,6 +1090,47 @@ caller, and the menu `onClick` catches, logs and shows a `Notice`. C01's site li
 **Verify** — right-click an embedded image under a non-absolute link format and delete it; confirm
 both the file and the link go. Repeat with a markdown-style embed (`![alt](path)`) and with a
 subfolder attachment.
+
+---
+
+## C28 — Delete prompt in a popout may never resolve
+
+```yaml
+id: C28
+status: todo          # todo | in-progress | done | wontfix | blocked
+outcome:              # one line + commit SHA, filled in by the session that closes this
+severity: unknown     # not from the scan: noticed while fixing C20
+verdict: investigate
+risk: medium
+size: S
+sites: 1
+```
+
+**Sites**
+
+| line | scanned | code |
+| --- | --- | --- |
+| `src/patchFileManager.ts:185` | — | `}).observe(document.body, config);` |
+
+**Not a scanner finding.** Noticed while fixing [C20](#c20). `callOriginalPromptForDeletion` arms a
+`MutationObserver` on `document.body` — the **main window's** body, since `document` is resolved at
+module scope — and then awaits a promise that only the observer can resolve. If Obsidian renders
+the delete-confirm modal into a focused popout's document, the observer never fires and the await
+never settles: no error, no prompt, nothing. That is the same shape of silent failure as
+[C27](#c27), where a floated rejection made a broken feature look inert.
+
+**Unmeasured.** It needs one test rather than an argument: enable Obsidian's *Confirm file deletion*,
+open a note in a popout, delete an attachment there, and watch for
+`[delete attachment] modal container detected` in a dev build. If it never prints, this is real.
+
+**If real** — the observer must watch the document the modal is actually in. Candidates:
+`activeWindow.document.body`, or the `doc` of the leaf being acted on (`leaf.view.containerEl.doc`).
+Design point #2 already requires everything document-touching to go through
+`iterateOverAllDocuments`, which this does not.
+
+**Traps** — this is the note/attachment deletion path. A wrong observer root does not merely fail to
+detect: it hangs the caller, and `modalResolvePromise` is a single module-level slot, so a stuck
+prompt can strand the next one too.
 
 ---
 

@@ -876,8 +876,13 @@ export default class ImportAttachments extends Plugin {
         // the deprecated workspace.activeLeaf; note it also returns null when there is no
         // active leaf at all, where the old code fell through and carried on.
         if (!this.app.workspace.getActiveViewOfType(MarkdownView)) {return;}
-        if(!(evt.target instanceof HTMLElement)) {return;}
-        const target:HTMLElement = evt.target;
+        // This handler is registered on every document (design point #2), so the event can come
+        // from a popout window, whose HTMLElement is a different constructor: `instanceof` is
+        // false there, and the menu item would simply never appear. instanceOf is cross-window
+        // safe. The scan flagged only the patchFileManager site, not this one.
+        const eventTarget = evt.target as Node | null;
+        if(eventTarget === null || !eventTarget.instanceOf(HTMLElement)) {return;}
+        const target:HTMLElement = eventTarget;
         const tagName:string = target.tagName;
 
         // Check if the right-clicked element is an image

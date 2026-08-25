@@ -131,10 +131,13 @@ async function callOriginalPromptForDeletion(this:FileManager, file:TAbstractFil
         new MutationObserver((mutations, observer) => {
             for (const mutation of mutations) {
                 if (mutation.addedNodes.length > 0) {
-                    // Check if the added node is the modal
-                    const modal = Array.from(mutation.addedNodes).find(node =>
-                        node instanceof HTMLElement && node.classList.contains('modal-container')
-                    ) as HTMLElement;
+                    // Check if the added node is the modal. `instanceOf` rather than `instanceof`:
+                    // each window has its own HTMLElement constructor, so a plain instanceof is
+                    // false for a node belonging to a popout. Typing the callback as a guard also
+                    // retires an `as HTMLElement` cast that was lying about the undefined case.
+                    const modal = Array.from(mutation.addedNodes).find((node): node is HTMLElement =>
+                        node.instanceOf(HTMLElement) && node.classList.contains('modal-container')
+                    );
                     if (modal) {
                         traceDelete('modal container detected');
                         // Add event listeners to buttons within the modal
