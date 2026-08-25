@@ -53,7 +53,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 
 | ID | Concern | Sites | Verdict | Risk | Size | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| [C01](#c01) | Floating promises | 20 | `fix-with-care` | medium | L | todo |
+| [C01](#c01) | Floating promises | 20 | `fix-with-care` | medium | L | done |
 | [C02](#c02) | Unbound method references (`this` scoping) | 17 | `false-positive-fix-anyway` | medium | M | todo |
 | [C03](#c03) | Console logging | 10 | `false-positive-document` | low | S | done |
 | [C04](#c04) | `setTimeout` → `window.setTimeout` | 6 | `fix` | low | S | done |
@@ -63,7 +63,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C08](#c08) | `eslint-disable` without a reason | 3 | `fix` | low | S | done |
 | [C09](#c09) | Cross-enum comparison in settings | 3 | `fix-with-care` | medium | S | todo |
 | [C10](#c10) | CommonJS `require` in `eslint.config.js` | 2 | `decision-needed` | low | S | todo |
-| [C11](#c11) | `async` handler where `void` is expected | 2 | `fix` | low | S | todo |
+| [C11](#c11) | `async` handler where `void` is expected | 2 | `fix` | low | S | done |
 | [C12](#c12) | Top-level `path` import (mobile) | 2 | `investigate` | high | L | todo |
 | [C13](#c13) | Top-level `fs` import (mobile) | 2 | `investigate` | high | L | todo |
 | [C14](#c14) | Top-level `crypto` import (mobile) | 1 | `investigate` | high | S | todo |
@@ -97,7 +97,7 @@ Then take to the user: C18, C15, C10, C26, and C12/C13/C14 as one decision, with
 ```yaml
 id: C01
 status: todo          # todo | in-progress | done | wontfix | blocked
-outcome:              # one line + commit SHA, filled in by the session that closes this
+outcome: 20 sites, but 8 of them were manufactured by two needless `async` keywords; buckets recorded in the section; both rules now enforced in eslint.config.js — 4219b4e, 193e9b9, 302f2a0, acde983, [sha]
 severity: medium       # as reported by the scan
 verdict: fix-with-care
 risk: medium
@@ -148,6 +148,31 @@ example of bucket 2 below.
 3. an `async` handler passed where a `void` return is expected → see C11, fix together.
 
 **Do this** — walk the sites in file order, one file per commit. State the bucket you chose for each site in the commit message.
+
+**Done, and the site list was not the right starting point.** A one-off type-checked lint run
+(`no-floating-promises` + `no-misused-promises`, which the repo config does not enable) is the
+ground truth and reproduced all 20 + C11's 2 exactly. Then, in file order:
+
+| what | sites | bucket |
+| --- | --- | --- |
+| `updateVisibilityAttachmentFolders` is **not async** — no `await` in its body, no caller awaits it | 7 | none needed |
+| `import()` in the modal, likewise | 1 | none needed |
+| `renderPreview()` ×3, `saveLogs()` | 4 | 1 — `void` |
+| `delete_file_cb`, `handleFiles` ×2, `moveFileToAttachmentsFolder`, `openWithDefaultApp`, `saveSettings` ×3 | 8 | 2 — `Utils.reportFailure` |
+| C11's two async click listeners | 2 | 3 |
+
+**Eight of the twenty needed no handling at all** — two `async` keywords on functions that never
+await were manufacturing them. Prefixing `void` twenty times would have hidden that.
+
+New shared helper `Utils.reportFailure(what, err)` — `console.error` plus a `Notice`, phrased for a
+user — because eight sites in four files wanted the same thing.
+
+`saveLogs()` in `patchConsole.ts` is the one deliberate exception: it runs *inside* the patched
+console, so a `catch` that logs would re-enter it, and a `Notice` would fire per log line.
+
+**Guarded against regression** — both rules are now enabled permanently in `eslint.config.js`, the
+only type-aware rules there. `project` was already configured for `src/**`, so the cost is ~2 s.
+That makes `npm run lint` a gate on this class of bug rather than a one-time cleanup.
 
 **Traps** — `editor_drop_cb`/`editor_paste_cb` are Obsidian event callbacks: making the registration site `await` changes nothing (Obsidian ignores the returned promise), so the handling has to be *inside* the callback.
 
@@ -522,7 +547,7 @@ sites: 2
 ```yaml
 id: C11
 status: todo          # todo | in-progress | done | wontfix | blocked
-outcome:              # one line + commit SHA, filled in by the session that closes this
+outcome: both listeners now return void — one extracted as moveOneStray(), one catching through reportFailure; done in the C01 pass as its note suggested — 302f2a0
 severity: medium       # as reported by the scan
 verdict: fix
 risk: low
