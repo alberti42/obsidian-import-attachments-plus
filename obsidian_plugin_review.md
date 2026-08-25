@@ -1228,7 +1228,7 @@ and link both go), cancel the prompt (neither goes), and delete a note with a `$
 ```yaml
 id: C30
 status: done          # todo | in-progress | done | wontfix | blocked
-outcome: context_menu_cb now returns unless getMode() is 'source', so reading view keeps Obsidian's own image menu — [sha]
+outcome: context_menu_cb now returns unless getMode() is 'source', so reading view keeps Obsidian's own image menu — 2c0a3e9
 severity: low         # not from the scan: the user's call while testing C27/C29
 verdict: fix
 risk: low
