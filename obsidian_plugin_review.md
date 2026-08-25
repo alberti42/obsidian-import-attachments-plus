@@ -1315,7 +1315,7 @@ the reference is not unique.
 ```yaml
 id: C31
 status: done          # todo | in-progress | done | wontfix | blocked
-outcome: both callers now fall back to the metadata cache for the link position; verified — file deleted and link removed — [sha]
+outcome: both callers now fall back to the metadata cache for the link position; verified — file deleted and link removed — 23c6f41
 severity: medium      # not from the scan: found by manual test
 verdict: fix
 risk: medium
