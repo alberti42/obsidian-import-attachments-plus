@@ -86,6 +86,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C31](#c31) | 'Delete link and file' looked for the link at the caret | 1 | `fix` | medium | S | done |
 | [C32](#c32) | Embedded-image menu replaced Obsidian's own | 1 | `fix` | medium | M | done |
 | [C33](#c33) | ⌘⌥-click did not reveal in a popout; listener leak on unload | 2 | `fix` | medium | S | done |
+| [C34](#c34) | Two delete entries on an image — is ours redundant? | — | `investigate` | low | S | wontfix |
 
 **Suggested order.** Mechanical first, so the noise drops fast and later diffs stay small:
 C16 → C05 → C08 → C07 → C04+C21 → C17 → C25 → C19 → C20 → C03 → C23 → C06.
@@ -1649,6 +1650,59 @@ behave in the main window.
 
 **Worth noticing** — this is the **second** multi-window defect of the review after [C20](#c20), and
 both predate it. Design point #2 is not decoration.
+
+---
+
+## C34 — Two delete entries on an image
+
+```yaml
+id: C34
+status: wontfix       # todo | in-progress | done | wontfix | blocked
+outcome: keep the feature — Obsidian's own delete-and-unlink is image-only, so links and non-image embeds have no built-in equivalent; no code change
+severity: low         # not from the scan: noticed while testing C32
+verdict: investigate
+risk: low
+size: S
+sites: 0
+```
+
+**Not a scanner finding, and closed with no code change** — recorded because the obvious "tidy up the
+duplicate" conclusion is **wrong**, and the next reader will be tempted by it.
+
+**The observation** — after [C32](#c32) stopped the plugin replacing Obsidian's context menu,
+right-clicking an embedded image shows two delete entries:
+
+| entry | owner | behaviour |
+| --- | --- | --- |
+| *Delete link and file* | this plugin (`file_menu_cb`) | deletes the attachment **and** removes the link text, subject to *Remove Wikilink when deleting an attachment file* |
+| *Delete image* | **Obsidian** | deletes the attachment and removes the embed too |
+
+Ownership was established by grep, not inference: the plugin's bundle contains only *"Delete link
+and file"*, no other installed plugin builds such a title, and *"Delete image"* is a literal string
+in `obsidian.asar`.
+
+**Why the feature stays.** Obsidian's entry is **image-only**. Right-click a plain link to an
+attachment — `[[Attachments/foo.pdf]]`, no `!` — and Obsidian offers no way to delete the file and
+the link together. That is the case the plugin covers, and it is the useful half. Ours is also
+optional (two settings gate it) and can delete the file while *keeping* the link, which Obsidian's
+cannot.
+
+So the duplication is confined to images, where both entries do the same thing. Two options were
+considered and neither taken:
+
+- narrowing `file_menu_cb` to skip images when Obsidian's own entry is present — its existing scan
+  for Obsidian's delete item (`promptForDeletion` / `promptForFileDeletion` in the callback source,
+  `main.ts:495`) does not match *Delete image*, so this would need new detection of a private
+  implementation detail;
+- removing the feature outright, which was the first instinct and is what the evidence ruled out.
+
+**Do not remove `file_menu_cb`/`delete_file_cb`** without re-checking the link case in the Obsidian
+of the day. If Obsidian ever offers delete-and-unlink for links too, this becomes the same story as
+[C32](#c32) and the file-explorer patches: a feature that outlived its gap.
+
+**Unrelated, noticed in passing** — the author's vault has a stale `obsidian-import-attachments-plus`
+entry in `.obsidian/community-plugins.json` with no matching directory. Harmless; only one copy
+(`import-attachments-plus`) actually loads.
 
 ---
 
