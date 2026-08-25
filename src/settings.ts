@@ -585,11 +585,11 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                 switch(folderLocation) {
                 case AttachmentFolderLocationType.ROOT:
                 case AttachmentFolderLocationType.CURRENT:
-                    attachmentFolderSetting.settingEl.style.display = 'none';
+                    attachmentFolderSetting.settingEl.toggleClass('import-plugin-setting-hidden', true);
                     break;
                 case AttachmentFolderLocationType.FOLDER:
                 case AttachmentFolderLocationType.SUBFOLDER:
-                    attachmentFolderSetting.settingEl.style.display = '';
+                    attachmentFolderSetting.settingEl.toggleClass('import-plugin-setting-hidden', false);
                     break;
                 }
             }

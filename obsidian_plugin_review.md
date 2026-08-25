@@ -69,7 +69,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C14](#c14) | Top-level `crypto` import (mobile) | 1 | `investigate` | high | S | todo |
 | [C15](#c15) | API newer than `minAppVersion` | 2 | `decision-needed` | medium | S | todo |
 | [C16](#c16) | Redundant `\| undefined` on optional params | 2 | `fix` | low | S | done |
-| [C17](#c17) | Inline `style.display` in settings | 2 | `fix` | low | S | todo |
+| [C17](#c17) | Inline `style.display` in settings | 2 | `fix` | low | S | done |
 | [C18](#c18) | `authorUrl` unreachable | 1 | `decision-needed` | low | S | todo |
 | [C19](#c19) | `builtin-modules` dependency | 1 | `fix` | low | S | done |
 | [C20](#c20) | `instanceof HTMLElement` across windows | 1 | `fix` | medium | S | todo |
@@ -684,8 +684,8 @@ sites: 2
 
 ```yaml
 id: C17
-status: todo          # todo | in-progress | done | wontfix | blocked
-outcome:              # one line + commit SHA, filled in by the session that closes this
+status: done          # todo | in-progress | done | wontfix | blocked
+outcome: class toggle instead of inline display; needed a new class — .import-plugin-hidden is explorer-scoped — [sha]
 severity: medium       # as reported by the scan
 verdict: fix
 risk: low

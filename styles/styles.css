@@ -2,6 +2,13 @@
 	display: none;
 }
 
+/* Hides a settings row that does not apply to the current attachment-folder location.
+   Deliberately not .import-plugin-hidden: that rule is scoped to the file explorer
+   (.nav-files-container above), so it would have no effect inside the settings tab. */
+.import-plugin-setting-hidden {
+	display: none;
+}
+
 .import-plugin table {
 	width: 100%;
 	border-collapse: collapse;
