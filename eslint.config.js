@@ -47,8 +47,9 @@ module.exports = tseslint.config(
             'prefer-arrow-callback': 'error',
             // The only two type-aware rules enabled, and they earn it: every user-visible bug
             // the 1.6.3 review turned up was a promise nobody handled — a delete that trashed
-            // the file and then silently skipped everything after it. `project` above already
-            // provides the type information, so these cost ~2 s and no extra configuration.
+            // the file and then silently skipped everything after it. They are free: `project`
+            // above was already building the TypeScript program for naming-convention, so these
+            // reuse it. Measured over two runs each, `npm run lint` is ~1.7 s either way.
             // Discard a promise deliberately with `void`; if its failure matters to the user,
             // route it through Utils.reportFailure.
             '@typescript-eslint/no-floating-promises': 'error',

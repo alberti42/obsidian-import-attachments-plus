@@ -171,8 +171,10 @@ user — because eight sites in four files wanted the same thing.
 console, so a `catch` that logs would re-enter it, and a `Notice` would fire per log line.
 
 **Guarded against regression** — both rules are now enabled permanently in `eslint.config.js`, the
-only type-aware rules there. `project` was already configured for `src/**`, so the cost is ~2 s.
-That makes `npm run lint` a gate on this class of bug rather than a one-time cleanup.
+only type-aware rules there, which makes `npm run lint` a gate on this class of bug rather than a
+one-time cleanup. They are effectively free: `project: 'tsconfig.json'` was already configured for
+`src/**` (naming-convention needs it), so the TypeScript program was being built either way.
+Measured, two runs each: **1.86 s / 1.39 s without, 1.73 s / 1.75 s with**.
 
 **Traps** — `editor_drop_cb`/`editor_paste_cb` are Obsidian event callbacks: making the registration site `await` changes nothing (Obsidian ignores the returned promise), so the handling has to be *inside* the callback.
 
