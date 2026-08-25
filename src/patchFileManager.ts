@@ -5,6 +5,11 @@ import ImportAttachments from 'main';
 import * as Utils from 'utils';
 import { DeleteAttachmentFolderModal } from './ImportAttachmentsModal';
 
+// Dev-only tracing, matching main.ts: a production build keeps the calls but logs nothing.
+const traceDelete = process.env.NODE_ENV === 'development'
+	? (...args: unknown[]) => { console.log('[delete attachment]', ...args); }
+	: () => { /* no-op in production */ };
+
 // Save a reference to the original method for the monkey patch
 let originalPromptForDeletion: ((file: TAbstractFile) => Promise<boolean>) | null = null;
 let plugin:ImportAttachments;
@@ -39,6 +44,7 @@ async function modifiedPromptForDeletion(this: FileManager, file: TAbstractFile)
 
     // Call the original function
     const wasFileDeleted = await callOriginalPromptForDeletion.call(this, file);
+    traceDelete('wasFileDeleted', wasFileDeleted);
     if(wasFileDeleted) {
         // In case the deleted file is a .md note, delete the attachment folder
         if (plugin.settings.autoDeleteAttachmentFolder) {
@@ -112,6 +118,7 @@ async function callOriginalPromptForDeletion(this:FileManager, file:TAbstractFil
 
     // Access the 'promptDelete' configuration setting
     const promptDelete = plugin.app.vault.getConfig('promptDelete');
+    traceDelete('callOriginalPromptForDeletion', { file: file.path, promptDelete });
     
     if(promptDelete)
     {
@@ -129,6 +136,7 @@ async function callOriginalPromptForDeletion(this:FileManager, file:TAbstractFil
                         node instanceof HTMLElement && node.classList.contains('modal-container')
                     ) as HTMLElement;
                     if (modal) {
+                        traceDelete('modal container detected');
                         // Add event listeners to buttons within the modal
                         const deleteButton = modal.querySelector('.modal-button-container .mod-warning');
                         const cancelButton = modal.querySelector('.modal-button-container .mod-cancel');
@@ -193,7 +201,10 @@ async function callOriginalPromptForDeletion(this:FileManager, file:TAbstractFil
     }
 
     await originalPromptForDeletion.call(this,file);
-    return await registeredUserDecisionPromise;
+    traceDelete('original promptForDeletion returned, awaiting the user decision');
+    const decision = await registeredUserDecisionPromise;
+    traceDelete('user decision', decision);
+    return decision;
 }
 
 export async function callPromptForDeletion(file:TAbstractFile) {    

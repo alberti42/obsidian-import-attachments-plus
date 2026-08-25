@@ -53,7 +53,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 
 | ID | Concern | Sites | Verdict | Risk | Size | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| [C01](#c01) | Floating promises | 22 | `fix-with-care` | medium | L | todo |
+| [C01](#c01) | Floating promises | 20 | `fix-with-care` | medium | L | todo |
 | [C02](#c02) | Unbound method references (`this` scoping) | 17 | `false-positive-fix-anyway` | medium | M | todo |
 | [C03](#c03) | Console logging | 10 | `false-positive-document` | low | S | done |
 | [C04](#c04) | `setTimeout` → `window.setTimeout` | 6 | `fix` | low | S | done |
@@ -79,7 +79,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C24](#c24) | `display()` deprecated since 1.13 | 1 | `decision-needed` | low | S | todo |
 | [C25](#c25) | `workspace.activeLeaf` deprecated | 1 | `fix` | low | S | done |
 | [C26](#c26) | No release-asset attestations | — | `decision-needed` | low | M | todo |
-| [C27](#c27) | Delete-image menu item did nothing (found while testing C25) | 1 | `fix` | high | S | done |
+| [C27](#c27) | Delete-image menu item did nothing (found while testing C25) | 2 | `fix` | high | S | done |
 
 **Suggested order.** Mechanical first, so the noise drops fast and later diffs stay small:
 C16 → C05 → C08 → C07 → C04+C21 → C17 → C25 → C19 → C20 → C03 → C23 → C06.
@@ -99,7 +99,7 @@ severity: medium       # as reported by the scan
 verdict: fix-with-care
 risk: medium
 size: L
-sites: 22
+sites: 20          # was 22; two were fixed in C27
 ```
 
 **Scanner message**
@@ -116,8 +116,8 @@ sites: 22
 | `src/ImportAttachmentsModal.ts:906` | 906 | `this.renderPreview();` |
 | `src/main.ts:180` | 260 | `updateVisibilityAttachmentFolders(this);` |
 | `src/main.ts:502` | 568 | `this.delete_file_cb(file);` |
-| `src/main.ts:637` | 703 | `this.delete_file_cb(fileToBeDeleted,target);` |
-| `src/main.ts:821` | 910 | `this.delete_img_cb(evt,target);` |
+| ~~`src/main.ts:637`~~ | 703 | ~~`this.delete_file_cb(fileToBeDeleted,target);`~~ — **awaited**, see [C27](#c27) |
+| ~~`src/main.ts:821`~~ | 910 | ~~`this.delete_img_cb(evt,target);`~~ — **caught + Notice**, see [C27](#c27) |
 | `src/main.ts:884` | 973 | `this.handleFiles(filesArray, editor, view, doToggleEmbedPreference, ImportOperationType.PASTE);` |
 | `src/main.ts:1013` | 1102 | `this.handleFiles(files_array, editor, view, doForceAsking, ImportOperationType.DRAG_AND_DROP);` |
 | `src/main.ts:1081` | 1170 | `this.moveFileToAttachmentsFolder(nonFolderFilesArray, editor, view, importSettings);` |
@@ -134,6 +134,10 @@ sites: 22
 | `src/settings.ts:617` | 617 | `updateVisibilityAttachmentFolders(this.plugin);` |
 
 **What the scanner wants** — every promise either awaited, `.catch()`-ed, or explicitly discarded with `void`.
+
+**20 sites, not 22.** Two were on the delete path and are fixed in [C27](#c27), where the silent
+rejection was the whole reason a broken feature looked like a no-op. That is also the worked
+example of bucket 2 below.
 
 **Assessment** — real, and the largest group. Do *not* blanket-prefix with `void`: several of these are the plugin's actual work (`this.import()`, `moveFileToAttachmentsFolder`, save-settings) where a rejection currently vanishes silently. Triage each site into one of three buckets:
 1. fire-and-forget UI refresh (e.g. `this.renderPreview()`) → `void` is right,
@@ -992,12 +996,12 @@ Info-level, repo-level (no source lines — it concerns the released `main.js` a
 ```yaml
 id: C27
 status: done          # todo | in-progress | done | wontfix | blocked
-outcome: resolve the embed src with resolveLink() instead of getFileByPath(); also logs when it cannot resolve — [sha]
+outcome: two causes — wrong DOM element (closest('.internal-embed')) and wrong resolver (resolveLink); verified working in a real vault — 2b9a3b6 + PENDING
 severity: high        # not from the scan: found by manual test
 verdict: fix
 risk: high
 size: S
-sites: 1
+sites: 2
 ```
 
 **Not a scanner finding.** Found while manually verifying [C25](#c25): right-clicking an embedded
@@ -1008,9 +1012,19 @@ deletion.
 
 | line | scanned | code |
 | --- | --- | --- |
+| `src/main.ts:630` | — | `const src = parent.getAttribute('src');` |
 | `src/main.ts:631` | — | `const fileInVault = this.app.vault.getFileByPath(src);` |
 
-**Cause** — the `src` attribute of an `.internal-embed` is the link *as written*, i.e. a
+**Two independent causes, both confirmed by a dev-build trace in a real vault.** The first fix
+alone did not make the feature work; both lines above were wrong.
+
+**Cause 1 — the wrong element.** `target.parentElement` is not the `.internal-embed` wrapper:
+Obsidian nests further elements between it and the `<img>`, so `getAttribute('src')` returned
+`null` (`[delete attachment] menu item clicked {tagName: 'IMG', src: null}`) and the function
+returned before resolving anything. Fixed by `target.closest('.internal-embed')`, which located
+`div.internal-embed.media-embed.image-embed.is-loaded`.
+
+**Cause 2** — the `src` attribute of an `.internal-embed` is the link *as written*, i.e. a
 **linkpath**, while `vault.getFileByPath()` resolves from the **vault root**. The two coincide only
 under the `Absolute path in vault` link format. Under `Shortest path when possible` (Obsidian's
 default) or `Path from the current file`, folders are omitted — `Notes/shot.png` is embedded as
@@ -1020,12 +1034,39 @@ plugin generated links its own delete path could not resolve.
 
 This is exactly the invariant CLAUDE.md already states for `strayAttachments.ts`: resolve links via
 `getFirstLinkpathDest`, never by re-parsing the written form. The rule was simply never applied here.
+The trace confirms it was load-bearing: `src` arrived as the bare
+`Screenshot ….png` and resolved to `Notes/Screenshot ….png`, which `getFileByPath` could never
+have found.
+
+**Also fixed, but not the cause and still unverified.** CodeMirror's `posAtDOM` raises when the
+node is not part of the editor content — its own doc comment says so — which is the normal case in
+reading view, in a hover popover and inside a Dataview block. That throw is not a
+`DeleteLinkError`, so it was rethrown into a floated promise and vanished. It is now caught, with
+a fallback that asks the metadata cache for the offset of the *sole* reference to the file (with
+none there is nothing to remove; with several there is no way to know which was clicked, so both
+decline and the file is deleted without touching the note). The confirmed session ran in
+`mode: 'source'`, where `posAtDOM` returned 6 — so **this branch has never actually been
+exercised**; reading view is the test that would.
 
 **Fix** — export the existing `resolveLink()` from `strayAttachments.ts` (one implementation, and it
 already handles url-encoded markdown-style embeds) and call it with the active note as the source
 path. The unresolved branch now logs instead of returning silently, which is what hid this.
 
+**Instrumentation** — the path now carries dev-only tracing in the `hideAttachmentFolders.ts`
+idiom, in both `main.ts` and `patchFileManager.ts`. It is what turned "nothing happens" into a
+one-click diagnosis, and this path has now broken twice invisibly, so it stays.
+
+⚠️ **CLAUDE.md is wrong about that idiom.** It claims the dev-only tracing calls are "tree-shaken
+out of production entirely". They are not: `process.env.NODE_ENV` is substituted and the tracer
+collapses to a no-op, but the call sites and their argument expressions survive — `'swept'`, from
+the pre-existing tracer that sentence describes, is present in `dist/main.js` after
+`npm run build`. Harmless, but the claim should not be relied on.
+
 **Interaction with C15** — this deleted one of C15's two `getFileByPath` sites; see that concern.
+
+**Interaction with C01** — two of C01's 22 floating-promise sites are on this path and were fixed
+here, because the unhandled rejection *was* the invisibility: `delete_img_cb` is now awaited by its
+caller, and the menu `onClick` catches, logs and shows a `Notice`. C01's site list is annotated.
 
 **Verify** — right-click an embedded image under a non-absolute link format and delete it; confirm
 both the file and the link go. Repeat with a markdown-style embed (`![alt](path)`) and with a

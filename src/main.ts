@@ -65,6 +65,27 @@ import { findStrayAttachments, findStrayAttachmentsOfNote, moveStrayAttachments,
 class DeleteLinkError extends Error {}
 
 // Main plugin class
+// Dev-only tracing of the attachment-delete path, which has now broken twice in ways that
+// were invisible without it. `process.env.NODE_ENV` is substituted at build time, so a
+// production build keeps the call sites but logs nothing: the tracer collapses to a no-op.
+// (Measured — the argument strings are still present in dist/main.js after `npm run build`.)
+const traceDelete = process.env.NODE_ENV === 'development'
+    ? (...args: unknown[]) => { console.log('[delete attachment]', ...args); }
+    : () => { /* no-op in production */ };
+
+// Dev-only: the DOM chain above a clicked media element, for diagnosing which ancestor
+// actually carries the vault link.
+const describeAncestry = process.env.NODE_ENV === 'development'
+    ? (el: HTMLElement | null): string[] => {
+        const out: string[] = [];
+        for (let node = el; node && out.length < 5; node = node.parentElement) {
+            const src = node.getAttribute('src');
+            out.push(`${node.tagName.toLowerCase()}.${node.className || '-'}${src!==null ? ` [src=${src}]` : ''}`);
+        }
+        return out;
+    }
+    : () => [];
+
 export default class ImportAttachments extends Plugin {
 	settings: ImportAttachmentsSettings = { ...DEFAULT_SETTINGS };
 	vaultPath: string;
@@ -526,10 +547,31 @@ export default class ImportAttachments extends Plugin {
         }
     }
 
+    /**
+     * Offset of the one reference to `target` inside `note`, or null.
+     *
+     * Used when the clicked DOM node is not part of the editor content, so CodeMirror
+     * cannot tell us where the link is. The cache can, as long as the answer is
+     * unambiguous: with no reference there is nothing to remove, and with several we
+     * cannot know which one was clicked, so both cases decline and leave the caller to
+     * delete the file without touching the note.
+     */
+    private offsetOfSoleReference(note: TFile | null, target: TFile): number | null {
+        if(!note) {return null;}
+        const cache = this.app.metadataCache.getFileCache(note);
+        if(!cache) {return null;}
+        const refs = [...(cache.embeds ?? []), ...(cache.links ?? [])]
+            .filter(ref => resolveLink(this.app, ref.link, note.path) === target);
+        if(refs.length !== 1) {return null;}
+        return refs[0].position.start.offset;
+    }
+
     async delete_file_cb(file_src:TFile,target?:HTMLElement):Promise<boolean> {
+        traceDelete('delete_file_cb', { file: file_src.path, hasTarget: !!target });
         try {
             // Find the current Markdown editor where the click happened
             const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+            traceDelete('active view', { found: activeView!==null, mode: activeView?.getMode() });
             if(activeView===null) {throw new DeleteLinkError("not active view of type 'MarkdownView' was found");}
             const editorView = activeView.editor;
             
@@ -541,7 +583,17 @@ export default class ImportAttachments extends Plugin {
             const cursorIdx = (():number|null => {
                 let pos:number|null
                 if(target) {
-                    pos = codemirror.posAtDOM(target);
+                    try {
+                        pos = codemirror.posAtDOM(target);
+                        traceDelete('posAtDOM', pos);
+                    } catch (err: unknown) {
+                        traceDelete('posAtDOM raised, falling back to the metadata cache', err);
+                        // posAtDOM raises when the node is not part of the editor content, which
+                        // is the normal case in reading view, in a hover popover and inside a
+                        // Dataview block. Ask the metadata cache where the link is instead.
+                        pos = this.offsetOfSoleReference(activeView.file, file_src);
+                        traceDelete('cache fallback offset', pos);
+                    }
                 } else {
                     pos = codemirror.state.selection.main.head;  // equivalent to editorView.getCursor()
                 }
@@ -552,6 +604,7 @@ export default class ImportAttachments extends Plugin {
             })();
 
             if(cursorIdx===null) {throw new DeleteLinkError('could not determine the link position in the MarkDown note');}
+            traceDelete('cursorIdx', cursorIdx);
 
             const line = doc.lineAt(cursorIdx);
             const lineContent = line.text;
@@ -575,6 +628,7 @@ export default class ImportAttachments extends Plugin {
                 // It is certain that that linkPosInLine will be somewhere inside the
                 // the link but it is not always at the beginning. So, we can be sure
                 // only the link on which we clicked will be removed.
+                traceDelete('candidate link', { matched: match[0], startIdx, endIdx, positionCh: position.ch });
                 if (position.ch >= startIdx && position.ch <= endIdx) {
                     const fileInVault = (():TFile|null=>{
                         let file_path:string;
@@ -593,7 +647,9 @@ export default class ImportAttachments extends Plugin {
                     }
                 
                     // Delete the file with user prompt
+                    traceDelete('prompting for deletion of', file_src.path);
                     const wasDeleted = await callPromptForDeletion(file_src);
+                    traceDelete('deletion result', { wasDeleted, removeWikilink: this.settings.removeWikilinkOnFileDeletion });
                     
                     // Remove the link only if the file was actually deleted by the user and
                     // the user has chosen to remove the link once the file has been deleted
@@ -615,6 +671,7 @@ export default class ImportAttachments extends Plugin {
                 // something went wrong when trying to identify the position of the link in the note
                 // sometimes this happens because we are visualizing a Dataview content and there is no real link in the note to be deleted
                 console.error(`No matching link found at the click position: ${err.message}`);
+                traceDelete('falling back to deleting the file without touching the note');
                 
                 // let's finally delete the file despite the fact that we were not able to remove the link
                 await callPromptForDeletion(file_src);
@@ -626,9 +683,17 @@ export default class ImportAttachments extends Plugin {
     async delete_img_cb(evt: MouseEvent, target:HTMLElement) {
         // Get a TFile reference from the clicked HTML element 
         const fileToBeDeleted:TFile|null = (():TFile|null=>{
-            const parent = target.parentElement;
-            if(!parent) {return null;}
-            const src = parent.getAttribute('src');
+            // The vault link lives on the .internal-embed wrapper. This used to read
+            // target.parentElement, but that wrapper is not always the img's direct parent:
+            // Obsidian nests further elements in some views, and then getAttribute('src')
+            // returned null and the menu item silently did nothing.
+            const embedEl = target.closest<HTMLElement>('.internal-embed');
+            const src = embedEl?.getAttribute('src') ?? target.parentElement?.getAttribute('src') ?? null;
+            traceDelete('embed element', {
+                found: embedEl!==null,
+                cls: embedEl?.className ?? null,
+                ancestry: describeAncestry(target),
+            });
             if(!src) {return null;}
             // The `src` of an .internal-embed is the link *as written*, i.e. a linkpath and
             // not a vault path. Only the 'Absolute path in vault' link format makes the two
@@ -639,6 +704,7 @@ export default class ImportAttachments extends Plugin {
             // fallback so markdown-style embeds work too.
             const sourcePath = this.app.workspace.getActiveFile()?.path ?? '';
             const resolved = resolveLink(this.app, src, sourcePath);
+            traceDelete('resolving embed', { src, sourcePath, resolved: resolved?.path ?? null });
             if(!resolved) {
                 // Do not fail silently: an unresolved embed used to make the menu item a no-op.
                 console.error(`Import Attachments+: no vault file matches the embedded link '${src}' in '${sourcePath}'.`);
@@ -648,7 +714,7 @@ export default class ImportAttachments extends Plugin {
 
         if(!fileToBeDeleted) {return;}
 
-        this.delete_file_cb(fileToBeDeleted,target);
+        await this.delete_file_cb(fileToBeDeleted,target);
     }
 
     async onExternalSettingsChange() {
@@ -830,7 +896,13 @@ export default class ImportAttachments extends Plugin {
                     .setIcon('trash-2')
                     .setSection('danger')
                     .onClick(() => {
-                        this.delete_img_cb(evt,target);
+                        traceDelete('menu item clicked', { tagName, src: target.parentElement?.getAttribute('src') });
+                        // An unhandled rejection here is invisible, which is how a broken
+                        // delete path went unnoticed: say so instead.
+                        this.delete_img_cb(evt,target).catch((err: unknown) => {
+                            console.error('Import Attachments+: deleting the attachment failed:', err);
+                            new Notice('Failed to delete the attachment.');
+                        });
                     });
                 item.dom.classList.add('is-warning');
             });
