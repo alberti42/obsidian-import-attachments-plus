@@ -342,8 +342,25 @@ export default class ImportAttachments extends Plugin {
         }
     }
 
-    file_menu_cb = (menu: Menu, file: TAbstractFile):void => {
+    file_menu_cb = (menu: Menu, file: TAbstractFile, source?: string):void => {
+        const mode = this.app.workspace.getActiveViewOfType(MarkdownView)?.getMode();
+        traceDelete('file-menu', { source, mode, file: file.path, sections: menu.sections.join(',') });
         if(menu.sections.contains('canvas')) {return;}
+
+        // Obsidian's own 'Delete image' does exactly what ours does on an image — it calls
+        // fileManager.promptForDeletion and then removes the link range — so two identical entries
+        // only invite picking one at random. `sections` is the language-independent way to spot
+        // that menu: an image right-click reports 'title,image', while a link reports the whole
+        // editor menu and the file explorer its own set. Matching the title would be wrong; it is
+        // localized (`menu.deleteImage` in Obsidian's string table).
+        //
+        // Its own entry cannot be detected directly, which is why this reads the sections instead:
+        // for an image, Obsidian fires 'file-menu' *before* adding its items, so the scan below
+        // never sees them. From the file explorer it adds them first, which is why the scan does
+        // work there and no second entry appears.
+        //
+        // No view-mode condition: reading view never offered this entry in the first place.
+        if(menu.sections.contains('image')) {return;}
         
         if (file instanceof TFile) {
             // Inspect the currently available menu items

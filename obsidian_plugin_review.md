@@ -86,7 +86,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C31](#c31) | 'Delete link and file' looked for the link at the caret | 1 | `fix` | medium | S | done |
 | [C32](#c32) | Embedded-image menu replaced Obsidian's own | 1 | `fix` | medium | M | done |
 | [C33](#c33) | ⌘⌥-click did not reveal in a popout; listener leak on unload | 2 | `fix` | medium | S | done |
-| [C34](#c34) | Two delete entries on an image — is ours redundant? | — | `investigate` | low | S | wontfix |
+| [C34](#c34) | Two delete entries on an image | 1 | `fix` | low | S | done |
 
 **Suggested order.** Mechanical first, so the noise drops fast and later diffs stay small:
 C16 → C05 → C08 → C07 → C04+C21 → C17 → C25 → C19 → C20 → C03 → C23 → C06.
@@ -1657,13 +1657,13 @@ both predate it. Design point #2 is not decoration.
 
 ```yaml
 id: C34
-status: wontfix       # todo | in-progress | done | wontfix | blocked
-outcome: keep the feature — Obsidian's own delete-and-unlink is image-only, so links and non-image embeds have no built-in equivalent; no code change
+status: done          # todo | in-progress | done | wontfix | blocked
+outcome: keep the feature (Obsidian's delete-and-unlink is image-only) but suppress our entry on the image menu, detected via menu.sections containing 'image' — cabc27f
 severity: low         # not from the scan: noticed while testing C32
-verdict: investigate
+verdict: fix
 risk: low
 size: S
-sites: 0
+sites: 1
 ```
 
 **Not a scanner finding, and closed with no code change** — recorded because the obvious "tidy up the
@@ -1687,17 +1687,39 @@ the link together. That is the case the plugin covers, and it is the useful half
 optional (two settings gate it) and can delete the file while *keeping* the link, which Obsidian's
 cannot.
 
-So the duplication is confined to images, where both entries do the same thing. Two options were
-considered and neither taken:
+So the duplication was confined to images, where both entries do the same thing — and **that** is
+what got fixed. Removing the feature outright was the first instinct, and the link case ruled it out.
 
-- narrowing `file_menu_cb` to skip images when Obsidian's own entry is present — its existing scan
-  for Obsidian's delete item (`promptForDeletion` / `promptForFileDeletion` in the callback source,
-  `main.ts:495`) does not match *Delete image*, so this would need new detection of a private
-  implementation detail;
-- removing the feature outright, which was the first instinct and is what the evidence ruled out.
+**How the image menu is recognised: `menu.sections`.** Measured with a dev build, since the code was
+guesswork otherwise:
+
+| right-click on | `source` | `sections` |
+| --- | --- | --- |
+| **image** | `link-context-menu` | **`title,image`** |
+| link (text) | `link-context-menu` | `title,correction,spellcheck,open,selection-link,…,danger` |
+| file explorer | `file-explorer-context-menu` | `title,open,action-primary,…,danger` |
+
+`source` is useless here — identical for image and link. `sections` is exact, and it is the same
+mechanism the pre-existing `menu.sections.contains('canvas')` guard uses. So:
+`if (menu.sections.contains('image')) { return; }`
+
+**Why not detect Obsidian's entry directly?** Because it is not there yet. Its callback *does* call
+`fileManager.promptForDeletion` — so the existing scan at `main.ts:495` would match it — but for an
+image Obsidian fires `file-menu` **before** adding its own items. From the **file explorer** it adds
+them first, which is why that scan does work there and the explorer never showed a second entry.
+Ordering, not faulty detection; do not "fix" the scan.
+
+**Why not match the title?** *"Delete image"* is localized — `menu.deleteImage` in Obsidian's string
+table, next to `resetSize: "Reset size"`. The existing comment refusing to match titles was right.
+
+**No view-mode condition.** A guard on `getMode() === 'source'` was written first, reasoning that
+Obsidian's version ends in a CodeMirror transaction and so could not exist in reading view. The
+author's answer: this entry never appeared in reading view anyway. Dead condition, removed.
 
 **Do not remove `file_menu_cb`/`delete_file_cb`** without re-checking the link case in the Obsidian
-of the day. If Obsidian ever offers delete-and-unlink for links too, this becomes the same story as
+of the day. What is left is precisely the non-duplicated part: plain links, non-image embeds
+(audio/video menus do not report an `image` section), and the option to delete the file while
+*keeping* the link. If Obsidian ever offers delete-and-unlink for links too, this becomes the same story as
 [C32](#c32) and the file-explorer patches: a feature that outlived its gap.
 
 **Unrelated, noticed in passing** — the author's vault has a stale `obsidian-import-attachments-plus`
