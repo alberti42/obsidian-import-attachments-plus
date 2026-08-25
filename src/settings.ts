@@ -17,6 +17,8 @@ import {
     YesNoTypes,
     isBoolean,
     isLinkType,
+    isImportActionType,
+    isYesNoTypes,
     isAttachmentFolderLocationType,
     AttachmentFolderLocationType,
     isHotkeysSettingTab,
@@ -84,15 +86,19 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                     dropdown.addOption(ImportActionType.COPY, 'Copy');
                     dropdown.setValue(this.plugin.settings.actionDroppedFilesOnImport)
                         .onChange(async (value: string) => {
-                            if (value in ImportActionType) {
-                                this.plugin.settings.actionDroppedFilesOnImport = value as ImportActionType;
-                                if (value !== ImportActionType.ASK_USER) {
-                                    this.plugin.settings.lastActionDroppedFilesOnImport = value as ImportActionType;
-                                }
-                                this.debouncedSaveSettings();
-                            } else {
+                            // `value in ImportActionType` used to stand here, which tests the
+                            // enum's *keys*; it worked only because every member is spelled
+                            // MOVE='MOVE'. The guard tests values and narrows, so the comparison
+                            // below shares the enum type and the four casts are gone.
+                            if (!isImportActionType(value)) {
                                 console.error('Invalid import action type:', value);
+                                return;
                             }
+                            this.plugin.settings.actionDroppedFilesOnImport = value;
+                            if (value !== ImportActionType.ASK_USER) {
+                                this.plugin.settings.lastActionDroppedFilesOnImport = value;
+                            }
+                            this.debouncedSaveSettings();
                         })
                 });
 
@@ -105,15 +111,19 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                     dropdown.addOption(ImportActionType.COPY, 'Copy');
                     dropdown.setValue(this.plugin.settings.actionPastedFilesOnImport)
                         .onChange(async (value: string) => {
-                            if (value in ImportActionType) {
-                                this.plugin.settings.actionPastedFilesOnImport = value as ImportActionType;
-                                if (value !== ImportActionType.ASK_USER) {
-                                    this.plugin.settings.lastActionPastedFilesOnImport = value as ImportActionType;
-                                }
-                                this.debouncedSaveSettings();
-                            } else {
+                            // `value in ImportActionType` used to stand here, which tests the
+                            // enum's *keys*; it worked only because every member is spelled
+                            // MOVE='MOVE'. The guard tests values and narrows, so the comparison
+                            // below shares the enum type and the four casts are gone.
+                            if (!isImportActionType(value)) {
                                 console.error('Invalid import action type:', value);
+                                return;
                             }
+                            this.plugin.settings.actionPastedFilesOnImport = value;
+                            if (value !== ImportActionType.ASK_USER) {
+                                this.plugin.settings.lastActionPastedFilesOnImport = value;
+                            }
+                            this.debouncedSaveSettings();
                         })
                 });
 
@@ -126,15 +136,15 @@ export class ImportAttachmentsSettingTab extends PluginSettingTab {
                     dropdown.addOption(YesNoTypes.NO, 'No');
                     dropdown.setValue(this.plugin.settings.embedFilesOnImport)
                         .onChange(async (value: string) => {
-                            if (Object.values(YesNoTypes).includes(value as YesNoTypes)) {
-                                this.plugin.settings.embedFilesOnImport = value as YesNoTypes;
-                                if (value !== YesNoTypes.ASK_USER) {
-                                    this.plugin.settings.lastEmbedFilesOnImport = value as YesNoTypes;
-                                }
-                                this.debouncedSaveSettings();
-                            } else {
+                            if (!isYesNoTypes(value)) {
                                 console.error('Invalid option selection:', value);
+                                return;
                             }
+                            this.plugin.settings.embedFilesOnImport = value;
+                            if (value !== YesNoTypes.ASK_USER) {
+                                this.plugin.settings.lastEmbedFilesOnImport = value;
+                            }
+                            this.debouncedSaveSettings();
                         })
                 });
 

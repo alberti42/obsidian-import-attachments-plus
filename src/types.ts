@@ -170,6 +170,19 @@ export function isLinkType(value: unknown): value is LinkType {
     return value === 'absolute' || value === 'relative' || value === 'shortest';
 }
 
+export function isImportActionType(value: unknown): value is ImportActionType {
+    return value === ImportActionType.MOVE ||
+           value === ImportActionType.COPY ||
+           value === ImportActionType.LINK ||
+           value === ImportActionType.ASK_USER;
+}
+
+export function isYesNoTypes(value: unknown): value is YesNoTypes {
+    return value === YesNoTypes.YES ||
+           value === YesNoTypes.NO ||
+           value === YesNoTypes.ASK_USER;
+}
+
 export function isAttachmentFolderLocationType(value: unknown): value is AttachmentFolderLocationType {
     return value === AttachmentFolderLocationType.ROOT || 
            value === AttachmentFolderLocationType.CURRENT || 

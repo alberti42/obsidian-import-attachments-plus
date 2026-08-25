@@ -61,7 +61,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C06](#c06) | `document.createElement` → `createEl` | 4 | `investigate` | low | S | done |
 | [C07](#c07) | Unnecessary type assertions | 3 | `fix` | low | S | done |
 | [C08](#c08) | `eslint-disable` without a reason | 3 | `fix` | low | S | done |
-| [C09](#c09) | Cross-enum comparison in settings | 3 | `fix-with-care` | medium | S | todo |
+| [C09](#c09) | Cross-enum comparison in settings | 3 | `fix-with-care` | medium | S | done |
 | [C10](#c10) | CommonJS `require` in `eslint.config.js` | 2 | `decision-needed` | low | S | todo |
 | [C11](#c11) | `async` handler where `void` is expected | 2 | `fix` | low | S | done |
 | [C12](#c12) | Top-level `path` import (mobile) | 2 | `investigate` | high | L | todo |
@@ -482,7 +482,7 @@ sites: 3
 ```yaml
 id: C09
 status: todo          # todo | in-progress | done | wontfix | blocked
-outcome:              # one line + commit SHA, filled in by the session that closes this
+outcome: narrowed with two new type guards, removing 12 casts; also fixed `value in ImportActionType`, which tested keys rather than values — [sha]
 severity: medium       # as reported by the scan
 verdict: fix-with-care
 risk: medium
@@ -507,6 +507,26 @@ sites: 3
 **Do this** — narrow at the boundary: type the handler parameter as the enum (`(value: ImportActionType) => …`) or convert explicitly (`value as ImportActionType`) once, at the top of the callback, rather than at each comparison.
 
 **Traps** — this gates real behaviour (whether the "ask the user" modal appears). Getting the narrowing wrong silently disables the prompt. `types.ts` already has type guards — prefer reusing one over a bare cast.
+
+**Done — and two of the three validations were wrong in a way the scan did not report.** Sites 75
+and 96 guarded with `value in ImportActionType`, which tests the enum's **keys**, not its values.
+It works only by coincidence: every member is spelled `MOVE='MOVE'`. Give any member a value that
+differs from its key and both dropdowns would silently stop saving — `console.error('Invalid import
+action type')` and no write — while the UI went on showing the new selection.
+
+Fixed as the concern suggested, by narrowing once at the boundary with a real guard rather than
+casting at each use. Two new guards in `types.ts`, `isImportActionType` and `isYesNoTypes`, written
+in the same shape as the existing `isAttachmentFolderLocationType`. After the guard, `value` *is*
+the enum, so the ASK_USER comparisons share its type and **all four `as` casts per handler are
+gone** (12 in total across the three handlers).
+
+**Left alone deliberately** — the fourth dropdown (`MultipleFilesImportTypes`, `settings.ts:150`)
+uses `Object.values(...).includes(value as ...)`. That is *correct*, unlike `in`, and it is not a
+C09 site: it has no ASK_USER comparison. It could take the same treatment for consistency, which
+is a one-line follow-up nobody has asked for.
+
+**Verify** — flip each of the three settings through every value and confirm ASK_USER still opens
+the modal and the others still skip it.
 
 **Verify** — flip each of the three settings through every value and confirm the ASK_USER path still opens a modal and the others still skip it.
 
