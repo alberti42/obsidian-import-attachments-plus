@@ -522,7 +522,9 @@ export default class ImportAttachments extends Plugin {
                 .setIcon('lucide-trash-2')
                 .setSection('danger')
                 .onClick((_:MouseEvent | KeyboardEvent)=> {
-                    this.delete_file_cb(file);
+                    this.delete_file_cb(file).catch((err: unknown) => {
+                        Utils.reportFailure('Could not delete the linked file', err);
+                    });
                 });
                 item.dom.classList.add('is-warning');
             });
@@ -984,7 +986,8 @@ export default class ImportAttachments extends Plugin {
                     evt.preventDefault();
 
                     const doToggleEmbedPreference = false; // Pretend shift was not pressed
-                    this.handleFiles(filesArray, editor, view, doToggleEmbedPreference, ImportOperationType.PASTE);
+                    this.handleFiles(filesArray, editor, view, doToggleEmbedPreference, ImportOperationType.PASTE)
+                        .catch((err: unknown) => { Utils.reportFailure('Could not import the pasted files', err); });
                 } else {
                     // TODO Process images from clipboard
                     //
@@ -1119,7 +1122,8 @@ export default class ImportAttachments extends Plugin {
             }
             
             // Handle the files as per your existing logic
-            this.handleFiles(files_array, editor, view, doForceAsking, ImportOperationType.DRAG_AND_DROP);
+            this.handleFiles(files_array, editor, view, doForceAsking, ImportOperationType.DRAG_AND_DROP)
+                .catch((err: unknown) => { Utils.reportFailure('Could not import the dropped files', err); });
         
         } else {
             console.error('No files dropped');
@@ -1187,7 +1191,8 @@ export default class ImportAttachments extends Plugin {
 			action: actionFilesOnImport,
 		};
 
-		this.moveFileToAttachmentsFolder(nonFolderFilesArray, editor, view, importSettings);
+		this.moveFileToAttachmentsFolder(nonFolderFilesArray, editor, view, importSettings)
+			.catch((err: unknown) => { Utils.reportFailure('Could not move the files to the attachment folder', err); });
 	}
 
 	// Function to move files to the attachments folder using fs.rename

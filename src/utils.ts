@@ -2,10 +2,25 @@
 import { promises as fs } from 'fs';  // This imports the promises API from fs
 import * as crypto from 'crypto';
 
-import { Vault, normalizePath, TAbstractFile, TFile, TFolder } from 'obsidian';
+import { Notice, Vault, normalizePath, TAbstractFile, TFile, TFolder } from 'obsidian';
 
 import { ParsedPath as ParsedFilePath, ParsedFolderPath } from 'types';
 import * as path from 'path';
+
+/**
+ * Report a background failure to the user.
+ *
+ * For promises nobody awaits. A rejection with no handler is invisible — no notice, no error,
+ * nothing in the console — which is exactly how a broken delete path looked like a no-op for
+ * several releases (see C27/C29 in obsidian_plugin_review.md). If a promise is discarded
+ * deliberately it should be `void`-ed; if its failure matters to the user, it should land here.
+ *
+ * `what` is phrased for a user, e.g. 'Could not import the pasted files'.
+ */
+export function reportFailure(what: string, err: unknown): void {
+	console.error(`Import Attachments+: ${what}:`, err);
+	new Notice(`${what}. See the developer console for details.`);
+}
 
 // Joins multiple path segments into a single normalized path.
 export function joinPaths(...paths: string[]): string {
