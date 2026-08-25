@@ -712,7 +712,7 @@ Same problem as **C12** — `utils.ts:3`. Cheapest of the three to resolve indep
 ```yaml
 id: C15
 status: todo          # todo | in-progress | done | wontfix | blocked
-outcome: resolved with getFirstLinkpathDest instead of bumping the floor — minAppVersion stays 1.5.0; revived a cross-check that had always returned null — [sha]
+outcome: resolved with getFirstLinkpathDest instead of bumping the floor — minAppVersion stays 1.5.0; revived a cross-check that had always returned null — e84f7a8
 severity: medium       # as reported by the scan
 verdict: decision-needed
 risk: medium
