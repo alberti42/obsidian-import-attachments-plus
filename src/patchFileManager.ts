@@ -14,7 +14,6 @@ const traceDelete = process.env.NODE_ENV === 'development'
 let originalPromptForDeletion: ((file: TAbstractFile) => Promise<boolean>) | null = null;
 let plugin:ImportAttachments;
 let fileManager: FileManager;
-let modalResolvePromise: ((wasDeleted: boolean) => void) | null;
 
 function unpatchFilemanager() {
 	if (originalPromptForDeletion) {
@@ -108,106 +107,98 @@ async function deleteAttachmentFolderAssociatedWithMdFile(plugin: ImportAttachme
 	}
 }
 
+/**
+ * Wait for the user's answer to Obsidian's own delete prompt.
+ *
+ * `promptForDeletion` resolves as soon as the modal is *open*, not when it is answered, so the
+ * answer has to be observed separately. It used to be read off the modal's buttons
+ * (`.modal-button-container .mod-warning` / `.mod-cancel`), and that broke: current Obsidian has
+ * no such buttons, the lookup threw *inside* the MutationObserver callback, and the promise was
+ * therefore never resolved. Obsidian still trashed the file, so the visible symptom was a file
+ * that disappeared while everything downstream — the attachment-folder cleanup here, the link
+ * removal in `delete_file_cb` — waited forever for an answer that never came. With
+ * `promptDelete` on, which is Obsidian's default, that is every deletion.
+ *
+ * So do not read the answer off private markup. The vault is the authority: if the file is gone,
+ * the user said yes. Cancellation is inferred from the modal disappearing without a deletion, and
+ * a timeout guarantees the promise settles either way — a pending promise here strands the caller.
+ */
+const DECISION_TIMEOUT_MS = 60_000;   // the user may sit on the prompt; this only stops a leak
+const NO_MODAL_TIMEOUT_MS = 2_000;    // no prompt: the delete either lands promptly or not at all
+const MODAL_GRACE_MS = 200;           // the modal closes before the trash completes
+
+function awaitDeletionDecision(file: TAbstractFile, expectModal: boolean): Promise<boolean> {
+    return new Promise<boolean>((resolve) => {
+        // Both documents, because a modal opened from a popout belongs to that window's document
+        // and not to the one this module closed over.
+        const docs = new Set<Document>([document, activeDocument]);
+        let settled = false;
+        let modalSeen = false;
+        let graceTimer: number | null = null;
+
+        const observers: MutationObserver[] = [];
+        const deleteRef = plugin.app.vault.on('delete', (deleted: TAbstractFile) => {
+            if (deleted.path === file.path) {
+                traceDelete('vault reported the deletion');
+                settle(true);
+            }
+        });
+
+        const overallTimer = window.setTimeout(() => {
+            traceDelete('no decision observed before the timeout; assuming cancelled');
+            settle(false);
+        }, expectModal ? DECISION_TIMEOUT_MS : NO_MODAL_TIMEOUT_MS);
+
+        function settle(decision: boolean) {
+            if (settled) {return;}
+            settled = true;
+            plugin.app.vault.offref(deleteRef);
+            observers.forEach(o => o.disconnect());
+            window.clearTimeout(overallTimer);
+            if (graceTimer !== null) {window.clearTimeout(graceTimer);}
+            resolve(decision);
+        }
+
+        if (!expectModal) {return;}
+
+        const modalPresent = () => [...docs].some(d => d.querySelector('.modal-container') !== null);
+
+        for (const d of docs) {
+            const observer = new MutationObserver(() => {
+                if (modalPresent()) {
+                    if (!modalSeen) {
+                        modalSeen = true;
+                        traceDelete('modal container detected');
+                    }
+                    return;
+                }
+                // The modal is gone. That is a cancellation unless a deletion is still in flight,
+                // so give the vault event a moment to arrive before concluding anything.
+                if (modalSeen && graceTimer === null) {
+                    graceTimer = window.setTimeout(() => { settle(false); }, MODAL_GRACE_MS);
+                }
+            });
+            observer.observe(d.body, { childList: true, subtree: false });
+            observers.push(observer);
+        }
+    });
+}
+
 async function callOriginalPromptForDeletion(this:FileManager, file:TAbstractFile):Promise<boolean> {
     if (!originalPromptForDeletion) {return false;}
 
-    // Create a new promise and store the resolve and reject functions
-    const registeredUserDecisionPromise = new Promise<boolean>((resolve, reject) => {
-        modalResolvePromise = resolve;
-    });
-
-    // Access the 'promptDelete' configuration setting
     const promptDelete = plugin.app.vault.getConfig('promptDelete');
     traceDelete('callOriginalPromptForDeletion', { file: file.path, promptDelete });
-    
-    if(promptDelete)
-    {
-        const config = {
-            childList: true,
-            subtree: false,
-        };
 
-        // Set up a MutationObserver to watch for the modal
-        new MutationObserver((mutations, observer) => {
-            for (const mutation of mutations) {
-                if (mutation.addedNodes.length > 0) {
-                    // Check if the added node is the modal. `instanceOf` rather than `instanceof`:
-                    // each window has its own HTMLElement constructor, so a plain instanceof is
-                    // false for a node belonging to a popout. Typing the callback as a guard also
-                    // retires an `as HTMLElement` cast that was lying about the undefined case.
-                    const modal = Array.from(mutation.addedNodes).find((node): node is HTMLElement =>
-                        node.instanceOf(HTMLElement) && node.classList.contains('modal-container')
-                    );
-                    if (modal) {
-                        traceDelete('modal container detected');
-                        // Add event listeners to buttons within the modal
-                        const deleteButton = modal.querySelector('.modal-button-container .mod-warning');
-                        const cancelButton = modal.querySelector('.modal-button-container .mod-cancel');
-
-                        if (!deleteButton) {
-                            throw new Error('Failed to correctly identify the "Delete" button.');
-                        }
-                        if (!cancelButton) {
-                            throw new Error('Failed to correctly identify the "Cancel" button.');
-                        }
-
-                        deleteButton.addEventListener('click', () => {
-                            if(modalResolvePromise) {
-                                // console.log("Delete button clicked");
-                                modalResolvePromise(true);
-                                modalResolvePromise = null;
-                            }
-                        });
-                    
-                        cancelButton.addEventListener('click', () => {
-                            if(modalResolvePromise) {
-                                // console.log("Cancel button clicked");
-                                modalResolvePromise(false);
-                                modalResolvePromise = null;
-                            }
-                        });
-
-                        // Watch for the modal being removed from the DOM (clicked outside or closed)
-                        const modalRemovedObserver = new MutationObserver((modalMutations:MutationRecord[], innerObserver:MutationObserver) => {
-                            for (const modalMutation of modalMutations) {
-                                if (Array.from(modalMutation.removedNodes).includes(modal)) {
-                                    innerObserver.disconnect();
-                                    if(modalResolvePromise) {
-                                        // console.log("Modal closed without action");
-                                        modalResolvePromise(false);
-                                        modalResolvePromise = null;
-                                    }
-                                    break;
-                                }
-                            }
-                        });
-
-                        if (modal.parentNode) {
-                            modalRemovedObserver.observe(modal.parentNode, config);
-                        }
-
-
-                        // Disconnect the creation observer once the modal is found
-                        observer.disconnect();
-                        break;
-                    }
-                }
-            }
-        }).observe(document.body, config);
-
-    } else {
-        if(modalResolvePromise) {
-            // console.log("Delete without prompt");
-            modalResolvePromise(true);
-            modalResolvePromise = null;
-        }
-    }
+    // Arm the watcher before opening the prompt: with promptDelete off the deletion lands
+    // immediately, and the vault event would otherwise be missed.
+    const decision = awaitDeletionDecision(file, !!promptDelete);
 
     await originalPromptForDeletion.call(this,file);
     traceDelete('original promptForDeletion returned, awaiting the user decision');
-    const decision = await registeredUserDecisionPromise;
-    traceDelete('user decision', decision);
-    return decision;
+    const wasDeleted = await decision;
+    traceDelete('user decision', wasDeleted);
+    return wasDeleted;
 }
 
 export async function callPromptForDeletion(file:TAbstractFile) {    

@@ -80,7 +80,8 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C25](#c25) | `workspace.activeLeaf` deprecated | 1 | `fix` | low | S | done |
 | [C26](#c26) | No release-asset attestations | — | `decision-needed` | low | M | todo |
 | [C27](#c27) | Delete-image menu item did nothing (found while testing C25) | 2 | `fix` | high | S | done |
-| [C28](#c28) | Delete prompt in a popout may never resolve (found while fixing C20) | 1 | `investigate` | medium | S | todo |
+| [C28](#c28) | Delete prompt in a popout may never resolve (found while fixing C20) | 1 | `investigate` | medium | S | done |
+| [C29](#c29) | Delete confirmation never resolved — deletion silently half-done | 1 | `fix` | **critical** | M | done |
 
 **Suggested order.** Mechanical first, so the noise drops fast and later diffs stay small:
 C16 → C05 → C08 → C07 → C04+C21 → C17 → C25 → C19 → C20 → C03 → C23 → C06.
@@ -1118,7 +1119,7 @@ subfolder attachment.
 ```yaml
 id: C28
 status: todo          # todo | in-progress | done | wontfix | blocked
-outcome:              # one line + commit SHA, filled in by the session that closes this
+outcome: real, and fixed by construction in C29 — both documents are observed now, and the yes-path no longer needs the modal at all; popout *cancel* still unverified — [sha]
 severity: unknown     # not from the scan: noticed while fixing C20
 verdict: investigate
 risk: medium
@@ -1143,7 +1144,14 @@ never settles: no error, no prompt, nothing. That is the same shape of silent fa
 open a note in a popout, delete an attachment there, and watch for
 `[delete attachment] modal container detected` in a dev build. If it never prints, this is real.
 
-**If real** — the observer must watch the document the modal is actually in. Candidates:
+**Confirmed real, and fixed in [C29](#c29)** — which had to rewrite this function anyway. The
+observer now watches `document` **and** `activeDocument`, and, more importantly, the answer no
+longer depends on seeing the modal: a confirmed deletion is recognised from the vault's own
+`delete` event, so the popout "yes" path cannot be missed regardless of which document the modal
+lives in. What remains unverified is *cancelling* a prompt in a popout, which would fall through to
+the 60 s timeout rather than settling immediately if the modal were somehow not observed.
+
+**Original note — the observer must watch the document the modal is actually in.** Candidates:
 `activeWindow.document.body`, or the `doc` of the leaf being acted on (`leaf.view.containerEl.doc`).
 Design point #2 already requires everything document-touching to go through
 `iterateOverAllDocuments`, which this does not.
@@ -1151,6 +1159,66 @@ Design point #2 already requires everything document-touching to go through
 **Traps** — this is the note/attachment deletion path. A wrong observer root does not merely fail to
 detect: it hangs the caller, and `modalResolvePromise` is a single module-level slot, so a stuck
 prompt can strand the next one too.
+
+---
+
+## C29 — Delete confirmation never resolved
+
+```yaml
+id: C29
+status: done          # todo | in-progress | done | wontfix | blocked
+outcome: replaced modal-button scraping with the vault's own delete event; verified in a vault, file and link both go — [sha]
+severity: critical    # not from the scan: found by manual test
+verdict: fix
+risk: high
+size: M
+sites: 1
+```
+
+**Not a scanner finding, and the most serious thing this review turned up.** Found while testing
+[C28](#c28), with Obsidian's *Confirm file deletion* turned on — which is its **default**.
+
+**Sites**
+
+| line | scanned | code |
+| --- | --- | --- |
+| `src/patchFileManager.ts:133` | — | `const deleteButton = modal.querySelector('.modal-button-container .mod-warning');` |
+
+**What happened** — `callOriginalPromptForDeletion` read the user's answer off the confirm modal's
+buttons. Current Obsidian has no `.modal-button-container .mod-warning`, so the lookup returned
+null and the code `throw`-ed — *inside the MutationObserver callback*, where nothing catches. The
+listeners were never attached, `modalResolvePromise` was never called, and the promise stayed
+pending forever. Obsidian's own prompt still trashed the file, so the visible result was:
+
+- the file disappeared,
+- and everything downstream of the answer was skipped: the link was never removed
+  (`removeWikilinkOnFileDeletion` looked broken), and in `patchFileManager` the whole
+  attachment-folder cleanup never ran — so **deleting a note never deleted its attachment folder**
+  for any user with the confirmation prompt on.
+
+Trace, on a first attempt with the prompt enabled:
+
+```
+[delete attachment] modal container detected
+Uncaught Error: Failed to correctly identify the "Delete" button.
+[delete attachment] original promptForDeletion returned, awaiting the user decision
+   … and then nothing at all
+```
+
+**Fix** — stop reading private markup. `promptForDeletion` resolves as soon as the modal opens, so
+the answer does still have to be observed, but the **vault is the authority**: a `vault.on('delete')`
+for that exact path means yes. Cancellation is inferred from the modal disappearing without a
+deletion (with a 200 ms grace, because the modal closes before the trash completes), and both
+`document` and `activeDocument` are watched. Every path now settles — 60 s with a prompt, 2 s
+without — because a pending promise here strands the caller, which is the whole bug.
+
+**Why it hid for so long** — three silent-failure mechanisms in a row, all of them on this one
+path: a throw inside an observer callback, a promise nobody times out, and a floated rejection at
+the caller ([C01](#c01)). Any one of the three would have surfaced it.
+
+**Verify** — with *Confirm file deletion* **on**: delete an attachment via the context menu (file
+and link both go), cancel the prompt (neither goes), and delete a note with a `${notename}` folder
+(the folder-cleanup prompt appears at all). The first is verified; see the outcome line.
 
 ---
 

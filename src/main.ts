@@ -655,7 +655,9 @@ export default class ImportAttachments extends Plugin {
                     // the user has chosen to remove the link once the file has been deleted
                     if(wasDeleted && this.settings.removeWikilinkOnFileDeletion) {
                         // Replace the range corresponding to the found link with empty string
+                        traceDelete('removing the link', { line: line.number - 1, startIdx, endIdx, before: editorView.getLine(line.number - 1) });
                         editorView.replaceRange('', { line: line.number - 1, ch: startIdx }, { line: line.number - 1, ch: endIdx });
+                        traceDelete('line after removal', editorView.getLine(line.number - 1));
                     }          
 
                     // Success              
@@ -707,7 +709,11 @@ export default class ImportAttachments extends Plugin {
             traceDelete('resolving embed', { src, sourcePath, resolved: resolved?.path ?? null });
             if(!resolved) {
                 // Do not fail silently: an unresolved embed used to make the menu item a no-op.
-                console.error(`Import Attachments+: no vault file matches the embedded link '${src}' in '${sourcePath}'.`);
+                // A dangling embed lands here — Obsidian still renders a broken <img> for one, so
+                // the menu item is offered for a file that is no longer in the vault.
+                const msg = `The embedded file '${src}' is not in the vault; nothing to delete.`;
+                console.error(`Import Attachments+: ${msg}`);
+                new Notice(msg);
             }
             return resolved;
         })();
