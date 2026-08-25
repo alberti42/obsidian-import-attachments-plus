@@ -239,7 +239,9 @@ export default class ImportAttachments extends Plugin {
         // Register documents
         this.registerDocuments();
 
-		console.log('Loaded plugin Import Attachments+');
+		if (process.env.NODE_ENV === 'development') {
+			console.log('Loaded plugin Import Attachments+');
+		}
 	}
 
     private iterateOverAllDocuments(fnc_cb:((doc:Document)=>void)) {

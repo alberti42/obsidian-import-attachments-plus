@@ -55,7 +55,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | --- | --- | --- | --- | --- | --- | --- |
 | [C01](#c01) | Floating promises | 22 | `fix-with-care` | medium | L | todo |
 | [C02](#c02) | Unbound method references (`this` scoping) | 17 | `false-positive-fix-anyway` | medium | M | todo |
-| [C03](#c03) | Console logging | 10 | `false-positive-document` | low | S | todo |
+| [C03](#c03) | Console logging | 10 | `false-positive-document` | low | S | done |
 | [C04](#c04) | `setTimeout` → `window.setTimeout` | 6 | `fix` | low | S | done |
 | [C05](#c05) | `await` on non-promises | 6 | `fix` | low | S | done |
 | [C06](#c06) | `document.createElement` → `createEl` | 4 | `investigate` | low | S | todo |
@@ -208,8 +208,8 @@ sites: 17
 
 ```yaml
 id: C03
-status: todo          # todo | in-progress | done | wontfix | blocked
-outcome:              # one line + commit SHA, filled in by the session that closes this
+status: done          # todo | in-progress | done | wontfix | blocked
+outcome: dev-gated the only unconditional log (verified absent from the production bundle); patchConsole.ts now says why its console references stay — [sha]
 severity: medium       # as reported by the scan
 verdict: false-positive-document
 risk: low

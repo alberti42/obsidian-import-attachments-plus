@@ -1,3 +1,6 @@
+// Dev-only console capture: the `console.*` references below are the feature, not
+// stray logging. Redirecting console output into settings.logs is the only way to
+// read logs on mobile, and monkeyPatchConsole() returns early on desktop.
 import { Platform } from 'obsidian';
 import ImportAttachments from 'main';
 
