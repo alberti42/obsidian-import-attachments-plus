@@ -209,7 +209,7 @@ sites: 17
 ```yaml
 id: C03
 status: done          # todo | in-progress | done | wontfix | blocked
-outcome: dev-gated the only unconditional log (verified absent from the production bundle); patchConsole.ts now says why its console references stay — [sha]
+outcome: dev-gated the only unconditional log (verified absent from the production bundle); patchConsole.ts now says why its console references stay — dea6fef
 severity: medium       # as reported by the scan
 verdict: false-positive-document
 risk: low
@@ -251,7 +251,7 @@ sites: 10
 ```yaml
 id: C04
 status: done          # todo | in-progress | done | wontfix | blocked
-outcome: all 6 modal setTimeout calls window-scoped, together with C21 — [sha]
+outcome: all 6 modal setTimeout calls window-scoped, together with C21 — 65c6161
 severity: medium       # as reported by the scan
 verdict: fix
 risk: low
@@ -287,7 +287,7 @@ sites: 6
 ```yaml
 id: C05
 status: done          # todo | in-progress | done | wontfix | blocked
-outcome: dropped the 6 no-op awaits (5 debouncedSaveSettings, 1 doesFileExist); enclosing async kept — [sha]
+outcome: dropped the 6 no-op awaits (5 debouncedSaveSettings, 1 doesFileExist); enclosing async kept — c3c682e
 severity: medium       # as reported by the scan
 verdict: fix
 risk: low
@@ -359,7 +359,7 @@ sites: 4
 ```yaml
 id: C07
 status: done          # todo | in-progress | done | wontfix | blocked
-outcome: two assertions were redundant and are gone; the modal one was NOT (querySelector returns Element) — now querySelector<HTMLElement> — [sha]
+outcome: two assertions were redundant and are gone; the modal one was NOT (querySelector returns Element) — now querySelector<HTMLElement> — cdb52b9
 severity: medium       # as reported by the scan
 verdict: fix
 risk: low
@@ -394,7 +394,7 @@ sites: 3
 ```yaml
 id: C08
 status: done          # todo | in-progress | done | wontfix | blocked
-outcome: appended `-- reason` to all three no-require-imports directives; lint still suppresses them — [sha]
+outcome: appended `-- reason` to all three no-require-imports directives; lint still suppresses them — 4ebfa6a
 severity: medium       # as reported by the scan
 verdict: fix
 risk: low
@@ -653,7 +653,7 @@ sites: 2
 ```yaml
 id: C16
 status: done          # todo | in-progress | done | wontfix | blocked
-outcome: dropped `| undefined` at both sites; type check clean, no behaviour change — [sha]
+outcome: dropped `| undefined` at both sites; type check clean, no behaviour change — b396655
 severity: medium       # as reported by the scan
 verdict: fix
 risk: low
@@ -748,7 +748,7 @@ sites: 1
 ```yaml
 id: C19
 status: done          # todo | in-progress | done | wontfix | blocked
-outcome: replaced with module.builtinModules and uninstalled; production bundle byte-identical — [sha]
+outcome: replaced with module.builtinModules and uninstalled; production bundle byte-identical — 0eff357
 severity: medium       # as reported by the scan
 verdict: fix
 risk: low
@@ -810,7 +810,7 @@ sites: 1
 ```yaml
 id: C21
 status: done          # todo | in-progress | done | wontfix | blocked
-outcome: settings.ts clearTimeout window-scoped, in the same commit as C04 — [sha]
+outcome: settings.ts clearTimeout window-scoped, in the same commit as C04 — 65c6161
 severity: medium       # as reported by the scan
 verdict: fix
 risk: low
@@ -868,7 +868,7 @@ sites: 1
 ```yaml
 id: C23
 status: done          # todo | in-progress | done | wontfix | blocked
-outcome: comment only — an eslint-disable naming the scanner rule is a hard error in ESLint 10 — [sha]
+outcome: comment only — an eslint-disable naming the scanner rule is a hard error in ESLint 10 — ba6ac7d
 severity: medium       # as reported by the scan
 verdict: false-positive-document
 risk: low
