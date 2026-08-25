@@ -70,7 +70,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C15](#c15) | API newer than `minAppVersion` | 2 | `decision-needed` | medium | S | done |
 | [C16](#c16) | Redundant `\| undefined` on optional params | 2 | `fix` | low | S | done |
 | [C17](#c17) | Inline `style.display` in settings | 2 | `fix` | low | S | done |
-| [C18](#c18) | `authorUrl` unreachable | 1 | `decision-needed` | low | S | todo |
+| [C18](#c18) | `authorUrl` unreachable | 1 | `decision-needed` | low | S | done |
 | [C19](#c19) | `builtin-modules` dependency | 1 | `fix` | low | S | done |
 | [C20](#c20) | `instanceof HTMLElement` across windows | 2 | `fix` | medium | S | done |
 | [C21](#c21) | `clearTimeout` → `window.clearTimeout` | 1 | `fix` | low | S | done |
@@ -841,7 +841,7 @@ sites: 2
 ```yaml
 id: C18
 status: todo          # todo | in-progress | done | wontfix | blocked
-outcome:              # one line + commit SHA, filled in by the session that closes this
+outcome: authorUrl -> https://github.com/alberti42 (200); the LinkedIn URL was correct but LinkedIn answers bots with 999, so no LinkedIn URL could clear the warning — a0517bc
 severity: medium       # as reported by the scan
 verdict: decision-needed
 risk: low
@@ -862,6 +862,22 @@ sites: 1
 **Assessment** — **scanner false positive, user's call.** `manifest.json:8` is `authorUrl` → your LinkedIn profile, which returns **HTTP 999** to non-browser clients (LinkedIn blocks bots). Verified: `curl` gets 999, a browser gets the page. `fundingUrl` returns 200 and is fine.
 
 **Options** — (a) leave it and accept the warning permanently; (b) point `authorUrl` at `https://github.com/alberti42` to clear it. Purely a preference — **ask the user, do not decide.**
+
+**Decided: (b), `authorUrl` points at `https://github.com/alberti42`.** The author's call after the
+trade-off was measured, since there is no third option: `manifest.json` has only `authorUrl` and
+`fundingUrl`, so the LinkedIn link cannot be kept alongside a bot-reachable one.
+
+Measured, rather than repeated from the report:
+
+| URL | plain `curl` | browser UA |
+| --- | --- | --- |
+| `linkedin.com/in/dr-andrea-alberti/` | **999** | 301 |
+| `github.com/alberti42` | **200** | — |
+| `buymeacoffee.com/alberti` (`fundingUrl`) | **200** | — |
+
+The LinkedIn URL was never wrong: LinkedIn sniffs the user agent and refuses non-browser clients,
+so *no* LinkedIn URL could ever have satisfied the scanner. That is why this needed a decision
+rather than a fix.
 
 ---
 
