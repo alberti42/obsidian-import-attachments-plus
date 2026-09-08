@@ -7,7 +7,7 @@ import { DeleteAttachmentFolderModal } from './ImportAttachmentsModal';
 
 // Dev-only tracing, matching main.ts: a production build keeps the calls but logs nothing.
 const traceDelete = process.env.NODE_ENV === 'development'
-	? (...args: unknown[]) => { console.log('[delete attachment]', ...args); }
+	? (...args: unknown[]) => { console.debug('[delete attachment]', ...args); }
 	: () => { /* no-op in production */ };
 
 // Save a reference to the original method for the monkey patch

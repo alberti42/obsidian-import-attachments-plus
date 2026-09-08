@@ -303,6 +303,32 @@ sites: 10
 
 **Do this** — remove or dev-gate `main.ts:242`; leave the rest and add a one-line comment at the top of `patchConsole.ts` saying the console references are the point, so the next reader (or scan) does not re-litigate it.
 
+**Update (2026-09-08): 13 → 7, because the rule sanctions `console.debug`.** Reading
+`eslint-plugin-obsidianmd`'s own config settles what the guideline actually asks for:
+
+```js
+"no-console": { options: [{ allow: ["warn", "error", "debug"] }] }
+```
+
+So *debug-level logging left in for development is allowed* — there is no Obsidian "dev flag" API,
+this is the mechanism. The six tracer and banner sites now use `console.debug`
+(`hideAttachmentFolders.ts`, `main.ts` ×3, `patchFileManager.ts`, `patchOpenFile.ts`) and are no
+longer reported.
+
+⚠️ **The cost, and it is real:** DevTools hides `debug` behind the **Verbose** level filter. The
+tracing that diagnosed C27/C29/C31/C33/C34 in one click each is invisible until that box is ticked.
+Recorded in CLAUDE.md next to the tracing note.
+
+**The remaining 7 are `patchConsole.ts`** and cannot move: the feature *is* `console.log = …`, so it
+must name the methods it patches. Could be reduced by patching in a loop over method names
+(`console[name]`), which would also shorten the file — but doing that *for the warning count* would
+be gaming the linter, so it is left alone.
+
+**And suppressing them is not an option either**, which retroactively gives [C23](#c23) a second
+reason: the scanner's config sets
+`eslint-comments/no-restricted-disable: ["error", "obsidianmd/*", "no-console", …]`, so an
+`eslint-disable` for these rules is itself an error.
+
 ---
 
 ## C04 — `setTimeout` → `window.setTimeout`
@@ -1823,9 +1849,10 @@ the output meaningful: `disableTypeChecked` (the recommended set otherwise fills
 `no-unsafe-*` from `require('electron')`), `no-undef: 'off'` (the rule does not know Node globals),
 and `reportUnusedDisableDirectives: 'off'` (that judgement belongs to the main config).
 
-**What the full local run leaves** (`obsidianmd.configs.recommended` over `src/`): 13
-`rule-custom-message` (the console sites, [C03](#c03)), 1 `no-tfile-tfolder-cast` ([C23](#c23)), and
-4 `ui/sentence-case` that the rule misfires on proper nouns — `'File'`, `'OK'`, `'Momentjs'` — and
+**What the full local run leaves** (`obsidianmd.configs.recommended` over `src/`): **12 warnings** —
+7 `rule-custom-message` (the `patchConsole.ts` sites; the other six moved to `console.debug`, which
+the rule allows — see [C03](#c03)), 1 `no-tfile-tfolder-cast` ([C23](#c23)), and 4
+`ui/sentence-case` that the rule misfires on proper nouns — `'File'`, `'OK'`, `'Momentjs'` — and
 which the website's own subset does not report.
 
 **Follow-up (2026-09-08): every `prefer-create-el` site is gone.** `main.ts` now uses

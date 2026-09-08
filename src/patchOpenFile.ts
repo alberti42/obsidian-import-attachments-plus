@@ -13,7 +13,7 @@ let originalOpenFile: ((this: WorkspaceLeaf, file: TFile, openState?: OpenViewSt
 
 // Dev-only tracing of the modifier state behind ⌘-click / ⌘⌥-click.
 const traceKeys = process.env.NODE_ENV === 'development'
-	? (...args: unknown[]) => { console.log('[open/reveal]', ...args); }
+	? (...args: unknown[]) => { console.debug('[open/reveal]', ...args); }
 	: () => { /* no-op in production */ };
 
 // Function references for event listeners

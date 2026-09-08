@@ -20,7 +20,7 @@ const HIDDEN_CLASS = 'import-plugin-hidden';
 // Dev-only tracing. `process.env.NODE_ENV` is substituted at build time, so these
 // calls are removed entirely from a production bundle.
 const trace = process.env.NODE_ENV === 'development'
-	? (...args: unknown[]) => { console.log('[hide attachment folders]', ...args); }
+	? (...args: unknown[]) => { console.debug('[hide attachment folders]', ...args); }
 	: () => { /* no-op in production */ };
 
 /**

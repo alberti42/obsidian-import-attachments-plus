@@ -64,7 +64,7 @@ class DeleteLinkError extends Error {}
 // production build keeps the call sites but logs nothing: the tracer collapses to a no-op.
 // (Measured — the argument strings are still present in dist/main.js after `npm run build`.)
 const traceDelete = process.env.NODE_ENV === 'development'
-    ? (...args: unknown[]) => { console.log('[delete attachment]', ...args); }
+    ? (...args: unknown[]) => { console.debug('[delete attachment]', ...args); }
     : () => { /* no-op in production */ };
 
 export default class ImportAttachments extends Plugin {
@@ -84,7 +84,7 @@ export default class ImportAttachments extends Plugin {
 
 		if (process.env.NODE_ENV === 'development') {
 			monkeyPatchConsole(this);
-			console.log('Import Attachments+: development mode including extra logging and debug features');
+			console.debug('Import Attachments+: development mode including extra logging and debug features');
 		}
 
 		this.settingsTab = new ImportAttachmentsSettingTab(this.app, this);
@@ -231,7 +231,7 @@ export default class ImportAttachments extends Plugin {
 	    this.addDeleteMenuForLinks(this.settings.showDeleteMenu);
 
 		if (process.env.NODE_ENV === 'development') {
-			console.log('Loaded plugin Import Attachments+');
+			console.debug('Loaded plugin Import Attachments+');
 		}
 	}
 
