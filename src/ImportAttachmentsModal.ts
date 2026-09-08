@@ -58,7 +58,7 @@ export class ImportActionTypeModal extends Modal {
 			input.checked = true;
 		}
 		
-		switchLabel.createEl('span', { cls: 'import-slider' });
+		switchLabel.createSpan({ cls: 'import-slider' });
 
 		// Label for option B (e.g., "Copy")
 		tr.createEl('td', { text: optionB, cls: 'import-option-B' });
@@ -631,8 +631,8 @@ export class StrayAttachmentsModal extends Modal {
 
 		this.previewEmptyEl = this.previewEl.createDiv({ cls: 'import-preview-empty' });
 		setIcon(this.previewEmptyEl.createDiv({ cls: 'import-preview-icon' }), 'file-question');
-		this.previewEmptyEl.createEl('div', { text: 'No preview', cls: 'import-preview-text' });
-		this.previewEmptyEl.createEl('div', {
+		this.previewEmptyEl.createDiv({ text: 'No preview', cls: 'import-preview-text' });
+		this.previewEmptyEl.createDiv({
 			text: 'Previews are shown for images, PDFs, audio and video.',
 			cls: 'import-preview-formats'
 		});
