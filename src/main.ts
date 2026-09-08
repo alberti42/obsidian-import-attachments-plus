@@ -828,15 +828,16 @@ export default class ImportAttachments extends Plugin {
             return;
         }
 
-        // Deliberately not Obsidian's createEl(): this input is never attached to a document,
-        // so the helper's conveniences (cls/text/parent) buy nothing, and it would pin the
-        // element to the main window. `activeDocument` is the document of the window the user
-        // is actually in, which is where the file dialog should belong — the same cross-window
-        // concern as C20. The scan asked for createEl here; this keeps the warning and the
-        // correctness instead of the reverse.
-        const input = activeDocument.createElement('input');
-        input.type = 'file';
-        input.multiple = true; // Allow selection of multiple files
+        // Never added to the document — it exists only to open the file picker via click() — so
+        // the global createEl() builds it detached. Same approach as obsidian-plugins-annotations.
+        //
+        // Note createEl() always creates in the *main* window's document (`window.createEl` calls
+        // document.createElement, and Node.prototype.createEl delegates to it), so this is not
+        // owned by a popout the user may be working in. That was measured, and accepted: the input
+        // is transient and detached, and nothing has shown the owning document affects where the
+        // OS dialog appears. If a popout ever puts the dialog on the wrong window, the fix is
+        // activeDocument.createElement('input') — and then we would know it matters.
+        const input = createEl('input', { type: 'file', attr: { multiple: true } });
 
         input.onchange = async (e: Event) => {
             const target = e.target as HTMLInputElement;

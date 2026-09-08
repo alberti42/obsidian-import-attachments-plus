@@ -384,7 +384,7 @@ sites: 6
 ```yaml
 id: C06
 status: done          # todo | in-progress | done | wontfix | blocked
-outcome: one real site; used activeDocument.createElement rather than createEl, and recorded why; other 3 sites are false positives — 901c5e8
+outcome: first activeDocument.createElement (keeping the warning); reversed 2026-09-08 to createEl() for consistency with obsidian-plugins-annotations, since the cross-window benefit was never demonstrated — 2c25e38
 severity: medium       # as reported by the scan
 verdict: investigate
 risk: low
@@ -412,8 +412,22 @@ three flagged lines already use `el.createEl(...)`. False positives.
 
 **Do this** — `main.ts:914` is a hidden `<input type=file>` used to open a native picker. It is never attached to a document, so `createEl` buys nothing except rule compliance; converting it is still fine (`createEl('input', { attr: { type: 'file' } })`). Low value either way — decide and record which.
 
-**Decided: neither option the scan offered — `activeDocument.createElement('input')`.** The reasoning,
-since the worklist asked for it to be recorded:
+**Reversed on 2026-09-08 — now `createEl('input', { type: 'file', attr: { multiple: true } })`,
+which is what the scan asked for.** The author uses exactly that in
+`obsidian-plugins-annotations` (`src/settings_tab.ts`, with the same "never attached, only for
+`click()`" comment), and consistency between the two plugins plus one fewer warning beat an
+advantage that was never demonstrated. The original reasoning is kept below because the *facts* in
+it still hold — only the conclusion changed.
+
+**Measured while reversing it:** `window.createEl` really does pin to the main window —
+`window.createEl = function(t,e,n){ var r = document.createElement(t); … }` in `obsidian.asar`, and
+`Node.prototype.createEl` sets `parent = this` and delegates to that same global. So the element is
+created in the main document even when called on a node inside a popout. What was never shown is
+that this *matters* for a detached input whose only purpose is `click()`. If a popout ever puts the
+file dialog on the wrong window, the fix is one line — `activeDocument.createElement('input')` — and
+by then it would be a measurement rather than a guess.
+
+**The original reasoning (facts still valid, conclusion superseded):**
 
 - The element is never attached, so `createEl`'s conveniences (cls/text/parent) are dead weight here.
 - `createEl` is a *global* helper and creates in the **main window's** document. So does the
@@ -1747,7 +1761,7 @@ sites: 4
 | count | finding | verdict |
 | --- | --- | --- |
 | 13 | console logging | deliberate — [C03](#c03) |
-| 4 | `prefer-create-el` | 3 false positives + 1 deliberate — [C06](#c06) |
+| 4 | `prefer-create-el` | 3 false positives + 1 real, **since fixed** — [C06](#c06) |
 | 4 | unnecessary type assertion | **this session's own debt — fixed here** |
 | 4 | Node builtin imports | not clearable with `require()`; see below — [C12](#c12)/[C13](#c13)/[C14](#c14) |
 | 1 | cast to `TFile` | deliberate — [C23](#c23) |
@@ -1772,6 +1786,12 @@ guard, and only a dynamic `import()` would satisfy it. That would make `hashFile
 `getFileInVault`, `makePosixPathOScompatible` and every caller `async` for the sake of a lint rule,
 against a mobile behaviour that is now verified: nothing Node-related is touched at load
 (brace-depth analysis, re-checked here), and every use sits on a desktop-only path. Not worth it.
+
+**Follow-up (2026-09-08): the one real `prefer-create-el` site is gone.** `main.ts` now uses
+`createEl('input', { type: 'file', attr: { multiple: true } })`, reversing [C06](#c06)'s decision —
+see that entry. `grep -rn createElement src/` matches only comments. That should take the scan to
+**26**, of which 3 remain in the `prefer-create-el` group and are false positives: the modal file
+has no `createElement` call at all.
 
 **Also worth noting**, since the count went 10 → 13: three of the console sites are new, from this
 session's dev tracers (`main.ts:67`, `patchFileManager.ts:10`, `patchOpenFile.ts:16`). They are the
