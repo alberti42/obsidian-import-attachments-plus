@@ -17,17 +17,17 @@ import { ParsedPath as ParsedFilePath, ParsedFolderPath } from 'types';
  */
 export function nodeFs(): typeof import('fs').promises {
 	// eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy on purpose; see above
-	return (require('fs') as typeof import('fs')).promises;
+	return require('fs').promises;
 }
 
 function nodePath(): typeof import('path') {
 	// eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy on purpose; see above
-	return require('path') as typeof import('path');
+	return require('path');
 }
 
 function nodeCrypto(): typeof import('crypto') {
 	// eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy on purpose; see above
-	return require('crypto') as typeof import('crypto');
+	return require('crypto');
 }
 
 /**
@@ -319,4 +319,3 @@ function uuidv4(): string {
 }
 
 export { uuidv4, formatDateTime };
-

@@ -102,7 +102,7 @@ export default class ImportAttachments extends Plugin {
 			}
 			// Normalize to POSIX-style path
 			// eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy so the plugin does not need `path` merely to load; see utils.ts
-			const { sep, posix } = require('path') as typeof import('path');
+			const { sep, posix } = require('path');
 			this.vaultPath = adapter.getBasePath().split(sep).join(posix.sep);
 		} else {
 			this.vaultPath = '';

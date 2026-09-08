@@ -10,7 +10,7 @@ Working file for a Claude Code session. **One concern per session**: pick the lo
 | Source | <https://community.obsidian.md/plugins/import-attachments-plus> |
 | Scanned commit | `29d7192` — *chore: release 1.6.2* |
 | Site badge | 96 warnings (95 recoverable + 3 info + 1 pass; one warning row is not rendered in the page payload) |
-| Report pulled | 2026-08-25 |
+| Report pulled | 2026-08-25; **re-scanned after the review: 96 → 27 warnings** (see [C35](#c35)) |
 | Line numbers | **remapped to `HEAD` (`b624c5e`) and verified** — every line below was confirmed to still hold the quoted code |
 
 `src/main.ts` shifted by ~89 lines between the scanned commit and `HEAD` (the `attachmentFolder.ts`
@@ -87,6 +87,7 @@ curl -H 'RSC: 1' https://community.obsidian.md/plugins/import-attachments-plus
 | [C32](#c32) | Embedded-image menu replaced Obsidian's own | 1 | `fix` | medium | M | done |
 | [C33](#c33) | ⌘⌥-click did not reveal in a popout; listener leak on unload | 2 | `fix` | medium | S | done |
 | [C34](#c34) | Two delete entries on an image | 1 | `fix` | low | S | done |
+| [C35](#c35) | Second scan pass: 96 → 27 warnings | 4 | `fix` | low | S | done |
 
 **Suggested order.** Mechanical first, so the noise drops fast and later diffs stay small:
 C16 → C05 → C08 → C07 → C04+C21 → C17 → C25 → C19 → C20 → C03 → C23 → C06.
@@ -1725,6 +1726,58 @@ of the day. What is left is precisely the non-duplicated part: plain links, non-
 **Unrelated, noticed in passing** — the author's vault has a stale `obsidian-import-attachments-plus`
 entry in `.obsidian/community-plugins.json` with no matching directory. Harmless; only one copy
 (`import-attachments-plus`) actually loads.
+
+---
+
+## C35 — Second scan pass
+
+```yaml
+id: C35
+status: done          # todo | in-progress | done | wontfix | blocked
+outcome: 96 -> 27 warnings; removed the 4 redundant casts this session had introduced, and recorded why the remaining 23 stay — 8bc284d
+severity: low
+verdict: fix
+risk: low
+size: S
+sites: 4
+```
+
+**A re-scan after the review**, reported by the author: **96 warnings → 27**. What is left, and why:
+
+| count | finding | verdict |
+| --- | --- | --- |
+| 13 | console logging | deliberate — [C03](#c03) |
+| 4 | `prefer-create-el` | 3 false positives + 1 deliberate — [C06](#c06) |
+| 4 | unnecessary type assertion | **this session's own debt — fixed here** |
+| 4 | Node builtin imports | not clearable with `require()`; see below — [C12](#c12)/[C13](#c13)/[C14](#c14) |
+| 1 | cast to `TFile` | deliberate — [C23](#c23) |
+| 1 | "Direct filesystem access" | a capability notice, not a defect: the plugin's purpose is importing files from outside the vault |
+
+**Fixed: the four assertions were mine.** `utils.ts:20/25/30` and `main.ts:105` were
+`require('fs') as typeof import('fs')` and friends, added by the lazy-require work. Under the
+scanner's configuration `require('fs')` is already typed, so the assertion changes nothing.
+
+Removing them does **not** weaken the call sites: each accessor declares its return type
+(`nodeFs(): typeof import('fs').promises`), which is what every caller sees. Proved rather than
+assumed — a probe calling `nodeFs().bogusMethod()` still fails with *Property 'bogusMethod' does not
+exist on type 'typeof import("node:fs/promises")'*. The `any` is confined to three one-line returns.
+
+The rebuilt bundle is **byte-identical to the published 1.6.5 `main.js`** (65744 bytes, `cmp`), since
+assertions are erased at compile time. So this is lint-only and carries no runtime risk.
+
+**Declined: the four Node-builtin warnings.** The rule asks for "a dynamic `import()` or `require()`
+guarded by `Platform.isDesktop`". The requires *are* lazy, and `main.ts:105` sits literally inside
+`if (Platform.isDesktopApp) { … }` — and is still flagged. So the rule does not credit an enclosing
+guard, and only a dynamic `import()` would satisfy it. That would make `hashFile`,
+`getFileInVault`, `makePosixPathOScompatible` and every caller `async` for the sake of a lint rule,
+against a mobile behaviour that is now verified: nothing Node-related is touched at load
+(brace-depth analysis, re-checked here), and every use sits on a desktop-only path. Not worth it.
+
+**Also worth noting**, since the count went 10 → 13: three of the console sites are new, from this
+session's dev tracers (`main.ts:67`, `patchFileManager.ts:10`, `patchOpenFile.ts:16`). They are the
+[C03](#c03) pattern — `process.env.NODE_ENV === 'development'`, no output in a production build —
+and they are what made [C29](#c29), [C31](#c31), [C33](#c33) and [C34](#c34) diagnosable in one
+click each. Kept deliberately.
 
 ---
 
