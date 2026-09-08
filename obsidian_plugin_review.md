@@ -1761,9 +1761,9 @@ sites: 4
 | count | finding | verdict |
 | --- | --- | --- |
 | 13 | console logging | deliberate — [C03](#c03) |
-| 4 | `prefer-create-el` | 3 false positives + 1 real, **since fixed** — [C06](#c06) |
+| 4 | `prefer-create-el` | **all 4 real, all fixed** — I called 3 of them false positives twice; see below |
 | 4 | unnecessary type assertion | **this session's own debt — fixed here** |
-| 4 | Node builtin imports | not clearable with `require()`; see below — [C12](#c12)/[C13](#c13)/[C14](#c14) |
+| 4 | Node builtin imports | **clearable after all, and cleared** — see below — [C12](#c12)/[C13](#c13)/[C14](#c14) |
 | 1 | cast to `TFile` | deliberate — [C23](#c23) |
 | 1 | "Direct filesystem access" | a capability notice, not a defect: the plugin's purpose is importing files from outside the vault |
 
@@ -1779,19 +1779,52 @@ exist on type 'typeof import("node:fs/promises")'*. The `any` is confined to thr
 The rebuilt bundle is **byte-identical to the published 1.6.5 `main.js`** (65744 bytes, `cmp`), since
 assertions are erased at compile time. So this is lint-only and carries no runtime risk.
 
-**Declined: the four Node-builtin warnings.** The rule asks for "a dynamic `import()` or `require()`
-guarded by `Platform.isDesktop`". The requires *are* lazy, and `main.ts:105` sits literally inside
-`if (Platform.isDesktopApp) { … }` — and is still flagged. So the rule does not credit an enclosing
-guard, and only a dynamic `import()` would satisfy it. That would make `hashFile`,
-`getFileInVault`, `makePosixPathOScompatible` and every caller `async` for the sake of a lint rule,
-against a mobile behaviour that is now verified: nothing Node-related is touched at load
-(brace-depth analysis, re-checked here), and every use sits on a desktop-only path. Not worth it.
+**The scan's rules can be run locally, and that changed two conclusions.** They are the npm package
+**`eslint-plugin-obsidianmd`** (0.4.2 at the time of writing) — the same rules the website runs.
+Reading `dist/lib/rules/noNodejsModules.js` answers what no amount of reasoning from the outside
+could:
 
-**Follow-up (2026-09-08): the one real `prefer-create-el` site is gone.** `main.ts` now uses
+```js
+function isPlatformIsDesktop(expr) {   // matches the property name literally
+    … expr.property.name === "isDesktop"
+}
+// accepted shapes: inside `if (Platform.isDesktop)`, `Platform.isDesktop && …`,
+// `Platform.isDesktop ? … : …`, or a function whose body opens with
+// `if (!Platform.isDesktop) { throw|return }`
+```
+
+**So I was wrong twice, and both are now fixed:**
+
+1. **The Node-builtin warnings were clearable.** I had concluded the rule "does not credit an
+   enclosing guard", because `main.ts` sat inside `if (Platform.isDesktopApp)` and was flagged
+   anyway. The real reason is that the rule matches **`isDesktop`**, not `isDesktopApp`. The
+   author's suggestion — put the guard inside the accessor — is exactly one of the accepted shapes.
+   All three accessors now open with `if (!Platform.isDesktop) { throw … }`, `main.ts` reaches Node
+   only through `Utils.nodePath()`, and the rule reports **0** where it reported 4. It costs a
+   boolean read against a `require()` cache lookup and then real file I/O: nothing.
+2. **The three `prefer-create-el` hits in the modal were not false positives.** I dismissed them
+   twice on the grounds that the file already uses `createEl` — but the rule wants the *specific*
+   helper, and says so once run: *"Use `switchLabel.createSpan({ cls: … })` instead of
+   `switchLabel.createEl('span', { cls: … })`"*. Now `createSpan`/`createDiv`; that rule reports
+   **0** too.
+
+**One behavioural note on the guards.** `Platform.isDesktop` is "the UI is in desktop mode" and
+`isDesktopApp` is "the electron-based desktop app" — the same everywhere except under
+`emulateMobile`, which reloads with `isDesktop` false while `isDesktopApp` stays true. Under
+emulation the accessors refuse, which is arguably what emulating mobile should do; but the feature
+gates still use `isDesktopApp`, so they call and get the throw rather than degrade. Feature gating
+stays on `isDesktopApp`; only Node availability keys on `isDesktop`.
+
+**What the full local run leaves** (`obsidianmd.configs.recommended` over `src/`): 13
+`rule-custom-message` (the console sites, [C03](#c03)), 1 `no-tfile-tfolder-cast` ([C23](#c23)), and
+4 `ui/sentence-case` that the rule misfires on proper nouns — `'File'`, `'OK'`, `'Momentjs'` — and
+which the website's own subset does not report.
+
+**Follow-up (2026-09-08): every `prefer-create-el` site is gone.** `main.ts` now uses
 `createEl('input', { type: 'file', attr: { multiple: true } })`, reversing [C06](#c06)'s decision —
-see that entry. `grep -rn createElement src/` matches only comments. That should take the scan to
-**26**, of which 3 remain in the `prefer-create-el` group and are false positives: the modal file
-has no `createElement` call at all.
+see that entry. `grep -rn createElement src/` matches only comments, and the three modal
+sites became `createSpan`/`createDiv`. With the Node-builtin guards as well, the scan should drop
+from 27 to **14**: the 13 console sites and the one `TFile` cast, both deliberate.
 
 **Also worth noting**, since the count went 10 → 13: three of the console sites are new, from this
 session's dev tracers (`main.ts:67`, `patchFileManager.ts:10`, `patchOpenFile.ts:16`). They are the
