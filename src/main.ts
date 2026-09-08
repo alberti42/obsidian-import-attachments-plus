@@ -100,9 +100,9 @@ export default class ImportAttachments extends Plugin {
 			if (!(adapter instanceof FileSystemAdapter)) {
 				throw new Error('The vault folder could not be determined.');
 			}
-			// Normalize to POSIX-style path
-			// eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy so the plugin does not need `path` merely to load; see utils.ts
-			const { sep, posix } = require('path');
+			// Normalize to POSIX-style path. Through the accessor rather than a require() here, so
+			// there is one guarded place where Node modules are reached for.
+			const { sep, posix } = Utils.nodePath();
 			this.vaultPath = adapter.getBasePath().split(sep).join(posix.sep);
 		} else {
 			this.vaultPath = '';

@@ -1,6 +1,6 @@
 // utils.ts
 
-import { Notice, Vault, normalizePath, TAbstractFile, TFile, TFolder } from 'obsidian';
+import { Notice, Platform, Vault, normalizePath, TAbstractFile, TFile, TFolder } from 'obsidian';
 
 import { ParsedPath as ParsedFilePath, ParsedFolderPath } from 'types';
 
@@ -14,18 +14,37 @@ import { ParsedPath as ParsedFilePath, ParsedFolderPath } from 'types';
  *
  * Note `uuidv4()` below does **not** use Node's crypto: `crypto.randomUUID()` is a web global, so
  * that one works on every platform.
+ *
+ * Each one opens with `if (!Platform.isDesktop) { throw }`. Two reasons, and the second is the
+ * reason it is `isDesktop` and not `isDesktopApp`:
+ *
+ *  - a thrown message beats the `TypeError: Cannot read properties of undefined` that calling
+ *    these on mobile used to produce;
+ *  - the community scanner's `no-nodejs-modules` rule only accepts a `require()` of a builtin when
+ *    it is unreachable unless `Platform.isDesktop` holds — it matches that property name
+ *    literally, which is why an enclosing `if (Platform.isDesktopApp)` never satisfied it.
+ *
+ * The two differ in exactly one place: `emulateMobile` (Obsidian's dev command) reloads with
+ * `isDesktop === false` while `isDesktopApp` stays true. Under mobile emulation these accessors
+ * therefore refuse, which is arguably the point of emulating mobile — but note the plugin's own
+ * feature gates still use `isDesktopApp`, so they will call and get the throw rather than degrade.
+ * Feature gating stays on `isDesktopApp`; only Node availability keys on `isDesktop`.
  */
+const NO_NODE = 'Import Attachments+: Node.js APIs are not available here (mobile, or mobile emulation)';
 export function nodeFs(): typeof import('fs').promises {
+	if (!Platform.isDesktop) { throw new Error(`${NO_NODE}: fs`); }
 	// eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy on purpose; see above
 	return require('fs').promises;
 }
 
-function nodePath(): typeof import('path') {
+export function nodePath(): typeof import('path') {
+	if (!Platform.isDesktop) { throw new Error(`${NO_NODE}: path`); }
 	// eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy on purpose; see above
 	return require('path');
 }
 
 function nodeCrypto(): typeof import('crypto') {
+	if (!Platform.isDesktop) { throw new Error(`${NO_NODE}: crypto`); }
 	// eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy on purpose; see above
 	return require('crypto');
 }
