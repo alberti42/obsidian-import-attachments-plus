@@ -1815,6 +1815,14 @@ emulation the accessors refuse, which is arguably what emulating mobile should d
 gates still use `isDesktopApp`, so they call and get the throw rather than degrade. Feature gating
 stays on `isDesktopApp`; only Node availability keys on `isDesktop`.
 
+**Now a script: `npm run lint:obsidian`.** `eslint-plugin-obsidianmd` is a devDependency and
+`eslint.obsidian.config.mjs` runs its recommended set over `src/`, with the deliberate findings
+downgraded to warnings so the script exits 0 today and fails only on something new. Kept separate
+from `npm run lint`, which must stay clean. Three settings in that config were each needed to make
+the output meaningful: `disableTypeChecked` (the recommended set otherwise fills the report with
+`no-unsafe-*` from `require('electron')`), `no-undef: 'off'` (the rule does not know Node globals),
+and `reportUnusedDisableDirectives: 'off'` (that judgement belongs to the main config).
+
 **What the full local run leaves** (`obsidianmd.configs.recommended` over `src/`): 13
 `rule-custom-message` (the console sites, [C03](#c03)), 1 `no-tfile-tfolder-cast` ([C23](#c23)), and
 4 `ui/sentence-case` that the rule misfires on proper nouns — `'File'`, `'OK'`, `'Momentjs'` — and
