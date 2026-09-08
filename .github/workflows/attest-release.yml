@@ -13,6 +13,14 @@ name: Attest release assets
 on:
   release:
     types: [published]
+  # Manual trigger, so the gate can be exercised without cutting a release — for instance after
+  # bumping the action versions. Re-attesting an already-signed release is harmless: it records a
+  # second attestation over the same digests.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to verify and attest (e.g. 1.6.6)
+        required: true
 
 # No write access to the repository: this job reads, verifies and attests.
 permissions:
@@ -24,17 +32,17 @@ jobs:
   attest:
     runs-on: ubuntu-latest
     env:
-      TAG: ${{ github.event.release.tag_name }}
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
       GH_TOKEN: ${{ github.token }}
 
     steps:
       - name: Check out the released tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ env.TAG }}
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -85,7 +93,7 @@ jobs:
           done
           exit $status
 
-      - uses: actions/attest-build-provenance@v2
+      - uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
             dist/main.js
